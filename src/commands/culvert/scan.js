@@ -24,9 +24,8 @@ module.exports = {
             { apply: 'brighten', params: [20] }
           ])
           .contrast(1)
-          .greyscale()
-          .invert()
-          .resize(1000, Jimp.AUTO)
+          .grayscale()
+          .scale(5)
           .write("processedImage.jpg");
   })
 
