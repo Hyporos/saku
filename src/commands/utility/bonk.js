@@ -1,5 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
-const { EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,7 +9,7 @@ module.exports = {
       .setColor(0xffc3c5)
       .setDescription("Bonking...");
 
-    const sent = await interaction.reply({
+    const message = await interaction.reply({
       embeds: [beforeEmbed],
       fetchReply: true,
     });
@@ -23,9 +22,9 @@ module.exports = {
           "https://cdn.discordapp.com/emojis/1058627632641609748.webp?size=44&quality=lossless",
       })
       .setDescription(
-        `Latency⠀⎯⠀**${
-          sent.createdTimestamp - interaction.createdTimestamp
-        }ms**\nAPI⠀⎯⠀**${client.ws.ping}ms**`
+        `**Latency** ⎯ ${
+          message.createdTimestamp - interaction.createdTimestamp
+        }ms\n**API** ⎯ ${client.ws.ping}ms`
       );
 
     interaction.editReply({ embeds: [afterEmbed] });
