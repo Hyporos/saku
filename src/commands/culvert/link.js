@@ -14,6 +14,7 @@ module.exports = {
   async execute(client, interaction) {
     const characterName = interaction.options.getString("character");
     const discordId = interaction.user.id;
+
     await schema.findOneAndUpdate(
       {
         _id: discordId,
@@ -28,7 +29,7 @@ module.exports = {
     );
 
     interaction.reply({
-      content: `Successfully linked ${characterName} to ${interaction.user} (ID: ${discordId})`,
+      content: `Successfully linked \u0060${characterName}\u0060 to ${interaction.user} (ID: ${discordId})`,
     });
   },
 };
