@@ -7,38 +7,46 @@ const culvertSchema = new Schema(
       type: String,
       required: true,
     },
-    characters: [{
-      _id: {
-        type: String,
-        required: true,
-      },
-      name: {
-        type: String,
-        required: true,
-      },
-      class: {
-        type: String,
-        required: true,
-      },
-      level: {
-        type: String,
-        required: true,
-      },
-      rank: {
-        type: String,
-        required: true,
-      },
-      scores: [{
-        date: {
+    characters: [
+      {
+        _id: {
           type: String,
           required: true,
         },
-        score: {
+        name: {
           type: String,
           required: true,
-        }
-      }]
-    }],
+        },
+        class: {
+          type: String,
+          required: true,
+        },
+        level: {
+          type: String,
+          required: true,
+        },
+        rank: {
+          type: String,
+          required: true,
+        },
+        scores: [
+          {
+            _id: {
+              type: String,
+              required: true,
+            },
+            date: {
+              type: Date,
+              required: true,
+            },
+            score: {
+              type: String,
+              required: true,
+            },
+          },
+        ],
+      },
+    ],
   },
   { versionKey: false }
 );

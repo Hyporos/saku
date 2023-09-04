@@ -16,32 +16,16 @@ module.exports = {
 
     const user = await culvertSchema.findById(discordId, "characters").exec();
 
-    const one = new ButtonBuilder()
-      .setCustomId("1")
-      .setLabel("1")
-      .setStyle(ButtonStyle.Primary);
+    const characterButtons = [];
 
-    const two = new ButtonBuilder()
-      .setCustomId("2")
-      .setLabel("2")
-      .setStyle(ButtonStyle.Secondary);
+    user.characters.forEach((character,index) => {
+      characterButtons.push(new ButtonBuilder()
+      .setCustomId(String(index))
+      .setLabel(character.name)
+      .setStyle(ButtonStyle.Secondary))
+    })
 
-      const three = new ButtonBuilder()
-      .setCustomId("3")
-      .setLabel("3")
-      .setStyle(ButtonStyle.Secondary);
-
-      const four = new ButtonBuilder()
-      .setCustomId("4")
-      .setLabel("4")
-      .setStyle(ButtonStyle.Secondary);
-
-      const five = new ButtonBuilder()
-      .setCustomId("5")
-      .setLabel("5")
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder().addComponents(one, two, three, four, five);
+    const row = new ActionRowBuilder().addComponents(characterButtons[0], characterButtons[1]);
 
     try {
       const success = new EmbedBuilder()
@@ -68,6 +52,7 @@ module.exports = {
           { name: "Participation", value: "14/20 (70%)", inline: true }
         );
       interaction.reply({ embeds: [success], components: [row] });
+      console.log(characterButtons)
     } catch (error) {
       interaction.reply({
         content: `${error}`,
