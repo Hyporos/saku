@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("scan")
-    .setDescription("Check Saku's response time")
+    .setDescription("Store user culvert information from an image")
     .addAttachmentOption((option) =>
       option.setName("attach").setDescription("Image").setRequired(true)
     ),
@@ -20,14 +20,12 @@ module.exports = {
 
     Jimp.read(image.proxyURL).then(function (image) {
       image
-          .color([
-            { apply: 'brighten', params: [20] }
-          ])
-          .contrast(1)
-          .grayscale()
-          .scale(5)
-          .write("processedImage.jpg");
-  })
+        .color([{ apply: "brighten", params: [20] }])
+        .contrast(1)
+        .grayscale()
+        .scale(5)
+        .write("processedImage.jpg");
+    });
 
     const worker = await createWorker({
       logger: (m) => console.log(m),
@@ -38,7 +36,10 @@ module.exports = {
       const {
         data: { text },
       } = await worker.recognize("./processedImage.jpg");
-      await interaction.editReply({ files: ["./processedImage.jpg"], content: text });
+      await interaction.editReply({
+        files: ["./processedImage.jpg"],
+        content: text,
+      });
       await worker.terminate();
     })();
   },

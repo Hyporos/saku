@@ -1,9 +1,11 @@
 const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
+const mongoose = require("mongoose");
 require("dotenv").config();
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const MONGO_URI = process.env.MONGO_URI;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -60,6 +62,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`Ready! Logged in as ${c.user.tag}`);
+  mongoose.connect(MONGO_URI, { keepAlive: true });
 });
 
 client.login(DISCORD_TOKEN);
