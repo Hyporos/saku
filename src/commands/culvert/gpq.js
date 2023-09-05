@@ -17,26 +17,48 @@ module.exports = {
         .setName("character")
         .setDescription("The character that the score will be logged to")
         .setRequired(true)
-        .addChoices(
-          { name: "satisfied", value: "satisfied" },
-          { name: "dissatisfied", value: "dissatisfied" },
-          { name: "Movie", value: "gif_movie" }
-        )
+        .setAutocomplete(true)
     ),
+
+  async autocomplete(interaction) {
+    const user = await culvertSchema.findById(interaction.user.id, "characters").exec();
+    const value = interaction.options.getFocused().toLowerCase();
+
+    let choices = [];
+
+    user.characters.forEach((character) => {
+        choices.push(character.name);
+    });
+
+    const filtered = choices
+      .filter((choice) => choice.toLowerCase().includes(value))
+      .slice(0, 25);
+
+    if (!interaction) return;
+
+    await interaction.respond(
+      filtered.map((choice) => ({ name: choice, value: choice }))
+    );
+  },
+
   async execute(client, interaction) {
     const selectedCharacter = interaction.options.getString("character");
     const culvertScore = interaction.options.getInteger("culvert_score");
 
-    const culvertObject = { score: culvertScore, date: dayjs().day(0) }; // Set the date to this sunday (reset)
+    const reset = String(dayjs().day(0).format("MM/DD/YY")); // Day of the week the culvert score gets reset (sunday)
 
     await culvertSchema.findOneAndUpdate(
       { "characters.name": selectedCharacter },
-      { $set: { "characters.$[index].scores": culvertObject } },
+      {
+        $addToSet: {
+          "characters.$[index].scores": { score: culvertScore, date: reset },
+        },
+      },
       { arrayFilters: [{ "index.name": selectedCharacter }], new: true }
     );
 
     interaction.reply({
-      content: `${selectedCharacter} has scored **${culvertScore}** for this week! ${dayjs().day(0)}`,
+      content: `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`,
     });
   },
 };

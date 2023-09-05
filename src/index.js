@@ -60,6 +60,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+client.on(Events.InteractionCreate, async interaction => {
+  if (interaction.isAutocomplete()) {
+    const command = interaction.client.commands.get(interaction.commandName);
+
+    if (!command) {
+      return;
+    }
+
+    try {
+      await command.autocomplete(interaction);
+    } catch (error) {
+      console.log(error)
+    }
+  }
+})
+
 client.once(Events.ClientReady, (c) => {
   console.log(`Ready! Logged in as ${c.user.tag}`);
   mongoose.connect(MONGO_URI, { keepAlive: true });

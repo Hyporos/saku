@@ -36,8 +36,10 @@ const culvertSchema = new Schema(
               required: true,
             },
             date: {
-              type: Date,
+              type: String,
               required: true,
+              unique: true,
+              dropDups: true,
             },
             score: {
               type: String,

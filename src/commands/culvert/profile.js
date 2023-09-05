@@ -1,9 +1,6 @@
 const {
   SlashCommandBuilder,
   EmbedBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ActionRowBuilder,
 } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 
@@ -15,17 +12,6 @@ module.exports = {
     const discordId = interaction.user.id;
 
     const user = await culvertSchema.findById(discordId, "characters").exec();
-
-    const characterButtons = [];
-
-    user.characters.forEach((character,index) => {
-      characterButtons.push(new ButtonBuilder()
-      .setCustomId(String(index))
-      .setLabel(character.name)
-      .setStyle(ButtonStyle.Secondary))
-    })
-
-    const row = new ActionRowBuilder().addComponents(characterButtons[0], characterButtons[1]);
 
     try {
       const success = new EmbedBuilder()
@@ -42,8 +28,7 @@ module.exports = {
         )
         .addFields({
           name: "Recent Scores",
-          value:
-            "```2023-08-14: 17,201\n2023-08-07: 15,862\n2023-07-31: 16,047\n2023-07-24: 16,052```",
+          value: `\u0060\u0060\u0060${user.characters[0].scores[0].date}: ${user.characters[0].scores[0].score}\u0060\u0060\u0060`,
           inline: false,
         })
         .addFields(
@@ -51,8 +36,8 @@ module.exports = {
           { name: "Total Score", value: "57388", inline: true },
           { name: "Participation", value: "14/20 (70%)", inline: true }
         );
-      interaction.reply({ embeds: [success], components: [row] });
-      console.log(characterButtons)
+      interaction.reply({ embeds: [success] });
+      console.log(characterButtons);
     } catch (error) {
       interaction.reply({
         content: `${error}`,
