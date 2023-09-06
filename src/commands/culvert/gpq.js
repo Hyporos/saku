@@ -6,35 +6,37 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("gpq")
     .setDescription("Log your culvert score for this week")
-    .addIntegerOption((option) =>
-      option
-        .setName("culvert_score")
-        .setDescription("The culvert score to be logged")
-        .setRequired(true)
-    )
     .addStringOption((option) =>
       option
         .setName("character")
         .setDescription("The character that the score will be logged to")
         .setRequired(true)
         .setAutocomplete(true)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("culvert_score")
+        .setDescription("The culvert score to be logged")
+        .setRequired(true)
     ),
 
   async autocomplete(interaction) {
-    const user = await culvertSchema.findById(interaction.user.id, "characters").exec();
+    const user = await culvertSchema
+      .findById(interaction.user.id, "characters")
+      .exec(); // ?is .exec needed?
     const value = interaction.options.getFocused().toLowerCase();
 
     let choices = [];
 
     user.characters.forEach((character) => {
-        choices.push(character.name);
+      choices.push(character.name);
     });
 
     const filtered = choices
       .filter((choice) => choice.toLowerCase().includes(value))
       .slice(0, 25);
 
-    if (!interaction) return;
+    if (!interaction) return; // ? is this needed?
 
     await interaction.respond(
       filtered.map((choice) => ({ name: choice, value: choice }))

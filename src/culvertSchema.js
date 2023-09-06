@@ -22,7 +22,7 @@ const culvertSchema = new Schema(
           required: true,
         },
         level: {
-          type: String,
+          type: Number,
           required: true,
         },
         rank: {
@@ -38,11 +38,9 @@ const culvertSchema = new Schema(
             date: {
               type: String,
               required: true,
-              unique: true,
-              dropDups: true,
             },
             score: {
-              type: String,
+              type: Number,
               required: true,
             },
           },
