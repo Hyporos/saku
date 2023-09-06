@@ -44,23 +44,48 @@ module.exports = {
       { "characters.$": 1 }
     );
 
-    const personalBest = await culvertSchema
-      .findOne({ "characters.name": selectedCharacter })
-      .sort({ "characters.scores.score": -1 })
-      .limit(1);
-
-    const personal = await culvertSchema.aggregate([
-      { $match: { "characters.name": selectedCharacter } },
+    const totalScore = await culvertSchema.aggregate([
       { $unwind: "$characters" },
-      { $sort: { "characters.scores.score": -1 } },
-      { $limit: 1 },
+      { $unwind: "$characters.scores" },
+      { $match: { "characters.name": selectedCharacter } },
+      {
+        $group: {
+          _id: null,
+          total_score: {
+            $sum: "$characters.scores.score",
+          },
+        },
+      },
+    ]);
+
+    const bestScore = await culvertSchema.aggregate([
+      {
+        $unwind: "$characters",
+      },
+      {
+        $match: {
+          "characters.name": selectedCharacter,
+        },
+      },
+      {
+        $set: {
+          "characters.scores": {
+            $sortArray: {
+              input: "$characters.scores",
+              sortBy: {
+                score: -1,
+              },
+            },
+          },
+        },
+      },
     ]);
 
     const scores = user.characters[0].scores;
     const latestScore = user.characters[0].scores.length;
 
     try {
-      console.log(personal.characters[0].scores[0].score);
+      console.log(bestScore);
       const success = new EmbedBuilder()
         .setColor(0xffc3c5)
         .setTitle(user.characters[0].name)
@@ -89,10 +114,14 @@ module.exports = {
         .addFields(
           {
             name: "Personal Best",
-            value: String(personal.characters[0].scores[0].score),
+            value: String(bestScore[0].characters.scores[0].score),
             inline: true,
           },
-          { name: "Total Score", value: "57388", inline: true },
+          {
+            name: "Total Score",
+            value: String(totalScore[0].total_score),
+            inline: true,
+          },
           { name: "Participation", value: "14/20 (70%)", inline: true }
         );
       interaction.reply({ embeds: [success] });
