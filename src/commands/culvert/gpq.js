@@ -50,7 +50,7 @@ module.exports = {
     const reset = String(dayjs().day(0).format("MM/DD/YY")); // Day of the week the culvert score gets reset (sunday)
 
     await culvertSchema.findOneAndUpdate(
-      { "characters.name": selectedCharacter },
+      { _id: interaction.user.id, "characters.name": selectedCharacter },
       {
         $addToSet: {
           "characters.$[index].scores": { score: culvertScore, date: reset },
@@ -59,8 +59,26 @@ module.exports = {
       { arrayFilters: [{ "index.name": selectedCharacter }], new: true }
     );
 
-    interaction.reply({
-      content: `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`,
+    const characterExists = await culvertSchema.exists({
+      "characters.name": selectedCharacter 
     });
+
+    const characterLinked = await culvertSchema.exists({
+      "_id": interaction.user.id, "characters.name": selectedCharacter 
+    });
+
+    if (!characterLinked && characterExists) {
+      interaction.reply({
+        content: `Error ⎯ The character **${selectedCharacter}** exists but is not linked under your name`,
+      });
+    } else if (!characterExists) {
+      interaction.reply({
+        content: `Error ⎯ The character **${selectedCharacter}** has not yet been linked`,
+      });
+    } else {
+      interaction.reply({
+        content: `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`,
+      });
+    }
   },
 };
