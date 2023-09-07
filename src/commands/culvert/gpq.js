@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
-const dayjs = require("dayjs");
 const culvertSchema = require("../../culvertSchema.js");
+const dayjs = require("dayjs");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,6 +19,8 @@ module.exports = {
         .setDescription("The culvert score to be logged")
         .setRequired(true)
     ),
+
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async autocomplete(interaction) {
     const user = await culvertSchema
@@ -43,42 +45,56 @@ module.exports = {
     );
   },
 
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
   async execute(client, interaction) {
     const selectedCharacter = interaction.options.getString("character");
     const culvertScore = interaction.options.getInteger("culvert_score");
 
-    const reset = String(dayjs().day(0).format("MM/DD/YY")); // Day of the week the culvert score gets reset (sunday)
+    // Day of the week the culvert score gets reset (sunday)
+    const reset = String(dayjs().day(0).format("YYYY-MM-DD"));
 
+    // Update character with this weeks score
     await culvertSchema.findOneAndUpdate(
-      { _id: interaction.user.id, "characters.name": selectedCharacter },
+      {
+        _id: interaction.user.id,
+        "characters.name": selectedCharacter,
+      },
       {
         $addToSet: {
           "characters.$[index].scores": { score: culvertScore, date: reset },
         },
       },
-      { arrayFilters: [{ "index.name": selectedCharacter }], new: true }
+      {
+        arrayFilters: [{ "index.name": selectedCharacter }],
+        new: true,
+      }
     );
 
+    // Check if character exists
     const characterExists = await culvertSchema.exists({
-      "characters.name": selectedCharacter 
+      "characters.name": selectedCharacter,
     });
 
+    // Check if character is linked to user
     const characterLinked = await culvertSchema.exists({
-      "_id": interaction.user.id, "characters.name": selectedCharacter 
+      _id: interaction.user.id,
+      "characters.name": selectedCharacter,
     });
 
-    if (!characterLinked && characterExists) {
-      interaction.reply({
-        content: `Error ⎯ The character **${selectedCharacter}** exists but is not linked under your name`,
-      });
-    } else if (!characterExists) {
-      interaction.reply({
-        content: `Error ⎯ The character **${selectedCharacter}** has not yet been linked`,
-      });
-    } else {
-      interaction.reply({
-        content: `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`,
-      });
-    }
+    // Display responses
+    if (!characterLinked && characterExists)
+      return interaction.reply(
+        `Error ⎯ The character **${selectedCharacter}** is not linked to you`
+      );
+
+    if (!characterExists)
+      return interaction.reply(
+        `Error ⎯ The character **${selectedCharacter}** has not yet been linked`
+      );
+
+    return interaction.reply(
+      `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`
+    );
   },
 };

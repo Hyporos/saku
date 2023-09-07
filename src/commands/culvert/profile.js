@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const axios = require("axios");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,6 +13,8 @@ module.exports = {
         .setRequired(true)
         .setAutocomplete(true)
     ),
+
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async autocomplete(interaction) {
     const user = await culvertSchema
@@ -36,14 +39,21 @@ module.exports = {
     );
   },
 
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
   async execute(client, interaction) {
     const selectedCharacter = interaction.options.getString("character");
 
+    // Ranking API
+    const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${selectedCharacter}&page_index=1`;
+
+    // Find the character with the given name
     const user = await culvertSchema.findOne(
       { "characters.name": selectedCharacter },
       { "characters.$": 1 }
     );
 
+    // Calculate the sum of character scores
     const totalScore = await culvertSchema.aggregate([
       { $unwind: "$characters" },
       { $unwind: "$characters.scores" },
@@ -58,6 +68,7 @@ module.exports = {
       },
     ]);
 
+    // Find the biggest (best) score of the character
     const bestScore = await culvertSchema.aggregate([
       {
         $unwind: "$characters",
@@ -85,17 +96,21 @@ module.exports = {
     const latestScore = user.characters[0].scores.length;
 
     try {
-      console.log(bestScore);
-      const success = new EmbedBuilder()
+      axios.get(url).then(function (res) {
+        // For some reason, Maplestory URL won't display on embed. Use the mapleranks domain instead
+        const spliced = res.data[0].CharacterImgUrl.slice(38);
+        const final = "https://i.mapleranks.com/u/" + spliced;
+
+        const success = new EmbedBuilder()
         .setColor(0xffc3c5)
         .setTitle(user.characters[0].name)
         .setDescription("Saku Culvert Stats")
         .setThumbnail(
-          "https://i.mapleranks.com/u/IHPLFBDDCCGNPIFMLMIACBEPIPELOHEJFNKMOHAIODAJLGEBOHAKNKFLPLACFHCIHAJGHCOHAKABMCNECAIFAPCNKDDEBODIMONAKNMDDGNDHCLOFMIBHKBANOGALHGCPMLPNILOBPHIEACPMDLNLLMMFMNPHOKAJICIDAOFOAINKEJAFMMLGKLFLJOCLPCOJLOJPOIFLJIAAINMBJEIMGMECAFFHACPODAAEBAFKMBIKCHMKABJCAEDMADJCDHF.png"
+          final
         )
         .addFields(
-          { name: "Class", value: "Hero", inline: true },
-          { name: "Level", value: "276", inline: true },
+          { name: "Class", value: String(res.data[0].JobName), inline: true },
+          { name: "Level", value: String(res.data[0].Level), inline: true },
           { name: "Rank", value: "Bloom", inline: true }
         )
         .addFields({
@@ -125,6 +140,13 @@ module.exports = {
           { name: "Participation", value: "14/20 (70%)", inline: true }
         );
       interaction.reply({ embeds: [success] });
+      })  .catch(function (error) {
+        // handle error
+        console.log(error);
+        interaction.reply({
+          content: `${error}`,
+        });
+      })
     } catch (error) {
       console.log(error);
       interaction.reply({
