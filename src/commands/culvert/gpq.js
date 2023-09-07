@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
 
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("gpq")
@@ -26,6 +28,7 @@ module.exports = {
     const user = await culvertSchema
       .findById(interaction.user.id, "characters")
       .exec(); // ?is .exec needed?
+
     const value = interaction.options.getFocused().toLowerCase();
 
     let choices = [];
@@ -48,6 +51,7 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
+    //Get option values
     const selectedCharacter = interaction.options.getString("character");
     const culvertScore = interaction.options.getInteger("culvert_score");
 
@@ -83,18 +87,16 @@ module.exports = {
     });
 
     // Display responses
-    if (!characterLinked && characterExists)
-      return interaction.reply(
-        `Error ⎯ The character **${selectedCharacter}** is not linked to you`
-      );
+    let response = "";
 
-    if (!characterExists)
-      return interaction.reply(
-        `Error ⎯ The character **${selectedCharacter}** has not yet been linked`
-      );
+    if (!characterLinked && characterExists) {
+      response = `Error ⎯ The character **${selectedCharacter}** is not linked to you`;
+    } else if (!characterExists) {
+      response = `Error ⎯ The character **${selectedCharacter}** has not yet been linked`;
+    } else {
+      response = `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`;
+    }
 
-    return interaction.reply(
-      `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`
-    );
+    interaction.reply(response);
   },
 };

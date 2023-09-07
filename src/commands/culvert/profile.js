@@ -55,9 +55,15 @@ module.exports = {
 
     // Calculate the sum of character scores
     const totalScore = await culvertSchema.aggregate([
-      { $unwind: "$characters" },
-      { $unwind: "$characters.scores" },
-      { $match: { "characters.name": selectedCharacter } },
+      {
+        $unwind: "$characters",
+      },
+      {
+        $unwind: "$characters.scores",
+      },
+      {
+        $match: { "characters.name": selectedCharacter },
+      },
       {
         $group: {
           _id: null,
@@ -92,61 +98,110 @@ module.exports = {
       },
     ]);
 
+    // Calculate the total number of weeks since a character has been linked
+    const totalWeeks = await culvertSchema.aggregate([
+      {
+        $unwind: "$characters",
+      },
+      {
+        $unwind: "$characters.scores",
+      },
+      {
+        $match: {
+          "characters.name": selectedCharacter,
+        },
+      },
+    ]);
+
+    // Calculate the particiation ratio of the character by returning the score objecte greater than 0
+    const participationRatio = await culvertSchema.aggregate([
+      {
+        $unwind: "$characters",
+      },
+      {
+        $unwind: "$characters.scores",
+      },
+      {
+        $match: {
+          "characters.name": selectedCharacter,
+          "characters.scores.score": { $gt: 0 },
+        },
+      },
+    ]);
+
     const scores = user.characters[0].scores;
     const latestScore = user.characters[0].scores.length;
 
     try {
-      axios.get(url).then(function (res) {
-        // For some reason, Maplestory URL won't display on embed. Use the mapleranks domain instead
-        const spliced = res.data[0].CharacterImgUrl.slice(38);
-        const final = "https://i.mapleranks.com/u/" + spliced;
+      axios
+        .get(url)
+        .then(function (res) {
+          // For some reason, Maplestory URL won't display on embed. Use the mapleranks domain instead
+          const spliced = res.data[0].CharacterImgUrl.slice(38);
+          const final = "https://i.mapleranks.com/u/" + spliced;
 
-        const success = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setTitle(user.characters[0].name)
-        .setDescription("Saku Culvert Stats")
-        .setThumbnail(
-          final
-        )
-        .addFields(
-          { name: "Class", value: String(res.data[0].JobName), inline: true },
-          { name: "Level", value: String(res.data[0].Level), inline: true },
-          { name: "Rank", value: "Bloom", inline: true }
-        )
-        .addFields({
-          name: "Recent Scores", // Bad practice. Duplicate code. Unsure how to implement a for loop here
-          value: `\u0060\u0060\u0060${scores[latestScore - 1]?.date || null}: ${
-            scores[latestScore - 1]?.score || 0
-          }\n${scores[latestScore - 2]?.date || null}: ${
-            scores[latestScore - 2]?.score || 0
-          }\n${scores[latestScore - 3]?.date || null}: ${
-            scores[latestScore - 3]?.score || 0
-          }\n${scores[latestScore - 4]?.date || null}: ${
-            scores[latestScore - 4]?.score || 0
-          }\n\u0060\u0060\u0060`,
-          inline: false,
+          console.log(participationRatio);
+
+          const success = new EmbedBuilder()
+            .setColor(0xffc3c5)
+            .setTitle(user.characters[0].name)
+            .setDescription("Saku Culvert Stats")
+            .setThumbnail(final)
+            .addFields(
+              {
+                name: "Class",
+                value: String(res.data[0].JobName),
+                inline: true,
+              },
+              { name: "Level", value: String(res.data[0].Level), inline: true },
+              { name: "Rank", value: "Bloom", inline: true }
+            )
+            .addFields({
+              name: "Recent Scores", // Bad practice. Duplicate code. Unsure how to implement a for loop here
+              value: `\u0060\u0060\u0060${
+                scores[latestScore - 1]?.date + ": " || "\u2800"
+              }${scores[latestScore - 1]?.score || 0}\n${
+                scores[latestScore - 2]?.date + ": " || "\u2800"
+              }${scores[latestScore - 2]?.score || 0}\n${
+                scores[latestScore - 3]?.date || "\u2800"
+              }${scores[latestScore - 3]?.score || 0}\n${
+                scores[latestScore - 4]?.date + ": " || "\u2800"
+              }${scores[latestScore - 4]?.score || 0}\n\u0060\u0060\u0060`,
+              inline: false,
+            })
+            .addFields(
+              {
+                name: "Personal Best",
+                value: String(bestScore[0].characters.scores[0].score),
+                inline: true,
+              },
+              {
+                name: "Total Score",
+                value: String(totalScore[0].total_score),
+                inline: true,
+              },
+              {
+                name: "Participation",
+                value:
+                  String(participationRatio.length) +
+                  "/" +
+                  String(totalWeeks.length) +
+                  "(" +
+                  String(
+                    (participationRatio.length / totalWeeks.length) * 100
+                  ) +
+                  "%)",
+                inline: true,
+              }
+            );
+          interaction.reply({ embeds: [success] });
         })
-        .addFields(
-          {
-            name: "Personal Best",
-            value: String(bestScore[0].characters.scores[0].score),
-            inline: true,
-          },
-          {
-            name: "Total Score",
-            value: String(totalScore[0].total_score),
-            inline: true,
-          },
-          { name: "Participation", value: "14/20 (70%)", inline: true }
-        );
-      interaction.reply({ embeds: [success] });
-      })  .catch(function (error) {
-        // handle error
-        console.log(error);
-        interaction.reply({
-          content: `${error}`,
+        .catch(function (error) {
+          console.log(error);
+          interaction.reply({
+            content: `${error}`,
+          });
         });
-      })
     } catch (error) {
       console.log(error);
       interaction.reply({
