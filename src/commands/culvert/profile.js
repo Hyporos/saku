@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const dayjs = require("dayjs");
 const axios = require("axios");
 
 module.exports = {
@@ -191,7 +192,11 @@ module.exports = {
                   "%)",
                 inline: true,
               }
-            );
+            )
+            .setFooter({
+              text: "Submit scores with /gpq  •  Visualize progress with /graph",
+              iconURL: "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
+            });
           interaction.reply({ embeds: [success] });
         })
         .catch(function (error) {
