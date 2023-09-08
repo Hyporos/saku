@@ -1,7 +1,5 @@
 const {
   SlashCommandBuilder,
-  hyperlink,
-  hideLinkEmbed,
   PermissionFlagsBits,
 } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
@@ -81,13 +79,10 @@ module.exports = {
         }
       })
       .catch(function (error) {
-        const rankings = hyperlink(
-          "rankings",
-          "<https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&search=true>"
-        );
-        console.log(error);
+        const rankings =
+          "https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1";
         interaction.reply(
-          `Error ⎯ The character **${characterName}** could not be found on the ${rankings}`
+          `Error ⎯ The character **${characterName}** could not be found on the [rankings](<${rankings}>)`
         );
       });
   },

@@ -60,7 +60,7 @@ module.exports = {
     const culvertScore = interaction.options.getInteger("culvert_score");
 
     // Day of the week the culvert score gets reset (sunday)
-    const reset = String(dayjs().day(0).format("YYYY-MM-DD"));
+    const reset = String(dayjs().day(0).format("YYYY-MM-DD")); // ? Is this String() needed?
 
     // Check if a score has already been set for this week
     const weekLogged = await culvertSchema.aggregate([

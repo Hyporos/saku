@@ -132,68 +132,67 @@ module.exports = {
     const latestScore = user.characters[0].scores.length;
 
     try {
-          const success = new EmbedBuilder()
-            .setColor(0xffc3c5)
-            .setTitle(user.characters[0].name)
-            .setDescription("Saku Culvert Stats")
-            .setThumbnail(user.characters[0].avatar || "")
-            .addFields(
-              {
-                name: "Class",
-                value: user.characters[0].class || "?",
-                inline: true,
-              },
-              { name: "Level", value: String(user.characters[0].level || "?"), inline: true },
-              { name: "Rank", value: "Bloom", inline: true }
-            )
-            .addFields({
-              name: "Recent Scores", // Bad practice. Duplicate code. Unsure how to implement a for loop here
-              value: `\u0060\u0060\u0060${
-                scores[latestScore - 1]?.date + ": " || "\u2800"
-              }${scores[latestScore - 1]?.score || 0}\n${
-                scores[latestScore - 2]?.date + ": " || "\u2800"
-              }${scores[latestScore - 2]?.score || 0}\n${
-                scores[latestScore - 3]?.date + ": " || "\u2800"
-              }${scores[latestScore - 3]?.score || 0}\n${
-                scores[latestScore - 4]?.date + ": " || "\u2800"
-              }${scores[latestScore - 4]?.score || 0}\n\u0060\u0060\u0060`,
-              inline: false,
-            })
-            .addFields(
-              {
-                name: "Personal Best",
-                value: String(bestScore[0].characters.scores[0]?.score || "0"),
-                inline: true,
-              },
-              {
-                name: "Total Score",
-                value: String(totalScore[0]?.total_score || "0"),
-                inline: true,
-              },
-              {
-                name: "Participation",
-                value:
-                  String(participationRatio.length) +
-                  "/" +
-                  String(totalWeeks.length) +
-                  " (" +
-                  String(
-                    (participationRatio.length / totalWeeks.length) * 100
-                  ) +
-                  "%)",
-                inline: true,
-              }
-            )
-            .setFooter({
-              text: "Submit scores with /gpq  •  Visualize progress with /graph",
-              iconURL: "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
-            });
-          interaction.reply({ embeds: [success] });
+      const success = new EmbedBuilder()
+        .setColor(0xffc3c5)
+        .setTitle(user.characters[0].name)
+        .setURL(
+          `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
+        )
+        .setDescription("Saku Culvert Stats")
+        .setThumbnail(user.characters[0].avatar)
+        .addFields(
+          {
+            name: "Class",
+            value: user.characters[0].class,
+            inline: true,
+          },
+          {
+            name: "Level",
+            value: `${user.characters[0].level}`,
+            inline: true,
+          },
+          { name: "Rank", value: "Bloom", inline: true }
+        )
+        .addFields({
+          name: "Recent Scores", // Bad practice. Duplicate code. Unsure how to implement a for loop here
+          value: `\u0060\u0060\u0060${
+            scores[latestScore - 1]?.date + ": " || "\u2800"
+          }${scores[latestScore - 1]?.score || 0}\n${
+            scores[latestScore - 2]?.date + ": " || "\u2800"
+          }${scores[latestScore - 2]?.score || 0}\n${
+            scores[latestScore - 3]?.date + ": " || "\u2800"
+          }${scores[latestScore - 3]?.score || 0}\n${
+            scores[latestScore - 4]?.date + ": " || "\u2800"
+          }${scores[latestScore - 4]?.score || 0}\n\u0060\u0060\u0060`,
+          inline: false,
+        })
+        .addFields(
+          {
+            name: "Personal Best",
+            value: `${bestScore[0].characters.scores[0]?.score || "0"}`,
+            inline: true,
+          },
+          {
+            name: "Total Score",
+            value: `${totalScore[0]?.total_score || "0"}`,
+            inline: true,
+          },
+          {
+            name: "Participation",
+            value: `${participationRatio.length}/${totalWeeks.length} 
+            (${(participationRatio.length / totalWeeks.length || 0) * 100}%)`,
+            inline: true,
+          }
+        )
+        .setFooter({
+          text: "Submit scores with /gpq  •  Visualize progress with /graph",
+          iconURL:
+            "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
+        });
+      interaction.reply({ embeds: [success] });
     } catch (error) {
+      interaction.reply(`${error}`);
       console.log(error);
-      interaction.reply({
-        content: `${error}`,
-      });
     }
   },
 };
