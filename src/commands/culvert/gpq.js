@@ -1,3 +1,7 @@
+//TODO - Add a streak system
+//TODO - Validate for negative and massive numbers
+//TODO - 
+
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");

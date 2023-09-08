@@ -1,7 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const dayjs = require("dayjs");
-const axios = require("axios");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -134,25 +132,18 @@ module.exports = {
     const latestScore = user.characters[0].scores.length;
 
     try {
-      axios
-        .get(url)
-        .then(function (res) {
-          // For some reason, Maplestory URL won't display on embed. Use the mapleranks domain instead
-          const spliced = res.data[0].CharacterImgUrl.slice(38);
-          const final = "https://i.mapleranks.com/u/" + spliced;
-
           const success = new EmbedBuilder()
             .setColor(0xffc3c5)
             .setTitle(user.characters[0].name)
             .setDescription("Saku Culvert Stats")
-            .setThumbnail(final)
+            .setThumbnail(user.characters[0].avatar)
             .addFields(
               {
                 name: "Class",
-                value: String(res.data[0].JobName),
+                value: user.characters[0].class,
                 inline: true,
               },
-              { name: "Level", value: String(res.data[0].Level), inline: true },
+              { name: "Level", value: String(user.characters[0].level), inline: true },
               { name: "Rank", value: "Bloom", inline: true }
             )
             .addFields({
@@ -198,13 +189,6 @@ module.exports = {
               iconURL: "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
             });
           interaction.reply({ embeds: [success] });
-        })
-        .catch(function (error) {
-          console.log(error);
-          interaction.reply({
-            content: `${error}`,
-          });
-        });
     } catch (error) {
       console.log(error);
       interaction.reply({
