@@ -136,14 +136,14 @@ module.exports = {
             .setColor(0xffc3c5)
             .setTitle(user.characters[0].name)
             .setDescription("Saku Culvert Stats")
-            .setThumbnail(user.characters[0].avatar)
+            .setThumbnail(user.characters[0].avatar || "")
             .addFields(
               {
                 name: "Class",
-                value: user.characters[0].class,
+                value: user.characters[0].class || "?",
                 inline: true,
               },
-              { name: "Level", value: String(user.characters[0].level), inline: true },
+              { name: "Level", value: String(user.characters[0].level || "?"), inline: true },
               { name: "Rank", value: "Bloom", inline: true }
             )
             .addFields({
@@ -162,12 +162,12 @@ module.exports = {
             .addFields(
               {
                 name: "Personal Best",
-                value: String(bestScore[0].characters.scores[0].score),
+                value: String(bestScore[0].characters.scores[0]?.score || "0"),
                 inline: true,
               },
               {
                 name: "Total Score",
-                value: String(totalScore[0].total_score),
+                value: String(totalScore[0]?.total_score || "0"),
                 inline: true,
               },
               {

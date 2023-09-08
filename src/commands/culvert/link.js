@@ -1,4 +1,9 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  hyperlink,
+  hideLinkEmbed,
+  PermissionFlagsBits,
+} = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const axios = require("axios");
 
@@ -36,10 +41,11 @@ module.exports = {
       "characters.name": characterName,
     });
 
-    // Create or update a user entry and link a character (if not already linked)
+    // Fetch Maplestory ranking data
     axios
       .get(url)
       .then(async function (res) {
+        // Create or update a user entry and link a character (if not already linked)
         if (!characterLinked) {
           await culvertSchema.findOneAndUpdate(
             {
@@ -63,21 +69,26 @@ module.exports = {
             }
           );
         }
+        // Display responses
+        if (characterLinked) {
+          interaction.reply(
+            `Error ⎯ The character **${characterName}** is already linked`
+          );
+        } else {
+          interaction.reply(
+            `Linked **${characterName}** to ${discordUser}\nUser ID: ${discordUser.id}`
+          );
+        }
       })
       .catch(function (error) {
+        const rankings = hyperlink(
+          "rankings",
+          "<https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&search=true>"
+        );
         console.log(error);
-        interaction.reply(`${error}`);
+        interaction.reply(
+          `Error ⎯ The character **${characterName}** could not be found on the ${rankings}`
+        );
       });
-
-    // Display responses
-    let response = "";
-
-    if (characterLinked) {
-      response = `Error ⎯ The character **${characterName}** is already linked`;
-    } else {
-      response = `Linked **${characterName}** to ${discordUser}\nUser ID: ${discordUser.id}`;
-    }
-
-    interaction.reply(response);
   },
 };
