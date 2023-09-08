@@ -58,22 +58,60 @@ module.exports = {
     // Day of the week the culvert score gets reset (sunday)
     const reset = String(dayjs().day(0).format("YYYY-MM-DD"));
 
-    // Update character with this weeks score
-    await culvertSchema.findOneAndUpdate(
+    // Check if a score has already been set for this week
+    const weekLogged = await culvertSchema.aggregate([
       {
-        _id: interaction.user.id,
-        "characters.name": selectedCharacter,
+        $unwind: "$characters",
       },
       {
-        $addToSet: {
-          "characters.$[index].scores": { score: culvertScore, date: reset },
+        $unwind: "$characters.scores",
+      },
+      {
+        $match: {
+          "characters.name": selectedCharacter,
+          "characters.scores.date": reset,
         },
       },
-      {
-        arrayFilters: [{ "index.name": selectedCharacter }],
-        new: true,
-      }
-    );
+    ]);
+
+    // Create or update an existing score on the selected character
+    if (weekLogged.length < 1) {
+      await culvertSchema.findOneAndUpdate(
+        {
+          _id: interaction.user.id,
+          "characters.name": selectedCharacter,
+        },
+        {
+          $addToSet: {
+            "characters.$[nameElem].scores": { score: culvertScore, date: reset },
+          },
+        },
+        {
+          arrayFilters: [{ "nameElem.name": selectedCharacter }],
+          new: true,
+        }
+      );
+    } else {
+      await culvertSchema.findOneAndUpdate(
+        {
+          _id: interaction.user.id,
+          "characters.name": selectedCharacter,
+          "characters.scores.date": reset,
+        },
+        {
+          $set: {
+            "characters.$[nameElem].scores.$[dateElem].score": culvertScore,
+          },
+        },
+        {
+          arrayFilters: [
+            { "nameElem.name": selectedCharacter },
+            { "dateElem.date": reset },
+          ],
+          new: true,
+        }
+      );
+    }
 
     // Check if character exists
     const characterExists = await culvertSchema.exists({
@@ -93,6 +131,8 @@ module.exports = {
       response = `Error ⎯ The character **${selectedCharacter}** is not linked to you`;
     } else if (!characterExists) {
       response = `Error ⎯ The character **${selectedCharacter}** has not yet been linked`;
+    } else if (weekLogged.length > 0) {
+      response = `${selectedCharacter}'s score has been updated to **${culvertScore}** for this week! (${reset})`;
     } else {
       response = `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`;
     }

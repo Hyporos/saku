@@ -140,8 +140,6 @@ module.exports = {
           const spliced = res.data[0].CharacterImgUrl.slice(38);
           const final = "https://i.mapleranks.com/u/" + spliced;
 
-          console.log(participationRatio);
-
           const success = new EmbedBuilder()
             .setColor(0xffc3c5)
             .setTitle(user.characters[0].name)
@@ -163,7 +161,7 @@ module.exports = {
               }${scores[latestScore - 1]?.score || 0}\n${
                 scores[latestScore - 2]?.date + ": " || "\u2800"
               }${scores[latestScore - 2]?.score || 0}\n${
-                scores[latestScore - 3]?.date || "\u2800"
+                scores[latestScore - 3]?.date + ": " || "\u2800"
               }${scores[latestScore - 3]?.score || 0}\n${
                 scores[latestScore - 4]?.date + ": " || "\u2800"
               }${scores[latestScore - 4]?.score || 0}\n\u0060\u0060\u0060`,
@@ -186,7 +184,7 @@ module.exports = {
                   String(participationRatio.length) +
                   "/" +
                   String(totalWeeks.length) +
-                  "(" +
+                  " (" +
                   String(
                     (participationRatio.length / totalWeeks.length) * 100
                   ) +

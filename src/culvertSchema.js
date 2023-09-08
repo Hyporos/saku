@@ -9,10 +9,7 @@ const culvertSchema = new Schema(
     },
     characters: [
       {
-        _id: {
-          type: String,
-          required: true,
-        },
+        _id: false,
         name: {
           type: String,
           required: true,
@@ -31,10 +28,7 @@ const culvertSchema = new Schema(
         },
         scores: [
           {
-            _id: {
-              type: String,
-              required: true,
-            },
+            _id: false,
             date: {
               type: String,
               required: true,
