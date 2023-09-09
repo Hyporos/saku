@@ -71,7 +71,7 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": selectedCharacter,
+          "characters.name": { $regex: selectedCharacter, $options: "i" },
           "characters.scores.date": reset,
         },
       },
@@ -82,7 +82,7 @@ module.exports = {
       await culvertSchema.findOneAndUpdate(
         {
           _id: interaction.user.id,
-          "characters.name": selectedCharacter,
+          "characters.name": { $regex: selectedCharacter, $options: "i" },
         },
         {
           $addToSet: {
@@ -90,7 +90,7 @@ module.exports = {
           },
         },
         {
-          arrayFilters: [{ "nameElem.name": selectedCharacter }],
+          arrayFilters: [{ "nameElem.name": { $regex: selectedCharacter, $options: "i" } }],
           new: true,
         }
       );
@@ -98,7 +98,7 @@ module.exports = {
       await culvertSchema.findOneAndUpdate(
         {
           _id: interaction.user.id,
-          "characters.name": selectedCharacter,
+          "characters.name": { $regex: selectedCharacter, $options: "i" },
           "characters.scores.date": reset,
         },
         {
@@ -108,7 +108,7 @@ module.exports = {
         },
         {
           arrayFilters: [
-            { "nameElem.name": selectedCharacter },
+            { "nameElem.name": { $regex: selectedCharacter, $options: "i" } },
             { "dateElem.date": reset },
           ],
           new: true,
@@ -118,13 +118,13 @@ module.exports = {
 
     // Check if character exists
     const characterExists = await culvertSchema.exists({
-      "characters.name": selectedCharacter,
+      "characters.name": { $regex: selectedCharacter, $options: "i" },
     });
 
     // Check if character is linked to user
     const characterLinked = await culvertSchema.exists({
       _id: interaction.user.id,
-      "characters.name": selectedCharacter,
+      "characters.name": { $regex: selectedCharacter, $options: "i" },
     });
 
     // Display responses

@@ -1,5 +1,3 @@
-//TODO - Set Class to JobDetail
-
 const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const axios = require("axios");
@@ -35,8 +33,41 @@ module.exports = {
 
     // Check if character is linked to user
     const characterLinked = await culvertSchema.exists({
-      "characters.name": characterName,
+      "characters.name": { $regex: characterName, $options: "i" },
     });
+
+    // Determine class name based on JobDetail
+    function getClassName(res) {
+      if (res.data[0].JobName === "Warrior") {
+        if (res.data[0].JobDetail === 12) return "Hero";
+        if (res.data[0].JobDetail === 22) return "Paladin";
+        if (res.data[0].JobDetail === 32) return "Dark Knight";
+      }
+
+      if (res.data[0].JobName === "Magician") {
+        if (res.data[0].JobDetail === 12) return "Arch Mage (F/P)";
+        if (res.data[0].JobDetail === 22) return "Arch Mage (I/L)";
+        if (res.data[0].JobDetail === 32) return "Bishop";
+      }
+
+      if (res.data[0].JobName === "Bowman") {
+        if (res.data[0].JobDetail === 12) return "Bowmaster";
+        if (res.data[0].JobDetail === 22) return "Marksman";
+      }
+
+      if (res.data[0].JobName === "Thief") {
+        if (res.data[0].JobDetail === 12) return "Night Lord";
+        if (res.data[0].JobDetail === 22) return "Shadower";
+      }
+
+      if (res.data[0].JobName === "Pirate") {
+        if (res.data[0].JobDetail === 12) return "Buccaneer";
+        if (res.data[0].JobDetail === 22) return "Corsair";
+        if (res.data[0].JobDetail === 32) return "Cannoneer";
+      }
+
+      return res.data[0].JobName;
+    }
 
     // Fetch Maplestory ranking data
     axios
@@ -52,11 +83,11 @@ module.exports = {
               _id: discordUser.id,
               $addToSet: {
                 characters: {
-                  name: characterName,
+                  name: res.data[0].CharacterName,
                   avatar:
                     "https://i.mapleranks.com/u/" +
                     res.data[0].CharacterImgUrl.slice(38), // Maplestory URL won't display an image, use the mapleranks URL instead
-                  class: res.data[0].JobName,
+                  class: getClassName(res),
                   level: res.data[0].Level,
                 },
               },

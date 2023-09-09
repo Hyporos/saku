@@ -1,5 +1,3 @@
-//TODO - Handle error when character does not exist
-
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 
@@ -50,7 +48,7 @@ module.exports = {
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
-      { "characters.name": selectedCharacter },
+      { "characters.name": { $regex: selectedCharacter, $options: "i" } },
       { "characters.$": 1 }
     );
 
@@ -63,7 +61,7 @@ module.exports = {
         $unwind: "$characters.scores",
       },
       {
-        $match: { "characters.name": selectedCharacter },
+        $match: { "characters.name": { $regex: selectedCharacter, $options: "i" } },
       },
       {
         $group: {
@@ -82,7 +80,7 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": selectedCharacter,
+          "characters.name": { $regex: selectedCharacter, $options: "i" },
         },
       },
       {
@@ -109,7 +107,7 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": selectedCharacter,
+          "characters.name": { $regex: selectedCharacter, $options: "i" },
         },
       },
     ]);
@@ -124,14 +122,14 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": selectedCharacter,
+          "characters.name": { $regex: selectedCharacter, $options: "i" },
           "characters.scores.score": { $gt: 0 },
         },
       },
     ]);
 
-    // Create the 'recent scores' embed field by taking and concatenating the last 4 scores submitted
-    function recentScores() {
+    // Create the 'recent scores' embed field by retreiving and concatenating the last 4 scores submitted
+    function getRecentScores() {
       const scores = user.characters[0].scores;
 
       let content = "\u0060\u0060\u0060";
@@ -139,19 +137,13 @@ module.exports = {
       for (let i = scores.length - 1; i >= scores.length - 4; i--) {
         // Only show the last 4 scores
         if (scores[i])
-        content = content.concat(
-            scores[i].date,
-            ": ",
-            scores[i].score,
-            "\n"
-          );
+          content = content.concat(scores[i].date, ": ", scores[i].score, "\n");
       }
 
-      if (scores.length > 0) {
-        content = content.concat("\u0060\u0060\u0060");
-      } else {
-        content = content.concat(" \u0060\u0060\u0060"); // If no scores found, display an empty box
-      }
+      // If no scores found, display an empty box
+      content = content.concat(
+        scores.length > 0 ? "\u0060\u0060\u0060" : " \u0060\u0060\u0060"
+      );
 
       return content;
     }
@@ -181,7 +173,7 @@ module.exports = {
         )
         .addFields({
           name: "Recent Scores",
-          value: recentScores(),
+          value: getRecentScores(),
           inline: false,
         })
         .addFields(
