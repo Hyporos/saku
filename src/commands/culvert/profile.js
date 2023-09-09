@@ -1,5 +1,9 @@
+//TODO - Handle error when character does not exist
+
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -41,10 +45,8 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
+    // Get option values
     const selectedCharacter = interaction.options.getString("character");
-
-    // Ranking API
-    const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${selectedCharacter}&page_index=1`;
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
@@ -128,11 +130,35 @@ module.exports = {
       },
     ]);
 
-    const scores = user.characters[0].scores;
-    const latestScore = user.characters[0].scores.length;
+    // Create the 'recent scores' embed field by taking and concatenating the last 4 scores submitted
+    function recentScores() {
+      const scores = user.characters[0].scores;
 
+      let content = "\u0060\u0060\u0060";
+
+      for (let i = scores.length - 1; i >= scores.length - 4; i--) {
+        // Only show the last 4 scores
+        if (scores[i])
+        content = content.concat(
+            scores[i].date,
+            ": ",
+            scores[i].score,
+            "\n"
+          );
+      }
+
+      if (scores.length > 0) {
+        content = content.concat("\u0060\u0060\u0060");
+      } else {
+        content = content.concat(" \u0060\u0060\u0060"); // If no scores found, display an empty box
+      }
+
+      return content;
+    }
+
+    // Create and display a profile embed for the selected character (if they exist)
     try {
-      const success = new EmbedBuilder()
+      const profile = new EmbedBuilder()
         .setColor(0xffc3c5)
         .setTitle(user.characters[0].name)
         .setURL(
@@ -151,19 +177,11 @@ module.exports = {
             value: `${user.characters[0].level}`,
             inline: true,
           },
-          { name: "Rank", value: "Bloom", inline: true }
+          { name: "Member Since", value: "2022-04-11", inline: true }
         )
         .addFields({
-          name: "Recent Scores", // Bad practice. Duplicate code. Unsure how to implement a for loop here
-          value: `\u0060\u0060\u0060${
-            scores[latestScore - 1]?.date + ": " || "\u2800"
-          }${scores[latestScore - 1]?.score || 0}\n${
-            scores[latestScore - 2]?.date + ": " || "\u2800"
-          }${scores[latestScore - 2]?.score || 0}\n${
-            scores[latestScore - 3]?.date + ": " || "\u2800"
-          }${scores[latestScore - 3]?.score || 0}\n${
-            scores[latestScore - 4]?.date + ": " || "\u2800"
-          }${scores[latestScore - 4]?.score || 0}\n\u0060\u0060\u0060`,
+          name: "Recent Scores",
+          value: recentScores(),
           inline: false,
         })
         .addFields(
@@ -179,8 +197,9 @@ module.exports = {
           },
           {
             name: "Participation",
-            value: `${participationRatio.length}/${totalWeeks.length} 
-            (${(participationRatio.length / totalWeeks.length || 0) * 100}%)`,
+            value: `${participationRatio.length}/${totalWeeks.length} (${
+              (participationRatio.length / totalWeeks.length || 0) * 100
+            }%)`,
             inline: true,
           }
         )
@@ -189,9 +208,12 @@ module.exports = {
           iconURL:
             "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
         });
-      interaction.reply({ embeds: [success] });
+      // Display responses
+      interaction.reply({ embeds: [profile] });
     } catch (error) {
-      interaction.reply(`${error}`);
+      interaction.reply(
+        `Error ⎯ The character **${selectedCharacter}** has not been linked to any user`
+      );
       console.log(error);
     }
   },
