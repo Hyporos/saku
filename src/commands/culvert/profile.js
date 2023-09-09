@@ -48,7 +48,7 @@ module.exports = {
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
-      { "characters.name": { $regex: selectedCharacter, $options: "i" } },
+      { "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" } },
       { "characters.$": 1 }
     );
 
@@ -61,7 +61,7 @@ module.exports = {
         $unwind: "$characters.scores",
       },
       {
-        $match: { "characters.name": { $regex: selectedCharacter, $options: "i" } },
+        $match: { "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" } },
       },
       {
         $group: {
@@ -80,7 +80,7 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": { $regex: selectedCharacter, $options: "i" },
+          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
         },
       },
       {
@@ -107,7 +107,7 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": { $regex: selectedCharacter, $options: "i" },
+          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
         },
       },
     ]);
@@ -122,7 +122,7 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": { $regex: selectedCharacter, $options: "i" },
+          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
           "characters.scores.score": { $gt: 0 },
         },
       },
