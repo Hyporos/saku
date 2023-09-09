@@ -12,7 +12,6 @@ module.exports = {
   async execute(client, interaction) {
     const number = Math.floor(Math.random() * 100) + 1;
     function getEmoji(number) {
-      if (number === 1) return "<:sakuicant:1112235091364683796>";
       if (number === 69) return "<:sakuSlyL:1091136098098487326>";
       if (number === 100) return "<:sakuHUH:1134861539728433222>";
       return "";
