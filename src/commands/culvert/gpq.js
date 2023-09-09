@@ -54,67 +54,11 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
-    //Get option values
     const selectedCharacter = interaction.options.getString("character");
     const culvertScore = interaction.options.getInteger("culvert_score");
 
     // Day of the week the culvert score gets reset (sunday)
     const reset = String(dayjs().day(0).format("YYYY-MM-DD")); // ? Is this String() needed?
-
-    // Check if a score has already been set for this week
-    const weekLogged = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $unwind: "$characters.scores",
-      },
-      {
-        $match: {
-          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-          "characters.scores.date": reset,
-        },
-      },
-    ]);
-
-    // Create or update an existing score on the selected character
-    if (weekLogged.length < 1) {
-      await culvertSchema.findOneAndUpdate(
-        {
-          _id: interaction.user.id,
-          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-        },
-        {
-          $addToSet: {
-            "characters.$[nameElem].scores": { score: culvertScore, date: reset },
-          },
-        },
-        {
-          arrayFilters: [{ "nameElem.name": { $regex: selectedCharacter, $options: "i" } }],
-          new: true,
-        }
-      );
-    } else {
-      await culvertSchema.findOneAndUpdate(
-        {
-          _id: interaction.user.id,
-          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-          "characters.scores.date": reset,
-        },
-        {
-          $set: {
-            "characters.$[nameElem].scores.$[dateElem].score": culvertScore,
-          },
-        },
-        {
-          arrayFilters: [
-            { "nameElem.name": { $regex: `^${selectedCharacter}$`, $options: "i" } },
-            { "dateElem.date": reset },
-          ],
-          new: true,
-        }
-      );
-    }
 
     // Check if character exists
     const characterExists = await culvertSchema.exists({
@@ -126,6 +70,80 @@ module.exports = {
       _id: interaction.user.id,
       "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
     });
+
+    // Check if a score has already been set for this week
+    const weekLogged = await culvertSchema.aggregate([
+      {
+        $unwind: "$characters",
+      },
+      {
+        $unwind: "$characters.scores",
+      },
+      {
+        $match: {
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
+          "characters.scores.date": reset,
+        },
+      },
+    ]);
+
+    // Create or update an existing score on the selected character
+    if (weekLogged.length < 1) {
+      await culvertSchema.findOneAndUpdate(
+        {
+          _id: interaction.user.id,
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
+        },
+        {
+          $addToSet: {
+            "characters.$[nameElem].scores": {
+              score: culvertScore,
+              date: reset,
+            },
+          },
+        },
+        {
+          arrayFilters: [
+            { "nameElem.name": { $regex: selectedCharacter, $options: "i" } },
+          ],
+          new: true,
+        }
+      );
+    } else {
+      await culvertSchema.findOneAndUpdate(
+        {
+          _id: interaction.user.id,
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
+          "characters.scores.date": reset,
+        },
+        {
+          $set: {
+            "characters.$[nameElem].scores.$[dateElem].score": culvertScore,
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              "nameElem.name": {
+                $regex: `^${selectedCharacter}$`,
+                $options: "i",
+              },
+            },
+            { "dateElem.date": reset },
+          ],
+          new: true,
+        }
+      );
+    }
 
     // Display responses
     let response = "";

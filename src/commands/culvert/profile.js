@@ -43,12 +43,13 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
-    // Get option values
     const selectedCharacter = interaction.options.getString("character");
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
-      { "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" } },
+      {
+        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+      },
       { "characters.$": 1 }
     );
 
@@ -61,7 +62,12 @@ module.exports = {
         $unwind: "$characters.scores",
       },
       {
-        $match: { "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" } },
+        $match: {
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
+        },
       },
       {
         $group: {
@@ -80,7 +86,10 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
         },
       },
       {
@@ -107,7 +116,10 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
         },
       },
     ]);
@@ -122,20 +134,23 @@ module.exports = {
       },
       {
         $match: {
-          "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
           "characters.scores.score": { $gt: 0 },
         },
       },
     ]);
 
-    // Create the 'recent scores' embed field by retreiving and concatenating the last 4 scores submitted
-    function getRecentScores() {
+    // Create the 'previous scores' embed field
+    function getPreviousScores() {
       const scores = user.characters[0].scores;
 
       let content = "\u0060\u0060\u0060";
 
-      for (let i = scores.length - 1; i >= scores.length - 4; i--) {
-        // Only show the last 4 scores
+      for (let i = scores.length - 2; i >= scores.length - 5; i--) {
+        // Only grab the last 4 scores before this week
         if (scores[i])
           content = content.concat(scores[i].date, ": ", scores[i].score, "\n");
       }
@@ -171,9 +186,28 @@ module.exports = {
           },
           { name: "Member Since", value: "2022-04-11", inline: true }
         )
+        .addFields(
+          {
+            name: "Current Score",
+            value: `${
+              user.characters[0].scores[user.characters[0].scores.length - 1]?.score || "0"
+            }`,
+            inline: true,
+          },
+          {
+            name: "Weekly Rank",
+            value: `17`,
+            inline: true,
+          },
+          {
+            name: "Lifetime Rank",
+            value: `20`,
+            inline: true,
+          }
+        )
         .addFields({
-          name: "Recent Scores",
-          value: getRecentScores(),
+          name: "Previous Scores",
+          value: getPreviousScores(),
           inline: false,
         })
         .addFields(
@@ -183,15 +217,17 @@ module.exports = {
             inline: true,
           },
           {
-            name: "Total Score",
+            name: "Lifetime Score",
             value: `${totalScore[0]?.total_score || "0"}`,
             inline: true,
           },
           {
             name: "Participation",
-            value: `${participationRatio.length}/${totalWeeks.length} (${
-              Math.round((participationRatio.length / totalWeeks.length || 0) * 100)
-            }%)`,
+            value: `${participationRatio.length}/${
+              totalWeeks.length
+            } (${Math.round(
+              (participationRatio.length / totalWeeks.length || 0) * 100
+            )}%)`,
             inline: true,
           }
         )
