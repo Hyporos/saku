@@ -6,7 +6,7 @@ const culvertSchema = require("../../culvertSchema.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("profile")
-    .setDescription("Preview a culvert profile")
+    .setDescription("Preview the culvert profile of a user")
     .addStringOption((option) =>
       option
         .setName("character")
@@ -190,7 +190,7 @@ module.exports = {
           {
             name: "Participation",
             value: `${participationRatio.length}/${totalWeeks.length} (${
-              (participationRatio.length / totalWeeks.length || 0) * 100
+              Math.round((participationRatio.length / totalWeeks.length || 0) * 100)
             }%)`,
             inline: true,
           }
@@ -204,7 +204,7 @@ module.exports = {
       interaction.reply({ embeds: [profile] });
     } catch (error) {
       interaction.reply(
-        `Error ⎯ The character **${selectedCharacter}** has not been linked to any user`
+        `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
       );
       console.log(error);
     }

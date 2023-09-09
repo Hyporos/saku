@@ -31,7 +31,7 @@ module.exports = {
     // Ranking API
     const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${characterName}&page_index=1`;
 
-    // Check if character is linked to user
+    // Check if character is linked to a user
     const characterLinked = await culvertSchema.exists({
       "characters.name": { $regex: characterName, $options: "i" },
     });
