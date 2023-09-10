@@ -1,3 +1,6 @@
+//TODO: Add a number of weeks argument
+//TODO: Add custom colors for graph
+
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
@@ -94,7 +97,7 @@ module.exports = {
     }
 
     // QuickChart Template Link
-    const url = `https://quickchart.io/chart/render/sf-2eba46e5-69a9-4e02-bce3-4099896485f7?labels=${getLabels()}&data1=${getData()}`;
+    const url = `https://quickchart.io/chart/render/sf-50c223fa-a4b0-4b36-8aec-cc56e00303b5?labels=${getLabels()}&data1=${getData()}`;
 
     // Display responses
     if (characterLinked && user.characters[0].scores.length >= 2) {
