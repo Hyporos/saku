@@ -157,7 +157,7 @@ module.exports = {
 
       // If no scores found, display an empty box
       content = content.concat(
-        scores.length > 0 ? "\u0060\u0060\u0060" : " \u0060\u0060\u0060"
+        scores.length > 1 ? "\u0060\u0060\u0060" : " \u0060\u0060\u0060"
       );
 
       return content;
@@ -168,10 +168,10 @@ module.exports = {
       const profile = new EmbedBuilder()
         .setColor(0xffc3c5)
         .setTitle(user.characters[0].name)
+        .setAuthor({name: 'Culvert Profile'})
         .setURL(
           `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
         )
-        .setDescription("Saku Culvert Stats")
         .setThumbnail(user.characters[0].avatar)
         .addFields(
           {

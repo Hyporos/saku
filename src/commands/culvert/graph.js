@@ -51,7 +51,9 @@ module.exports = {
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
-      { "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" } },
+      {
+        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+      },
       { "characters.$": 1 }
     );
 
@@ -97,14 +99,21 @@ module.exports = {
     }
 
     // QuickChart Template Link
-    const url = `https://quickchart.io/chart/render/sf-50c223fa-a4b0-4b36-8aec-cc56e00303b5?labels=${getLabels()}&data1=${getData()}`;
+    const url = `https://quickchart.io/chart/render/sf-a0c9df8f-a30d-4688-8734-9f584db5ce26?labels=${getLabels()}&data1=${getData()}`;
 
     // Display responses
     if (characterLinked && user.characters[0].scores.length >= 2) {
       const graph = new EmbedBuilder()
         .setColor(0x202222)
+        .setAuthor({name: 'Culvert Graph'})
         .setImage(url)
-        .setTitle(user.characters[0].name);
+        .setTitle(user.characters[0].name)
+        .setURL(
+          `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
+        )
+        .setDescription(`Level ${user.characters[0].level} ${user.characters[0].class} ⎯ Rank 20 (Lifetime Culvert)`)
+        .setFooter({
+          text: "Submit scores with /gpq  •  Display stats with /profile"});
       interaction.reply({ embeds: [graph] });
     } else if (!characterLinked) {
       interaction.reply(
