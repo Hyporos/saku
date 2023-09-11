@@ -10,16 +10,9 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
-    const beforeEmbed = new EmbedBuilder()
-      .setColor(0xffc3c5)
-      .setDescription("Pinging...");
+    const message = await interaction.deferReply({ fetchReply: true });
 
-    const message = await interaction.reply({
-      embeds: [beforeEmbed],
-      fetchReply: true,
-    });
-
-    const afterEmbed = new EmbedBuilder()
+    const pong = new EmbedBuilder()
       .setColor(0xffc3c5)
       .setAuthor({
         name: "Pong!",
@@ -32,6 +25,6 @@ module.exports = {
         }ms\n**API** ⎯ ${client.ws.ping}ms`
       );
 
-    interaction.editReply({ embeds: [afterEmbed] });
+    interaction.editReply({ embeds: [pong] });
   },
 };

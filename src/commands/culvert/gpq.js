@@ -58,7 +58,7 @@ module.exports = {
     const culvertScore = interaction.options.getInteger("culvert_score");
 
     // Day of the week the culvert score gets reset (sunday)
-    const reset = String(dayjs().day(0).format("YYYY-MM-DD")); // ? Is this String() needed?
+    const reset = dayjs().day(0).format("YYYY-MM-DD");
 
     // Check if character exists
     const characterExists = await culvertSchema.exists({
