@@ -168,7 +168,7 @@ module.exports = {
       const profile = new EmbedBuilder()
         .setColor(0xffc3c5)
         .setTitle(user.characters[0].name)
-        .setAuthor({name: 'Culvert Profile'})
+        .setAuthor({ name: "Culvert Profile" })
         .setURL(
           `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
         )
@@ -190,7 +190,8 @@ module.exports = {
           {
             name: "Current Score",
             value: `${
-              user.characters[0].scores[user.characters[0].scores.length - 1]?.score || "0"
+              user.characters[0].scores[user.characters[0].scores.length - 1]
+                ?.score || "0"
             }`,
             inline: true,
           },
@@ -200,8 +201,8 @@ module.exports = {
             inline: true,
           },
           {
-            name: "Lifetime Rank",
-            value: `20`,
+            name: "Personal Best",
+            value: `${bestScore[0].characters.scores[0]?.score || "0"}`,
             inline: true,
           }
         )
@@ -212,13 +213,13 @@ module.exports = {
         })
         .addFields(
           {
-            name: "Personal Best",
-            value: `${bestScore[0].characters.scores[0]?.score || "0"}`,
+            name: "Lifetime Score",
+            value: `${totalScore[0]?.total_score || "0"}`,
             inline: true,
           },
           {
-            name: "Lifetime Score",
-            value: `${totalScore[0]?.total_score || "0"}`,
+            name: "Lifetime Rank",
+            value: `20`,
             inline: true,
           },
           {

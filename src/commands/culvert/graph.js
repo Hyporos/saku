@@ -111,9 +111,8 @@ module.exports = {
         .setURL(
           `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
         )
-        .setDescription(`Level ${user.characters[0].level} ${user.characters[0].class} ⎯ Rank 20 (Lifetime Culvert)`)
         .setFooter({
-          text: "Submit scores with /gpq  •  Display stats with /profile"});
+          text: "Submit scores with /gpq • Display stats with /profile"});
       interaction.reply({ embeds: [graph] });
     } else if (!characterLinked) {
       interaction.reply(

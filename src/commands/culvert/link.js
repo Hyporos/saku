@@ -32,7 +32,7 @@ module.exports = {
 
     // Check if character is linked to a user
     const characterLinked = await culvertSchema.exists({
-      "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+      "characters.name": { $regex: `^${characterName}$`, $options: "i" },
     });
 
     // Determine class name based on JobDetail
