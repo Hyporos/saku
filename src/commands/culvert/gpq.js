@@ -111,7 +111,7 @@ module.exports = {
         {
           arrayFilters: [
             {
-              "nameElem.name": { $regex: `^${character.name}$`, $options: "i" },
+              "nameElem.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
             },
           ],
           new: true,

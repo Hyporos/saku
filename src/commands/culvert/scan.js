@@ -19,6 +19,8 @@ module.exports = {
   async execute(client, interaction) {
     const image = interaction.options.getAttachment("attach");
 
+    await interaction.deferReply();
+
     // Day of the week the culvert score gets reset (sunday)
     const reset = String(dayjs().day(0).format("YYYY-MM-DD")); // ? Is this String() needed?
 
@@ -28,7 +30,7 @@ module.exports = {
         .contrast(1)
         .grayscale()
         .invert()
-        .scale(5)
+        .scale(4)
         .write("processedImage.jpg");
     });
 
@@ -37,8 +39,8 @@ module.exports = {
     });
 
     (async () => {
-      await worker.loadLanguage("eng");
-      await worker.initialize("eng");
+      await worker.loadLanguage("eng+fra+spa+dan+swe+ita");
+      await worker.initialize("eng+fra+spa+dan+swe+ita");
       await worker.setParameters({
         tessedit_char_blacklist: ",.",
       });
@@ -68,11 +70,12 @@ module.exports = {
 
       for (const character of characters) {
         // Find the character with the given name
-        const splicedName = character.name.substring(0,4);
+        const splicedFirst = character.name.substring(0,4);
+        const splicedLast = character.name.substring(character.name.length -4)
         const user = await culvertSchema.findOne(
           {
             "characters.name": {
-              $regex: `^${splicedName}`,
+              $regex: `^${splicedFirst}|${splicedLast}$`,
               $options: "i",
             },
           },
@@ -92,7 +95,7 @@ module.exports = {
             {
               $match: {
                 "characters.name": {
-                  $regex: `^${splicedName}`,
+                  $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
                 "characters.scores.date": reset,
@@ -105,7 +108,7 @@ module.exports = {
             await culvertSchema.findOneAndUpdate(
               {
                 "characters.name": {
-                  $regex: `^${splicedName}`,
+                  $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
               },
@@ -121,7 +124,7 @@ module.exports = {
                 arrayFilters: [
                   {
                     "nameElem.name": {
-                      $regex: `^${splicedName}`,
+                      $regex: `^${splicedFirst}|${splicedLast}$`,
                       $options: "i",
                     },
                   },
@@ -133,7 +136,7 @@ module.exports = {
             await culvertSchema.findOneAndUpdate(
               {
                 "characters.name": {
-                  $regex: `^${splicedName}`,
+                  $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
                 "characters.scores.date": reset,
@@ -148,7 +151,7 @@ module.exports = {
                 arrayFilters: [
                   {
                     "nameElem.name": {
-                      $regex: `^${splicedName}`,
+                      $regex: `^${splicedFirst}|${splicedLast}$`,
                       $options: "i",
                     },
                   },
@@ -176,7 +179,7 @@ module.exports = {
         response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
       }
 
-      interaction.reply(response);
+      interaction.editReply(response);
     })();
   },
 };
