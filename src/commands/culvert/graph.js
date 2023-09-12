@@ -70,7 +70,7 @@ module.exports = {
 
         let content = "";
 
-        for (let i = 0; i <= 8; i++) {
+        for (let i = scores.length - 1; i >= scores.length - 9; i--) {
           if (scores[i]) {
             const newDate = dayjs(scores[i].date).format("MM/DD"); // Reformat the date
             content = content.concat(newDate, ",");
@@ -89,7 +89,7 @@ module.exports = {
 
         let content = "";
 
-        for (let i = 0; i <= 8; i++) {
+        for (let i = scores.length - 1; i >= scores.length - 9; i--) {
           if (scores[i]) content = content.concat(scores[i].score, ",");
         }
 
@@ -99,7 +99,7 @@ module.exports = {
     }
 
     // QuickChart Template Link
-    const url = `https://quickchart.io/chart/render/sf-a0c9df8f-a30d-4688-8734-9f584db5ce26?labels=${getLabels()}&data1=${getData()}`;
+    const url = `https://quickchart.io/chart/render/sf-2ee241ce-43cc-4fea-96bf-0e41120ddeed?labels=${getLabels()}&data1=${getData()}`;
 
     // Display responses
     if (characterLinked && user.characters[0].scores.length >= 2) {

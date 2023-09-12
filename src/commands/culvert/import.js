@@ -1,26 +1,108 @@
-//TODO - Add a streak system
-//TODO - Validate for negative and massive numbers
-
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const fs = require("fs");
+const { parse } = require("csv");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("import")
-    .setDescription("Import character data from google sheets"),
+    .setDescription("Import character data from a .csv"),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
+  // ! WELCOME TO MY TWO TIME USE SPAGHETTI CODE ! NO POINT IN OPTIMIZING THIS !
+
   async execute(client, interaction) {
 
-    // Check if character exists
-    const characterExists = await culvertSchema.exists({
-      "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-    });
+    await interaction.deferReply();
+
+    fs.createReadStream("./culv.csv")
+      .pipe(parse({ delimiter: ",", from_line: 2 }))
+      .on("data", async function (row) {
+        for (let j = 4; j <= 28; j++) {
+          const memberSince = row[0].split(/\r?\n/);
+          const charNames = row[1].split(/\r?\n/);
+          const charScore = row[j].split(/\r?\n/);
+
+          const dates = [
+            "Member-Since",
+            "GuildMember",
+            "Discord",
+            "DiscordId",
+            "2023-03-19",
+            "2023-03-26",
+            "2023-04-02",
+            "2023-04-09",
+            "2023-04-16",
+            "2023-04-23",
+            "2023-04-30",
+            "2023-05-07",
+            "2023-05-14",
+            "2023-05-21",
+            "2023-05-28",
+            "2023-06-04",
+            "2023-06-11",
+            "2023-06-18",
+            "2023-06-25",
+            "2023-07-02",
+            "2023-07-09",
+            "2023-07-16",
+            "2023-07-23",
+            "2023-07-30",
+            "2023-08-06",
+            "2023-08-13",
+            "2023-08-20",
+            "2023-08-27",
+            "2023-09-03",
+          ];
+
+          console.log(dates[j]);
+
+          // AOKI, JIEYAH, DWAEKKI HAVE WRONG PICS
+          // EGGSITE, ALACARTE, ULTRAZIRALL, RINKAWA, THANHY HAVE WRONG DISCORD
+          for (let i = 0; i < charNames.length; i++) {
+            if (charScore[i] !== "" && !isNaN(Number(charScore[i]))) { 
+              await culvertSchema.findOneAndUpdate(
+                {
+                  "characters.name": {
+                    $regex: `^${charNames[i]}$`,
+                    $options: "i",
+                  },
+                },
+                {
+                  $addToSet: {
+                    "characters.$[nameElem].scores": {
+                      score: Number(charScore[i]),
+                      date: dates[j],
+                    },
+                  },
+                },
+                {
+                  arrayFilters: [
+                    {
+                      "nameElem.name": {
+                        $regex: `^${charNames[i]}$`,
+                        $options: "i",
+                      },
+                    },
+                  ],
+                  new: true,
+                }
+              );
+            }
+          }
+        }
+      })
+      .on("end", function () {
+        console.log("finished");
+      })
+      .on("error", function (error) {
+        console.log(error.message);
+      });
 
     // Display responses
-    let response = "";
+    await interaction.editReply("Finished");
   },
 };

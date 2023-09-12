@@ -59,7 +59,7 @@ module.exports = {
       .setAuthor({ name: "Culvert Rankings" })
       .addFields({
         name: "Weekly (2023-09-10)",
-        value: `\u0060\u0060\u00601.⠀Beezle⠀⠀⠀⠀⠀⠀⠀⠀⠀18951\n2.⠀Druuwu⠀⠀⠀⠀⠀⠀⠀⠀⠀16583\n3.⠀dissatisfied⠀⠀⠀⠀14931\n4.⠀Beewi⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀12184\n5.⠀maister⠀⠀⠀⠀⠀⠀⠀⠀10941\n6.⠀Rally⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀9843\n7.⠀lycheeemelon⠀⠀⠀⠀8431\n8.⠀memeboxx⠀⠀⠀⠀⠀⠀⠀⠀6531\u0060\u0060\u0060`,
+        value: `\u0060\u0060\u00601.⠀Beezle\t\t\t18951\n2.⠀Druuwu\t\t\t16583\n3.⠀dissatisfied\t\t14931\n4.⠀Beewi\t\t\t\t12184\n5.⠀maister\t\t\t10941\n6.⠀Rally\t\t\t\t9843\n7.⠀lycheeemelon\t\t8431\n8.⠀memeboxx\t\t\t6531\u0060\u0060\u0060`,
         inline: false,
       })
       .setFooter({ text: "Page 1/20 • Resets in 3 days" });

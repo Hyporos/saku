@@ -57,6 +57,9 @@ module.exports = {
     const selectedCharacter = interaction.options.getString("character");
     const culvertScore = interaction.options.getInteger("culvert_score");
 
+    // Check if the sender is a Bee
+    const isBee = interaction.member.roles.cache.has("720001044746076181")
+
     // Day of the week the culvert score gets reset (sunday)
     const reset = dayjs().day(0).format("YYYY-MM-DD");
 
@@ -94,7 +97,7 @@ module.exports = {
     if (weekLogged.length < 1) {
       await culvertSchema.findOneAndUpdate(
         {
-          _id: interaction.user.id,
+        _id: (!isBee ? interaction.user.id : { $regex: /.*/}),
           "characters.name": {
             $regex: `^${selectedCharacter}$`,
             $options: "i",
@@ -120,7 +123,7 @@ module.exports = {
     } else {
       await culvertSchema.findOneAndUpdate(
         {
-          _id: interaction.user.id,
+        _id: (!isBee ? interaction.user.id : { $regex: /.*/}),
           "characters.name": {
             $regex: `^${selectedCharacter}$`,
             $options: "i",
@@ -150,7 +153,7 @@ module.exports = {
     // Display responses
     let response = "";
 
-    if (!characterLinked && characterExists) {
+    if (!characterLinked && characterExists && !isBee) {
       response = `Error ⎯ The character **${selectedCharacter}** is not linked to you`;
     } else if (!characterExists) {
       response = `Error ⎯ The character **${selectedCharacter}** has not yet been linked`;

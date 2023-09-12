@@ -26,20 +26,21 @@ module.exports = {
 
     // Create individual exceptions for recurring un-scannable names
     function exceptions(name) {
-      if (name === "dissatisfiedrhunder" || name === "dissatisfiedhunder") return "dìssatisfied";
-      if (name === "lgniteChee") return "IgniteCheese"
-      if (name === "Idiot") return "ldìot"
-      if (name === "Takina") return "Takìna"
-      if (name === "YapeOnurG") return "VapeOnurGirl"
-      if (name === "WhylCry") return "WhyICry"
-      if (name === "miche") return "míche"
-      if (name === "Náro") return "Nàro"
-      if (name === "Migs") return "Mïgs"
-      if (name === "Cehba") return "Cebba"
-      if (name === "Kyéra") return "Kyêra"
-      if (name === "Jdéy") return "Jòéy"
-      if (name === "yuhing") return "yubin8"
-      if (name === "Méllgw") return "Mëlløw"
+      if (name === "dissatisfiedrhunder" || name === "dissatisfiedhunder")
+        return "dìssatisfied";
+      if (name === "lgniteChee") return "IgniteCheese";
+      if (name === "Idiot") return "ldìot";
+      if (name === "Takina") return "Takìna";
+      if (name === "YapeOnurG") return "VapeOnurGirl";
+      if (name === "WhylCry") return "WhyICry";
+      if (name === "miche") return "míche";
+      if (name === "Náro") return "Nàro";
+      if (name === "Migs") return "Mïgs";
+      if (name === "Cehba") return "Cebba";
+      if (name === "Kyéra") return "Kyêra";
+      if (name === "Jdéy") return "Jòéy";
+      if (name === "yuhing") return "yubin8";
+      if (name === "Méllgw") return "Mëlløw";
       return name;
     }
 
@@ -49,7 +50,7 @@ module.exports = {
         .contrast(1)
         .grayscale()
         .invert()
-        .scale(4)
+        .scale(1.4)
         .write("processedImage.jpg");
     });
 
@@ -196,10 +197,22 @@ module.exports = {
         }
       }
 
+      function getSuccessList() {
+        let content = "";
+
+        for (const character of characters) {
+          content = content.concat(
+            `${character.name}: **${!isNaN(character.score) ? character.score : "0 (NaN)"}**\n`
+          );
+        }
+
+        return content;
+      }
+
       // Display responses
       let response = `Submitted scores for **${
         successCount - numberNaN.length
-      }/${characters.length}** characters`;
+      }/${characters.length}** characters\n\n${getSuccessList()}`;
 
       if (notFound.length > 0) {
         response = response.concat(
@@ -222,6 +235,7 @@ module.exports = {
       }
 
       interaction.editReply(response);
+      console.log(characters);
     })();
   },
 };

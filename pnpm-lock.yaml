@@ -11,6 +11,9 @@ dependencies:
   axios:
     specifier: ^1.5.0
     version: 1.5.0
+  csv:
+    specifier: ^6.3.3
+    version: 6.3.3
   dayjs:
     specifier: ^1.11.9
     version: 1.11.9
@@ -644,6 +647,28 @@ packages:
     engines: {node: '>= 0.8'}
     dependencies:
       delayed-stream: 1.0.0
+    dev: false
+
+  /csv-generate@4.2.8:
+    resolution: {integrity: sha512-qQ5CUs4I58kfo90EDBKjdp0SpJ3xWnN1Xk1lZ1ITvfvMtNRf+jrEP8tNPeEPiI9xJJ6Bd/km/1hMjyYlTpY42g==}
+    dev: false
+
+  /csv-parse@5.5.0:
+    resolution: {integrity: sha512-RxruSK3M4XgzcD7Trm2wEN+SJ26ChIb903+IWxNOcB5q4jT2Cs+hFr6QP39J05EohshRFEvyzEBoZ/466S2sbw==}
+    dev: false
+
+  /csv-stringify@6.4.2:
+    resolution: {integrity: sha512-DXIdnnCUQYjDKTu6TgCSzRDiAuLxDjhl4ErFP9FGMF3wzBGOVMg9bZTLaUcYtuvhXgNbeXPKeaRfpgyqE4xySw==}
+    dev: false
+
+  /csv@6.3.3:
+    resolution: {integrity: sha512-TuOM1iZgdDiB6IuwJA8oqeu7g61d9CU9EQJGzCJ1AE03amPSh/UK5BMjAVx+qZUBb/1XEo133WHzWSwifa6Yqw==}
+    engines: {node: '>= 0.1.90'}
+    dependencies:
+      csv-generate: 4.2.8
+      csv-parse: 5.5.0
+      csv-stringify: 6.4.2
+      stream-transform: 3.2.8
     dev: false
 
   /dayjs@1.11.9:
@@ -1373,6 +1398,10 @@ packages:
     requiresBuild: true
     dependencies:
       memory-pager: 1.5.0
+    dev: false
+
+  /stream-transform@3.2.8:
+    resolution: {integrity: sha512-NUx0mBuI63KbNEEh9Yj0OzKB7iMOSTpkuODM2G7By+TTVihEIJ0cYp5X+pq/TdJRlsznt6CYR8HqxexyC6/bTw==}
     dev: false
 
   /streamsearch@1.1.0:
