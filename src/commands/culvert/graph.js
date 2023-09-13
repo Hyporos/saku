@@ -17,6 +17,20 @@ module.exports = {
         .setDescription("The characters graph to be visualized")
         .setRequired(true)
         .setAutocomplete(true)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("number_of_weeks")
+        .setDescription(
+          "The number of weeks to display on the graph (default: 8)"
+        )
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName("omit_missed_weeks")
+        .setDescription(
+          "Prevent the missed weeks (unsubmitted scores) from displaying on the graph"
+        )
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -48,6 +62,8 @@ module.exports = {
 
   async execute(client, interaction) {
     const selectedCharacter = interaction.options.getString("character_name");
+    const numOfWeeks = interaction.options.getInteger("number_of_weeks");
+    const omitMissed = interaction.options.getBoolean("omit_missed_weeks");
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
@@ -68,17 +84,25 @@ module.exports = {
       if (characterLinked) {
         const scores = user.characters[0].scores;
 
+        let threshold = (!numOfWeeks ? 8 : numOfWeeks);
         let content = "";
 
-        for (let i = scores.length - 1; i >= scores.length - 9; i--) {
+        for (
+          let i = scores.length - 1;
+          i >= scores.length - threshold;
+          i--
+        ) {
           if (scores[i]) {
-            const newDate = dayjs(scores[i].date).format("MM/DD"); // Reformat the date
-            content = content.concat(newDate, ",");
+            if (omitMissed && scores[i].score === 0) {
+              threshold++;
+            } else {
+              const newDate = dayjs(scores[i].date).format("MM/DD"); // Reformat the date
+              content = content.concat(newDate, ",");
+            }
           }
         }
 
-        content = content.slice(0, -1); // Remove the unnecessary comma at the end
-        return content;
+        return content.slice(0, -1); // Remove the unnecessary comma at the end
       }
     }
 
@@ -87,14 +111,24 @@ module.exports = {
       if (characterLinked) {
         const scores = user.characters[0].scores;
 
+        let threshold = (!numOfWeeks ? 8 : numOfWeeks);
         let content = "";
 
-        for (let i = scores.length - 1; i >= scores.length - 9; i--) {
-          if (scores[i]) content = content.concat(scores[i].score, ",");
+        for (
+          let i = scores.length - 1;
+          i >= scores.length - threshold;
+          i--
+        ) {
+          if (scores[i]) {
+            if (omitMissed && scores[i].score === 0) {
+              threshold++
+            } else {
+              content = content.concat(scores[i].score, ",");
+            }
+          }
         }
 
-        content = content.slice(0, -1); // Remove the unnecessary comma at the end
-        return content;
+        return content.slice(0, -1); // Remove the unnecessary comma at the end
       }
     }
 
@@ -105,14 +139,15 @@ module.exports = {
     if (characterLinked && user.characters[0].scores.length >= 2) {
       const graph = new EmbedBuilder()
         .setColor(0x202222)
-        .setAuthor({name: 'Culvert Graph'})
+        .setAuthor({ name: "Culvert Graph" })
         .setImage(url)
         .setTitle(user.characters[0].name)
         .setURL(
           `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
         )
         .setFooter({
-          text: "Submit scores with /gpq • Display stats with /profile"});
+          text: "Submit scores with /gpq • Display stats with /profile",
+        });
       interaction.reply({ embeds: [graph] });
     } else if (!characterLinked) {
       interaction.reply(

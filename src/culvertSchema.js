@@ -26,7 +26,7 @@ const culvertSchema = new Schema(
           type: Number,
           required: true,
         },
-        rank: {
+        joinDate: {
           type: String,
           required: true,
         },

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -44,6 +45,9 @@ module.exports = {
 
   async execute(client, interaction) {
     const selectedCharacter = interaction.options.getString("character");
+
+    // Day of the week the culvert score gets reset (sunday)
+    const reset = dayjs().day(0).format("YYYY-MM-DD");
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
@@ -147,10 +151,26 @@ module.exports = {
     function getPreviousScores() {
       const scores = user.characters[0].scores;
 
+      let notSubmitted = false;
+
       let content = "\u0060\u0060\u0060";
 
-      for (let i = scores.length - 2; i >= scores.length - 5; i--) {
-        // Only grab the last 4 scores before this week
+      // If the user has not submitted a score for this week, pretend it's 0.
+      if (user.characters[0].scores[scores.length - 1].date !== reset) {
+        content = content.concat(
+          scores[scores.length - 1].date,
+          ": ",
+          scores[scores.length - 1].score,
+          "\n"
+        );
+        notSubmitted = true;
+      }
+      for (
+        let i = scores.length - 2;
+        i >= scores.length - (!notSubmitted ? 5 : 4);
+        i--
+      ) {
+        // Only grab the last 3/4 scores before this week
         if (scores[i])
           content = content.concat(scores[i].date, ": ", scores[i].score, "\n");
       }
@@ -184,14 +204,18 @@ module.exports = {
             value: `${user.characters[0].level}`,
             inline: true,
           },
-          { name: "Member Since", value: "2022-04-11", inline: true }
+          { name: "Member Since", value: `${user.characters[0].joinDate}`, inline: true }
         )
         .addFields(
           {
             name: "Current Score",
             value: `${
               user.characters[0].scores[user.characters[0].scores.length - 1]
-                ?.score || "0"
+                ?.date !== reset
+                ? 0
+                : user.characters[0].scores[
+                    user.characters[0].scores.length - 1
+                  ]?.score || "0"
             }`,
             inline: true,
           },

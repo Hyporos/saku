@@ -16,93 +16,101 @@ module.exports = {
 
   async execute(client, interaction) {
 
-    await interaction.deferReply();
+    if (interaction.user.id !== "631397640714675725") {
+      await interaction.deferReply();
 
-    fs.createReadStream("./culv.csv")
-      .pipe(parse({ delimiter: ",", from_line: 2 }))
-      .on("data", async function (row) {
-        for (let j = 4; j <= 28; j++) {
-          const memberSince = row[0].split(/\r?\n/);
-          const charNames = row[1].split(/\r?\n/);
-          const charScore = row[j].split(/\r?\n/);
-
-          const dates = [
-            "Member-Since",
-            "GuildMember",
-            "Discord",
-            "DiscordId",
-            "2023-03-19",
-            "2023-03-26",
-            "2023-04-02",
-            "2023-04-09",
-            "2023-04-16",
-            "2023-04-23",
-            "2023-04-30",
-            "2023-05-07",
-            "2023-05-14",
-            "2023-05-21",
-            "2023-05-28",
-            "2023-06-04",
-            "2023-06-11",
-            "2023-06-18",
-            "2023-06-25",
-            "2023-07-02",
-            "2023-07-09",
-            "2023-07-16",
-            "2023-07-23",
-            "2023-07-30",
-            "2023-08-06",
-            "2023-08-13",
-            "2023-08-20",
-            "2023-08-27",
-            "2023-09-03",
-          ];
-
-          console.log(dates[j]);
-
-          // AOKI, JIEYAH, DWAEKKI HAVE WRONG PICS
-          // EGGSITE, ALACARTE, ULTRAZIRALL, RINKAWA, THANHY HAVE WRONG DISCORD
-          for (let i = 0; i < charNames.length; i++) {
-            if (charScore[i] !== "" && !isNaN(Number(charScore[i]))) { 
-              await culvertSchema.findOneAndUpdate(
-                {
-                  "characters.name": {
-                    $regex: `^${charNames[i]}$`,
-                    $options: "i",
-                  },
-                },
-                {
-                  $addToSet: {
-                    "characters.$[nameElem].scores": {
-                      score: Number(charScore[i]),
-                      date: dates[j],
+      fs.createReadStream("./culv.csv")
+        .pipe(parse({ delimiter: ",", from_line: 2 }))
+        .on("data", async function (row) {
+          for (let j = 4; j <= 28; j++) {
+            const memberSince = row[0].split(/\r?\n/);
+            const charNames = row[1].split(/\r?\n/);
+            const charScore = row[j].split(/\r?\n/);
+  
+            const dates = [
+              "Member-Since",
+              "GuildMember",
+              "Discord",
+              "DiscordId",
+              "2023-03-19",
+              "2023-03-26",
+              "2023-04-02",
+              "2023-04-09",
+              "2023-04-16",
+              "2023-04-23",
+              "2023-04-30",
+              "2023-05-07",
+              "2023-05-14",
+              "2023-05-21",
+              "2023-05-28",
+              "2023-06-04",
+              "2023-06-11",
+              "2023-06-18",
+              "2023-06-25",
+              "2023-07-02",
+              "2023-07-09",
+              "2023-07-16",
+              "2023-07-23",
+              "2023-07-30",
+              "2023-08-06",
+              "2023-08-13",
+              "2023-08-20",
+              "2023-08-27",
+              "2023-09-03",
+            ];
+  
+            console.log(dates[j]);
+  
+            // AOKI, JIEYAH, DWAEKKI HAVE WRONG PICS
+            // EGGSITE, ALACARTE, ULTRAZIRALL, RINKAWA, THANHY HAVE WRONG DISCORD
+            for (let i = 0; i < charNames.length; i++) {
+              if (charScore[i] !== "" && !isNaN(Number(charScore[i]))) { 
+                const updated = charScore[i].replaceAll(',','')
+                await culvertSchema.findOneAndUpdate(
+                  {
+                    "characters.name": {
+                      $regex: `^${charNames[i]}$`,
+                      $options: "i",
                     },
                   },
-                },
-                {
-                  arrayFilters: [
-                    {
-                      "nameElem.name": {
-                        $regex: `^${charNames[i]}$`,
-                        $options: "i",
+                  {
+                    $addToSet: {
+                      "characters.$[nameElem].joinDate": memberSince[i],
+                      "characters.$[nameElem].scores": {
+                        score: updated,
+                        date: dates[j],
                       },
                     },
-                  ],
-                  new: true,
-                }
-              );
+                  },
+                  {
+                    arrayFilters: [
+                      {
+                        "nameElem.name": {
+                          $regex: `^${charNames[i]}$`,
+                          $options: "i",
+                        },
+                      },
+                    ],
+                    new: true,
+                  }
+                );
+              }
             }
           }
-        }
-      })
-      .on("end", function () {
-        console.log("finished");
-      })
-      .on("error", function (error) {
-        console.log(error.message);
-      });
+        })
+        .on("end", async function () {
+          console.log("finished");
+          await interaction.editReply("Finished");
+        })
+        .on("error", async function (error) {
+          console.log(error.message);
+          await interaction.editReply("Error");
+        });
+  
+      // Display responses
+    } else {
+      interaction.reply("Error ⎯ This command is currently disabled")
+    }
 
-    // Display responses
-    await interaction.editReply("Finished");
   },
 };
