@@ -64,7 +64,7 @@ module.exports = {
             // AOKI, JIEYAH, DWAEKKI HAVE WRONG PICS
             // EGGSITE, ALACARTE, ULTRAZIRALL, RINKAWA, THANHY HAVE WRONG DISCORD
             for (let i = 0; i < charNames.length; i++) {
-              if (charScore[i] !== "" && !isNaN(Number(charScore[i]))) { 
+              if (charScore[i] !== "" && !isNaN(Number(charScore[i]))) {                      
                 const updated = charScore[i].replaceAll(',','')
                 await culvertSchema.findOneAndUpdate(
                   {
@@ -75,11 +75,35 @@ module.exports = {
                   },
                   {
                     $addToSet: {
-                      "characters.$[nameElem].joinDate": memberSince[i],
                       "characters.$[nameElem].scores": {
                         score: updated,
                         date: dates[j],
                       },
+                    },
+                  },
+                  {
+                    arrayFilters: [
+                      {
+                        "nameElem.name": {
+                          $regex: `^${charNames[i]}$`,
+                          $options: "i",
+                        },
+                      },
+                    ],
+                    new: true,
+                  }
+                );
+                // member since
+                await culvertSchema.findOneAndUpdate(
+                  {
+                    "characters.name": {
+                      $regex: `^${charNames[i]}$`,
+                      $options: "i",
+                    },
+                  },
+                  {
+                    $set: {
+                      "characters.$[nameElem].joinDate": memberSince[i],
                     },
                   },
                   {

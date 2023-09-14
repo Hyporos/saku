@@ -11,7 +11,7 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName("character")
-        .setDescription("The characters profile to be viewed")
+        .setDescription("The character's profile to be viewed")
         .setRequired(true)
         .setAutocomplete(true)
     ),
@@ -19,9 +19,11 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async autocomplete(interaction) {
-    const user = await culvertSchema
-      .findById(interaction.user.id, "characters")
-      .exec(); // ?is .exec needed?
+    const user = await culvertSchema.findById(
+      interaction.user.id,
+      "characters"
+    );
+
     const value = interaction.options.getFocused().toLowerCase();
 
     let choices = [];
@@ -33,8 +35,6 @@ module.exports = {
     const filtered = choices
       .filter((choice) => choice.toLowerCase().includes(value))
       .slice(0, 25);
-
-    if (!interaction) return; // ? is this needed?
 
     await interaction.respond(
       filtered.map((choice) => ({ name: choice, value: choice }))
@@ -204,7 +204,11 @@ module.exports = {
             value: `${user.characters[0].level}`,
             inline: true,
           },
-          { name: "Member Since", value: `${user.characters[0].joinDate}`, inline: true }
+          {
+            name: "Member Since",
+            value: `${user.characters[0].joinDate}`,
+            inline: true,
+          }
         )
         .addFields(
           {

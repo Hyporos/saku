@@ -12,24 +12,12 @@ const culvertSchema = require("../../culvertSchema.js");
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("rankings")
-    .setDescription("View the culvert leaderboard")
-    .addStringOption((option) =>
-      option
-        .setName("category")
-        .setDescription("The leaderboard category")
-        .setRequired(true)
-        .addChoices(
-          { name: "This week", value: "this_week" },
-          { name: "Last week", value: "last_week" },
-          { name: "Lifetime", value: "lifetime" }
-        )
-    ),
+    .setName("wos")
+    .setDescription("View the wall of shame..."),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
-    const category = interaction.options.getString("category");
 
     await interaction.deferReply();
 
@@ -90,17 +78,15 @@ module.exports = {
     // Sort the array of lifetime scores
     lifetimeList.sort((a, b) => {
       if (a.score === undefined) {
-        return 1;
-      }
-      if (b.score === undefined) {
         return -1;
       }
-      return b.score - a.score;
+      if (b.score === undefined) {
+        return 1;
+      }
+      return a.score - b.score;
     });
 
-    // Find the users rank
-
-    // Create the rankings list embed field
+    // Create the wos list embed field
     let firstRank = 0;
     let lastRank = 8;
     let page = 1;
@@ -115,14 +101,13 @@ module.exports = {
       for (let i = firstRank; i < lastRank; i++) {
         if (placement > 9) padding = 19; // Adjust padding based on placement length
         if (placement > 99) padding = 18;
-        if (lifetimeList[i]?.name) {
+        if (lifetimeList[i]?.name) { 
           content = content.concat(
             `${placement}. ${lifetimeList[i].name.padEnd(padding, " ")}${
               lifetimeList[i].score || 0
             }\n`
           );
         }
-
         placement++;
       }
       return content.concat("\u0060\u0060\u0060");
@@ -130,14 +115,13 @@ module.exports = {
 
     // Original embed
     const rankings = new EmbedBuilder()
-      .setColor(0xffc3c5)
-      .setAuthor({ name: "Culvert Rankings" })
+      .setColor(0xa30d0e)
       .addFields({
-        name: "Lifetime",
+        name: "Wall of Shame",
         value: `${getLifetimeRank()}`,
         inline: false,
       })
-      .setFooter({ text: `Page ${page}/${maxPage} • Your rank: #71` });
+      .setFooter({ text: `Page ${page}/${maxPage}` });
 
     // Display responses via button collector
     const response = await interaction.editReply({
@@ -156,16 +140,10 @@ module.exports = {
     collector.on("collect", async (interaction) => {
       // Handle button presses
       if (interaction.customId === "previous") {
-        if (page <= 1) {
-          page = 1;
-        } else {
-          page--;
-        }
         firstRank -= 8;
         lastRank -= 8;
-        placement -= 16;
-
- // if previous page, decrement the placements
+        page--;
+        placement -= 16; // if previous page, decrement the placements
       } else if (interaction.customId === "next") {
         firstRank += 8;
         lastRank += 8;
@@ -174,14 +152,13 @@ module.exports = {
 
       // New updated embed object // ! This should not be duplicated
       const rankingsUpdate = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setAuthor({ name: "Culvert Rankings" })
-        .addFields({
-          name: "Lifetime",
-          value: `${getLifetimeRank()}`,
-          inline: false,
-        })
-        .setFooter({ text: `Page ${page}/${maxPage} • Your rank: #71` });
+      .setColor(0xa30d0e)
+      .addFields({
+        name: "Wall of Shame",
+        value: `${getLifetimeRank()}`,
+        inline: false,
+      })
+      .setFooter({ text: `Page ${page}/${maxPage}` });
 
       // Display new page
       await interaction.deferUpdate();
@@ -201,14 +178,13 @@ module.exports = {
 
       // New updated embed object // ! This should not be duplicated
       const rankingsUpdate = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setAuthor({ name: "Culvert Rankings" })
-        .addFields({
-          name: "Lifetime",
-          value: `${getLifetimeRank()}`,
-          inline: false,
-        })
-        .setFooter({ text: `Page ${page}/${maxPage} • Your rank: #71` });
+      .setColor(0xa30d0e)
+      .addFields({
+        name: "Wall of Shame",
+        value: `${getLifetimeRank()}`,
+        inline: false,
+      })
+      .setFooter({ text: `Page ${page}/${maxPage}` });
 
       interaction.editReply({
         embeds: [rankingsUpdate],

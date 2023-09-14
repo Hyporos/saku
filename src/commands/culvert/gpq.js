@@ -28,9 +28,10 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async autocomplete(interaction) {
-    const user = await culvertSchema
-      .findById(interaction.user.id, "characters")
-      .exec(); // ?is .exec needed?
+    const user = await culvertSchema.findById(
+      interaction.user.id,
+      "characters"
+    );
 
     const value = interaction.options.getFocused().toLowerCase();
 
@@ -44,8 +45,6 @@ module.exports = {
       .filter((choice) => choice.toLowerCase().includes(value))
       .slice(0, 25);
 
-    if (!interaction) return; // ? is this needed?
-
     await interaction.respond(
       filtered.map((choice) => ({ name: choice, value: choice }))
     );
@@ -58,7 +57,7 @@ module.exports = {
     const culvertScore = interaction.options.getInteger("culvert_score");
 
     // Check if the sender is a Bee
-    const isBee = interaction.member.roles.cache.has("720001044746076181")
+    const isBee = interaction.member.roles.cache.has("720001044746076181");
 
     // Day of the week the culvert score gets reset (sunday)
     const reset = dayjs().day(0).format("YYYY-MM-DD");
@@ -97,7 +96,7 @@ module.exports = {
     if (weekLogged.length < 1) {
       await culvertSchema.findOneAndUpdate(
         {
-        _id: (!isBee ? interaction.user.id : { $regex: /.*/}),
+          _id: !isBee ? interaction.user.id : { $regex: /.*/ },
           "characters.name": {
             $regex: `^${selectedCharacter}$`,
             $options: "i",
@@ -114,7 +113,10 @@ module.exports = {
         {
           arrayFilters: [
             {
-              "nameElem.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+              "nameElem.name": {
+                $regex: `^${selectedCharacter}$`,
+                $options: "i",
+              },
             },
           ],
           new: true,
@@ -123,7 +125,7 @@ module.exports = {
     } else {
       await culvertSchema.findOneAndUpdate(
         {
-        _id: (!isBee ? interaction.user.id : { $regex: /.*/}),
+          _id: !isBee ? interaction.user.id : { $regex: /.*/ },
           "characters.name": {
             $regex: `^${selectedCharacter}$`,
             $options: "i",

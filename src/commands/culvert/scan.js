@@ -9,7 +9,7 @@ const Jimp = require("jimp");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("scan")
-    .setDescription("Store user culvert data by image")
+    .setDescription("Submit bulk culvert data from a screenshot")
     .addAttachmentOption((option) =>
       option.setName("attach").setDescription("Image").setRequired(true)
     ),
