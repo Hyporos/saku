@@ -160,7 +160,7 @@ module.exports = {
         content = content.concat(
           scores[scores.length - 1]?.date,
           ": ",
-          scores[scores.length - 1]?.score,
+          scores[scores.length - 1].score?.toLocaleString("en-US"),
           "\n"
         );
         notSubmitted = true;
@@ -172,7 +172,7 @@ module.exports = {
       ) {
         // Only grab the last 3/4 scores before this week
         if (scores[i])
-          content = content.concat(scores[i].date, ": ", scores[i].score, "\n");
+          content = content.concat(scores[i].date, ": ", scores[i].score.toLocaleString("en-US"), "\n");
       }
 
       // If no scores found, display an empty box
@@ -219,7 +219,7 @@ module.exports = {
                 ? 0
                 : user.characters[0].scores[
                     user.characters[0].scores.length - 1
-                  ]?.score || "0"
+                  ].score?.toLocaleString("en-US") || "0"
             }`,
             inline: true,
           },
@@ -230,7 +230,7 @@ module.exports = {
           },
           {
             name: "Personal Best",
-            value: `${bestScore[0].characters.scores[0]?.score || "0"}`,
+            value: `${bestScore[0].characters.scores[0]?.score.toLocaleString("en-US") || "0"}`,
             inline: true,
           }
         )
@@ -242,7 +242,7 @@ module.exports = {
         .addFields(
           {
             name: "Lifetime Score",
-            value: `${totalScore[0]?.total_score || "0"}`,
+            value: `${totalScore[0]?.total_score.toLocaleString("en-US") || "0"}`,
             inline: true,
           },
           {
