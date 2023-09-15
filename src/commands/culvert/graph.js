@@ -100,7 +100,7 @@ module.exports = {
     // QuickChart Template Link
     const url = `https://quickchart.io/chart/render/sf-2ee241ce-43cc-4fea-96bf-0e41120ddeed?labels=${getLabels(
       "x"
-    )}&data1=${getLabels("y")}&borderColor1=rgba(${user.graphColor},0.7)&backgroundColor1=rgba(${user.graphColor},0.4)`;
+    )}&data1=${getLabels("y")}&borderColor1=rgba(${user?.graphColor},0.7)&backgroundColor1=rgba(${user?.graphColor},0.4)`;
 
 
     // Display responses

@@ -30,7 +30,7 @@ const culvertSchema = new Schema(
           type: Number,
           required: true,
         },
-        joinDate: {
+        memberSince: {
           type: String,
           required: true,
         },

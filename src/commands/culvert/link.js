@@ -19,7 +19,14 @@ module.exports = {
         .setName("discord_user")
         .setDescription("The Discord user to be paired with the character")
         .setRequired(true)
-    ),
+    )
+    .addStringOption((option) =>
+    option
+      .setName("member_since")
+      .setDescription("The date that the character joined the guild")
+      .setRequired(true)
+  ),
+    
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -80,6 +87,7 @@ module.exports = {
             },
             {
               _id: discordUser.id,
+              graphColor: "31,119,180",
               $addToSet: {
                 characters: {
                   name: res.data[0].CharacterName,
