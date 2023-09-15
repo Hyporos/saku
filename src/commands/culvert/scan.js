@@ -106,6 +106,7 @@ module.exports = {
               $options: "i",
             },
           },
+          { "characters.$": 1 }
         );
 
         if (user) {
@@ -201,7 +202,9 @@ module.exports = {
 
         for (const character of characters) {
           content = content.concat(
-            `${character.name}: **${!isNaN(character.score) ? character.score : "0 (NaN)"}**\n`
+            `${character.name}: **${
+              !isNaN(character.score) ? character.score : "0 (NaN)"
+            }**\n`
           );
         }
 

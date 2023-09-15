@@ -103,7 +103,7 @@ module.exports = {
                   },
                   {
                     $set: {
-                      "characters.$[nameElem].joinDate": memberSince[i],
+                      "characters.$[nameElem].memberSince": memberSince[i],
                       graphColor: "31,119,180"
                     },
                   },

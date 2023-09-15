@@ -53,7 +53,8 @@ module.exports = {
     const user = await culvertSchema.findOne(
       {
         "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      }
+      },
+      { "characters.$": 1 }
     );
 
     // Calculate the sum of character scores
@@ -155,11 +156,11 @@ module.exports = {
       let content = "\u0060\u0060\u0060";
 
       // If the user has not submitted a score for this week, pretend it's 0.
-      if (user.characters[0].scores[scores.length - 1].date !== reset) {
+      if (scores[0] && user.characters[0].scores[scores.length - 1]?.date !== reset) {
         content = content.concat(
-          scores[scores.length - 1].date,
+          scores[scores.length - 1]?.date,
           ": ",
-          scores[scores.length - 1].score,
+          scores[scores.length - 1]?.score,
           "\n"
         );
         notSubmitted = true;
@@ -205,7 +206,7 @@ module.exports = {
           },
           {
             name: "Member Since",
-            value: `${user.characters[0].joinDate}`,
+            value: `${user.characters[0].memberSince}`,
             inline: true,
           }
         )

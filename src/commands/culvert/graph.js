@@ -67,7 +67,8 @@ module.exports = {
     const user = await culvertSchema.findOne(
       {
         "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      }
+      },
+      { "characters.$": 1 }
     );
 
     // Fetch the x and y axis labels for the graph

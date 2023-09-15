@@ -21,18 +21,18 @@ module.exports = {
         .setRequired(true)
     )
     .addStringOption((option) =>
-    option
-      .setName("member_since")
-      .setDescription("The date that the character joined the guild")
-      .setRequired(true)
-  ),
-    
+      option
+        .setName("member_since")
+        .setDescription("The date that the character joined the guild")
+        .setRequired(true)
+    ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
     const characterName = interaction.options.getString("character_name");
     const discordUser = interaction.options.getUser("discord_user");
+    const memberSince = interaction.options.getString("member_since");
 
     // Ranking API
     const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${characterName}&page_index=1`;
@@ -96,6 +96,7 @@ module.exports = {
                     res.data[0].CharacterImgUrl.slice(38), // Maplestory URL won't display an image, use the mapleranks URL instead
                   class: getClassName(res),
                   level: res.data[0].Level,
+                  memberSince: memberSince,
                 },
               },
             },
