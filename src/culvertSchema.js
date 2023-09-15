@@ -7,6 +7,10 @@ const culvertSchema = new Schema(
       type: String,
       required: true,
     },
+    graphColor: {
+      type: String,
+      required: true,
+    },
     characters: [
       {
         _id: false,

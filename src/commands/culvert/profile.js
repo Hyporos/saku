@@ -128,7 +128,7 @@ module.exports = {
       },
     ]);
 
-    // Calculate the particiation ratio of the character by returning the score objecte greater than 0
+    // Calculate the particiation ratio of the character by returning the score objects greater than 0
     const participationRatio = await culvertSchema.aggregate([
       {
         $unwind: "$characters",

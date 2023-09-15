@@ -104,7 +104,7 @@ module.exports = {
         if (lifetimeList[i]?.name) { 
           content = content.concat(
             `${placement}. ${lifetimeList[i].name.padEnd(padding, " ")}${
-              lifetimeList[i].score || 0
+              lifetimeList[i].score?.toLocaleString("en-US") || 0
             }\n`
           );
         }
@@ -140,14 +140,22 @@ module.exports = {
     collector.on("collect", async (interaction) => {
       // Handle button presses
       if (interaction.customId === "previous") {
-        firstRank -= 8;
-        lastRank -= 8;
-        page--;
-        placement -= 16; // if previous page, decrement the placements
+        if (page <= 1) {
+          placement -= 8; // prevent placement from changing
+        } else {
+          page--;
+          firstRank -= 8;
+          lastRank -= 8;
+          placement -= 16;
+        }
       } else if (interaction.customId === "next") {
-        firstRank += 8;
-        lastRank += 8;
-        page++;
+        if (page >= maxPage) {
+          placement -= 8;
+        } else {
+          firstRank += 8;
+          lastRank += 8;
+          page++;
+        }
       }
 
       // New updated embed object // ! This should not be duplicated
