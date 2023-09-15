@@ -12,17 +12,33 @@ module.exports = {
     .setDescription("Submit bulk culvert data from a screenshot")
     .addAttachmentOption((option) =>
       option.setName("attach").setDescription("Image").setRequired(true)
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName("last_week")
+        .setDescription(
+          "Submit the scores for last week instead (default: false)"
+        )
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
+    // Check if the sender is a Bee
+    if (!interaction.member.roles.cache.has("720001044746076181")) {
+      return interaction.reply(
+        "Error ⎯ You do not have permission to use this command"
+      );
+    }
+
     const image = interaction.options.getAttachment("attach");
+    const lastWeek = interaction.options.getBoolean("last_week");
 
     await interaction.deferReply();
 
     // Day of the week the culvert score gets reset (sunday)
     const reset = dayjs().day(0).format("YYYY-MM-DD");
+    const lastReset = dayjs().day(-7).format("YYYY-MM-DD");
 
     // Create individual exceptions for recurring un-scannable names
     function exceptions(name) {
@@ -111,7 +127,7 @@ module.exports = {
 
         if (user) {
           successCount++;
-          // Check if a score has already been set for this week
+          // Check if a score has already been set for the week
           const weekLogged = await culvertSchema.aggregate([
             {
               $unwind: "$characters",
@@ -125,7 +141,7 @@ module.exports = {
                   $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
-                "characters.scores.date": reset,
+                "characters.scores.date": lastWeek ? lastReset : reset,
               },
             },
           ]);
@@ -143,7 +159,7 @@ module.exports = {
                 $addToSet: {
                   "characters.$[nameElem].scores": {
                     score: !isNaN(character.score) ? character.score : 0,
-                    date: reset,
+                    date: lastWeek ? lastReset : reset,
                   },
                 },
               },
@@ -167,7 +183,7 @@ module.exports = {
                   $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
-                "characters.scores.date": reset,
+                "characters.scores.date": lastWeek ? lastReset : reset,
               },
               {
                 $set: {
@@ -186,7 +202,7 @@ module.exports = {
                       $options: "i",
                     },
                   },
-                  { "dateElem.date": reset },
+                  { "dateElem.date": lastWeek ? lastReset : reset },
                 ],
                 new: true,
               }

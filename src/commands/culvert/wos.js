@@ -18,6 +18,11 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
+    // Check if the sender is a Bee
+    if (!interaction.member.roles.cache.has("720001044746076181")){
+      return interaction.reply("Error ⎯ You do not have permission to use this command")
+    }
+
     await interaction.deferReply();
 
     // Create buttons & row
@@ -53,16 +58,19 @@ module.exports = {
         }
       }
 
-      shameList.push({
-        name: user.characters.name,
-        totalScores: totalScores,
-        submittedScores: totalScores - missedScores,
-        rate: Math.round(((totalScores - missedScores) / totalScores) * 100),
-      });
+      if (((totalScores - missedScores) / totalScores) * 100 <= 60) {
+        shameList.push({
+          name: user.characters.name,
+          totalScores: totalScores,
+          submittedScores: totalScores - missedScores,
+          rate: Math.round(((totalScores - missedScores) / totalScores) * 100),
+        });
+      }
     }
 
     // Sort the array of lifetime scores
     shameList.sort((a, b) => {
+      // If the rate is NaN, move it to the back of the list
       if (isNaN(a.rate)) {
         return 1;
       } else if (isNaN(b.rate)) {
@@ -169,6 +177,8 @@ module.exports = {
     collector.on("end", () => {
       previous.setDisabled(true);
       next.setDisabled(true);
+
+      placement -= 8; // TODO: Figure out why this even goes up +8 when it disables
 
       // New updated embed object // ! This should not be duplicated
       const rankingsUpdate = new EmbedBuilder()

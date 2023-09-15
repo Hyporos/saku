@@ -67,7 +67,7 @@ module.exports = {
       "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
     });
 
-    // Check if character is linked to user
+    // Check if character is linked to user // ! MAKE THIS NORMAL JS BRO
     const characterLinked = await culvertSchema.exists({
       _id: interaction.user.id,
       "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },

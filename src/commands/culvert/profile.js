@@ -225,8 +225,6 @@ module.exports = {
           character.name.toLowerCase() === selectedCharacter.toLowerCase()
       ) + 1;
 
-    console.log(weeklyList);
-
     // Create the 'previous scores' embed field
     function getPreviousScores() {
       const scores = user.characters[0].scores;
@@ -294,7 +292,7 @@ module.exports = {
           },
           {
             name: "Member Since",
-            value: `${user.characters[0].memberSince}`,
+            value: `${dayjs(user.characters[0].memberSince).format("MMM DD, YYYY")}`,
             inline: true,
           }
         )
