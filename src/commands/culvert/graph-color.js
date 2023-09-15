@@ -52,10 +52,10 @@ module.exports = {
     // Display responses
     let response = "";
 
-    if (oldUser.graphColor === newColor) {
+    if (oldUser.graphColor === getGraphColor()) {
       response = {content: `Error ⎯ Your graph color is already set to ${newColor}`, ephemeral: true};
     } else {
-      response = {content: `Graph color successully changed to ${newColor}`, ephemeral: true};
+      response = {content: `Your graph color has been changed to ${newColor}`, ephemeral: true};
     }
 
     interaction.reply(response);

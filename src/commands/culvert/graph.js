@@ -68,7 +68,7 @@ module.exports = {
       {
         "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
       },
-      { "characters.$": 1 }
+      { "characters.$": 1, graphColor: 1 }
     );
 
     // Fetch the x and y axis labels for the graph
@@ -101,8 +101,9 @@ module.exports = {
     // QuickChart Template Link
     const url = `https://quickchart.io/chart/render/sf-2ee241ce-43cc-4fea-96bf-0e41120ddeed?labels=${getLabels(
       "x"
-    )}&data1=${getLabels("y")}&borderColor1=rgba(${user?.graphColor},0.7)&backgroundColor1=rgba(${user?.graphColor},0.4)`;
-
+    )}&data1=${getLabels("y")}&borderColor1=rgba(${
+      user?.graphColor
+    },0.7)&backgroundColor1=rgba(${user?.graphColor},0.4)`;
 
     // Display responses
     let response = "";
@@ -127,7 +128,9 @@ module.exports = {
             numOfWeeks > user.characters[0].scores.length
               ? user.characters[0].scores.length
               : numOfWeeks
-          } weeks • ${omitMissed ? "Omitting" : "Displaying"} unsubmitted scores`,
+          } weeks • ${
+            omitMissed ? "Omitting" : "Displaying"
+          } unsubmitted scores`,
         });
       response = { embeds: [graph] };
     }
