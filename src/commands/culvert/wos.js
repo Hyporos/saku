@@ -18,7 +18,6 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
-
     await interaction.deferReply();
 
     // Create buttons & row
@@ -42,48 +41,35 @@ module.exports = {
     ]);
 
     // Calculate the sum of lifetime character scores
-    let lifetimeList = [];
+    let shameList = [];
 
     for (const user of users) {
-      const totalScore = await culvertSchema.aggregate([
-        {
-          $unwind: "$characters",
-        },
-        {
-          $unwind: "$characters.scores",
-        },
-        {
-          $match: {
-            "characters.name": {
-              $regex: `^${user.characters.name}`,
-              $options: "i",
-            },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            total_score: {
-              $sum: "$characters.scores.score",
-            },
-          },
-        },
-      ]);
-      lifetimeList.push({
+      const totalScores = user.characters.scores.length;
+      let missedScores = 0;
+
+      for (const score of user.characters.scores) {
+        if (score.score === 0) {
+          missedScores++;
+        }
+      }
+
+      shameList.push({
         name: user.characters.name,
-        score: totalScore[0]?.total_score,
+        totalScores: totalScores,
+        submittedScores: totalScores - missedScores,
+        rate: Math.round(((totalScores - missedScores) / totalScores) * 100),
       });
     }
 
     // Sort the array of lifetime scores
-    lifetimeList.sort((a, b) => {
-      if (a.score === undefined) {
+    shameList.sort((a, b) => {
+      if (isNaN(a.rate)) {
+        return 1;
+      } else if (isNaN(b.rate)) {
         return -1;
       }
-      if (b.score === undefined) {
-        return 1;
-      }
-      return a.score - b.score;
+
+      return a.rate - b.rate || a.totalScores - b.totalScores;
     });
 
     // Create the wos list embed field
@@ -91,7 +77,7 @@ module.exports = {
     let lastRank = 8;
     let page = 1;
     let placement = 1;
-    const maxPage = Math.ceil(lifetimeList.length / 8);
+    const maxPage = Math.ceil(shameList.length / 8);
 
     function getLifetimeRank() {
       let content = "\u0060\u0060\u0060";
@@ -101,11 +87,11 @@ module.exports = {
       for (let i = firstRank; i < lastRank; i++) {
         if (placement > 9) padding = 19; // Adjust padding based on placement length
         if (placement > 99) padding = 18;
-        if (lifetimeList[i]?.name) { 
+        if (shameList[i]?.name) {
           content = content.concat(
-            `${placement}. ${lifetimeList[i].name.padEnd(padding, " ")}${
-              lifetimeList[i].score?.toLocaleString("en-US") || 0
-            }\n`
+            `${placement}. ${shameList[i].name.padEnd(padding, " ")}${
+              shameList[i].submittedScores
+            }/${shameList[i].totalScores} (${shameList[i].rate}%)\n`
           );
         }
         placement++;
@@ -160,13 +146,13 @@ module.exports = {
 
       // New updated embed object // ! This should not be duplicated
       const rankingsUpdate = new EmbedBuilder()
-      .setColor(0xa30d0e)
-      .addFields({
-        name: "Wall of Shame",
-        value: `${getLifetimeRank()}`,
-        inline: false,
-      })
-      .setFooter({ text: `Page ${page}/${maxPage}` });
+        .setColor(0xa30d0e)
+        .addFields({
+          name: "Wall of Shame",
+          value: `${getLifetimeRank()}`,
+          inline: false,
+        })
+        .setFooter({ text: `Page ${page}/${maxPage}` });
 
       // Display new page
       await interaction.deferUpdate();
@@ -186,13 +172,13 @@ module.exports = {
 
       // New updated embed object // ! This should not be duplicated
       const rankingsUpdate = new EmbedBuilder()
-      .setColor(0xa30d0e)
-      .addFields({
-        name: "Wall of Shame",
-        value: `${getLifetimeRank()}`,
-        inline: false,
-      })
-      .setFooter({ text: `Page ${page}/${maxPage}` });
+        .setColor(0xa30d0e)
+        .addFields({
+          name: "Wall of Shame",
+          value: `${getLifetimeRank()}`,
+          inline: false,
+        })
+        .setFooter({ text: `Page ${page}/${maxPage}` });
 
       interaction.editReply({
         embeds: [rankingsUpdate],

@@ -46,7 +46,7 @@ module.exports = {
 
     const pagination = new ActionRowBuilder().addComponents(previous, next);
 
-    // Find the character with the given name
+    // Find the name of all characters
     const users = await culvertSchema.aggregate([
       {
         $unwind: "$characters",
@@ -57,33 +57,15 @@ module.exports = {
     let lifetimeList = [];
 
     for (const user of users) {
-      const totalScore = await culvertSchema.aggregate([
-        {
-          $unwind: "$characters",
-        },
-        {
-          $unwind: "$characters.scores",
-        },
-        {
-          $match: {
-            "characters.name": {
-              $regex: `^${user.characters.name}`,
-              $options: "i",
-            },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            total_score: {
-              $sum: "$characters.scores.score",
-            },
-          },
-        },
-      ]);
+      let totalScore = 0;
+
+      for (const scoreObject of user.characters?.scores) {
+        totalScore += scoreObject.score;
+      }
+
       lifetimeList.push({
         name: user.characters.name,
-        score: totalScore[0]?.total_score,
+        score: totalScore,
       });
     }
 
@@ -102,22 +84,21 @@ module.exports = {
     let weeklyList = [];
 
     for (const user of users) {
-      const scores = user.characters.scores;
-      const scoreFound = scores.find(score => score.date === dayjs().day(-7).format("YYYY-MM-DD"));
-      if (
-        scoreFound
-      ) {
+      const scoreObject = user.characters.scores.find(
+        (score) => score.date === dayjs().day(-7).format("YYYY-MM-DD")
+      );
+
+      if (scoreObject) {
         weeklyList.push({
           name: user.characters.name,
-          score: scoreFound.score,
+          score: scoreObject.score,
         });
-        console.log(dayjs().day(-7).format("YYYY-MM-DD"));
       } else {
         weeklyList.push({
           name: user.characters.name,
           score: 0,
-      });
-    }
+        });
+      }
     }
 
     // Sort the array of weekly scores

@@ -57,6 +57,13 @@ module.exports = {
       { "characters.$": 1 }
     );
 
+    // Find the name of all characters
+    const users = await culvertSchema.aggregate([
+      {
+        $unwind: "$characters",
+      },
+    ]);
+
     // Calculate the sum of character scores
     const totalScore = await culvertSchema.aggregate([
       {
@@ -147,6 +154,79 @@ module.exports = {
       },
     ]);
 
+    // Calculate the sum of lifetime character scores
+    let lifetimeList = [];
+
+    for (const user of users) {
+      let totalScore = 0;
+
+      for (const scoreObject of user.characters?.scores) {
+        totalScore += scoreObject.score;
+      }
+
+      lifetimeList.push({
+        name: user.characters.name,
+        score: totalScore,
+      });
+    }
+
+    // Sort the array of lifetime scores
+    lifetimeList.sort((a, b) => {
+      if (a.score === undefined) {
+        return 1;
+      }
+      if (b.score === undefined) {
+        return -1;
+      }
+      return b.score - a.score;
+    });
+
+    // Calculate the sum of weekly character scores
+    let weeklyList = [];
+
+    for (const user of users) {
+      const scoreObject = user.characters.scores.find(
+        (score) => score.date === dayjs().day(-7).format("YYYY-MM-DD")
+      );
+
+      if (scoreObject) {
+        weeklyList.push({
+          name: user.characters.name,
+          score: scoreObject.score,
+        });
+      } else {
+        weeklyList.push({
+          name: user.characters.name,
+          score: 0,
+        });
+      }
+    }
+
+    // Sort the array of weekly scores
+    weeklyList.sort((a, b) => {
+      if (a.score === undefined) {
+        return 1;
+      }
+      if (b.score === undefined) {
+        return -1;
+      }
+      return b.score - a.score;
+    });
+
+    // Get the weekly and lifetime rank of the character
+    const weeklyRank =
+      weeklyList.findIndex(
+        (character) =>
+          character.name.toLowerCase() === selectedCharacter.toLowerCase()
+      ) + 1;
+    const lifetimeRank =
+      lifetimeList.findIndex(
+        (character) =>
+          character.name.toLowerCase() === selectedCharacter.toLowerCase()
+      ) + 1;
+
+    console.log(weeklyList);
+
     // Create the 'previous scores' embed field
     function getPreviousScores() {
       const scores = user.characters[0].scores;
@@ -156,7 +236,10 @@ module.exports = {
       let content = "\u0060\u0060\u0060";
 
       // If the user has not submitted a score for this week, pretend it's 0.
-      if (scores[0] && user.characters[0].scores[scores.length - 1]?.date !== reset) {
+      if (
+        scores[0] &&
+        user.characters[0].scores[scores.length - 1]?.date !== reset
+      ) {
         content = content.concat(
           scores[scores.length - 1]?.date,
           ": ",
@@ -172,7 +255,12 @@ module.exports = {
       ) {
         // Only grab the last 3/4 scores before this week
         if (scores[i])
-          content = content.concat(scores[i].date, ": ", scores[i].score.toLocaleString("en-US"), "\n");
+          content = content.concat(
+            scores[i].date,
+            ": ",
+            scores[i].score.toLocaleString("en-US"),
+            "\n"
+          );
       }
 
       // If no scores found, display an empty box
@@ -225,12 +313,16 @@ module.exports = {
           },
           {
             name: "Weekly Rank",
-            value: `17`,
+            value: `${weeklyRank}`,
             inline: true,
           },
           {
             name: "Personal Best",
-            value: `${bestScore[0].characters.scores[0]?.score.toLocaleString("en-US") || "0"}`,
+            value: `${
+              bestScore[0].characters.scores[0]?.score.toLocaleString(
+                "en-US"
+              ) || "0"
+            }`,
             inline: true,
           }
         )
@@ -242,12 +334,14 @@ module.exports = {
         .addFields(
           {
             name: "Lifetime Score",
-            value: `${totalScore[0]?.total_score.toLocaleString("en-US") || "0"}`,
+            value: `${
+              totalScore[0]?.total_score.toLocaleString("en-US") || "0"
+            }`,
             inline: true,
           },
           {
             name: "Lifetime Rank",
-            value: `20`,
+            value: `${lifetimeRank}`,
             inline: true,
           },
           {
@@ -261,7 +355,7 @@ module.exports = {
           }
         )
         .setFooter({
-          text: "Submit scores with /gpq  •  Visualize progress with /graph",
+          text: "Submit scores with /gpq • Visualize progress with /graph",
           iconURL:
             "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
         });
