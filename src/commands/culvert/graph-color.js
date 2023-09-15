@@ -1,20 +1,16 @@
-//TODO - Add a streak system
-//TODO - Validate for negative and massive numbers
-
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("graphcolor")
-    .setDescription("Change the color of your progression graph")
+    .setDescription("Change the color of the progression graph area")
     .addStringOption((option) =>
       option
         .setName("color")
-        .setDescription("The new color that the graph will use (default: blue)")
+        .setDescription("The new color of the graph area (default: blue)")
         .setRequired(true)
         .addChoices(
           { name: "Blue", value: "blue" },
@@ -32,19 +28,17 @@ module.exports = {
   async execute(client, interaction) {
     const newColor = interaction.options.getString("color");
 
-
-
     function getGraphColor() {
-        if (newColor === "blue") return "blue";
-        if (newColor === "purple") return "purple";
-        if (newColor === "pink") return "pink";
-        if (newColor === "red") return "red";
-        if (newColor === "orange") return "orange";
-        if (newColor === "yellow") return "yellow";
-        if (newColor === "green") return "green";
+      if (newColor === "blue") return "31,119,180";
+      if (newColor === "purple") return "124,48,184";
+      if (newColor === "pink") return "196,82,189";
+      if (newColor === "red") return "180,31,31";
+      if (newColor === "orange") return "180,88,31";
+      if (newColor === "yellow") return "180,170,31";
+      if (newColor === "green") return "58,180,31";
     }
 
-    await culvertSchema.findOneAndUpdate(
+    const oldUser = await culvertSchema.findOneAndUpdate(
       {
         _id: interaction.user.id,
       },
@@ -52,15 +46,18 @@ module.exports = {
         $set: {
           graphColor: getGraphColor(),
         },
-      },
-      {
-        upsert: true,
       }
     );
 
     // Display responses
     let response = "";
 
-    interaction.reply("done");
-  }
+    if (oldUser.graphColor === newColor) {
+      response = `Error ⎯ Your graph color is already set to ${newColor}`;
+    } else {
+      response = `Graph color successully changed to ${newColor}`;
+    }
+
+    interaction.reply(response);
+  },
 };

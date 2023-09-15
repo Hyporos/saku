@@ -67,8 +67,7 @@ module.exports = {
     const user = await culvertSchema.findOne(
       {
         "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      },
-      { "characters.$": 1 }
+      }
     );
 
     // Fetch the x and y axis labels for the graph
@@ -78,16 +77,6 @@ module.exports = {
 
         let threshold = !numOfWeeks ? 8 : numOfWeeks;
         let content = "";
-
-        if (scores[scores.length - 1].date !== reset) {
-          content = content.concat( // Put an empty field for this week if not yet submitted
-            axis === "x"
-              ? dayjs().day(0).format("MM/DD")
-              : 0,
-            ","
-          );
-          threshold--;
-        }
 
         for (let i = scores.length - 1; i >= scores.length - threshold; i--) {
           if (scores[i]) {
@@ -111,7 +100,8 @@ module.exports = {
     // QuickChart Template Link
     const url = `https://quickchart.io/chart/render/sf-2ee241ce-43cc-4fea-96bf-0e41120ddeed?labels=${getLabels(
       "x"
-    )}&data1=${getLabels("y")}`;
+    )}&data1=${getLabels("y")}&borderColor1=rgba(${user.graphColor},0.7)&backgroundColor1=rgba(${user.graphColor},0.4)`;
+
 
     // Display responses
     let response = "";

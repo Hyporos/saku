@@ -106,7 +106,6 @@ module.exports = {
               $options: "i",
             },
           },
-          { "characters.$": 1 }
         );
 
         if (user) {

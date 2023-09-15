@@ -53,8 +53,7 @@ module.exports = {
     const user = await culvertSchema.findOne(
       {
         "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      },
-      { "characters.$": 1 }
+      }
     );
 
     // Calculate the sum of character scores
