@@ -78,7 +78,7 @@ module.exports = {
           case "graph":
             return `\u0060[character]\u0060 ⎯ The character's graph to be rendered\n\u0060[number_of_weeks]\u0060 ⎯ The number of weeks to display (default: 8)\n\u0060[omit_unsubmitted]\u0060 ⎯ Prevent unsubmitted scores (missed weeks) from displaying`;
           case "graphcolor":
-            return `\u0060[color]\u0060 ⎯ The new color of the graph area (default: blue)`;
+            return `\u0060[color]\u0060 ⎯ The new color of the graph area (default: pink)`;
           case "rankings":
             return `\u0060[timeframe]\u0060 ⎯ The timeframe that the leaderboard will display`;
           case "link":
