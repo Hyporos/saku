@@ -17,8 +17,8 @@ module.exports = {
     .setDescription("View the culvert leaderboard")
     .addStringOption((option) =>
       option
-        .setName("category")
-        .setDescription("The leaderboard category")
+        .setName("timeframe")
+        .setDescription("The timeframe that the leaderboard will display")
         .setRequired(true)
         .addChoices(
           { name: "Weekly", value: "weekly" },

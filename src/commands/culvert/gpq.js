@@ -4,6 +4,8 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+dayjs.extend(utc);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -20,8 +22,8 @@ module.exports = {
     )
     .addIntegerOption((option) =>
       option
-        .setName("culvert_score")
-        .setDescription("The culvert score to be logged")
+        .setName("score")
+        .setDescription("The score to be logged")
         .setRequired(true)
     ),
 
@@ -61,6 +63,12 @@ module.exports = {
 
     // Day of the week the culvert score gets reset (sunday)
     const reset = dayjs().day(0).format("YYYY-MM-DD");
+    const newReset = dayjs().utc().day(1).format("YYYY-MM-DD");
+
+    console.log("Now: " + dayjs().format("YYYY-MM-DD HH:mm:ss"));
+    console.log("Now UTC: " + dayjs().utc().format("YYYY-MM-DD HH:mm:ss"));
+    console.log("Next Sunday: " + dayjs().day(0).format("YYYY-MM-DD HH:mm:ss"));
+    console.log("Next Monday UTC: " + dayjs().utc().day(1).format("YYYY-MM-DD HH:mm:ss"));
 
     // Check if character exists
     const characterExists = await culvertSchema.exists({

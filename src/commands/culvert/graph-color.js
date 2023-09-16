@@ -6,7 +6,7 @@ const culvertSchema = require("../../culvertSchema.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("graphcolor")
-    .setDescription("Change the color of the progression graph area")
+    .setDescription("Change the color of your progression graph area")
     .addStringOption((option) =>
       option
         .setName("color")
@@ -31,7 +31,7 @@ module.exports = {
     function getGraphColor() {
       if (newColor === "blue") return "31,119,180";
       if (newColor === "purple") return "124,48,184";
-      if (newColor === "pink") return "196,82,189";
+      if (newColor === "pink") return "255,189,213";
       if (newColor === "red") return "180,31,31";
       if (newColor === "orange") return "180,88,31";
       if (newColor === "yellow") return "180,170,31";

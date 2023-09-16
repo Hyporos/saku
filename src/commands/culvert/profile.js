@@ -7,7 +7,7 @@ const dayjs = require("dayjs");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("profile")
-    .setDescription("Preview the culvert profile of a user")
+    .setDescription("View the culvert profile of a user")
     .addStringOption((option) =>
       option
         .setName("character")

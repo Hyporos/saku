@@ -11,7 +11,7 @@ module.exports = {
 
   async execute(client, interaction) {
     const message = await interaction.deferReply({ fetchReply: true });
-
+    
     const pong = new EmbedBuilder()
       .setColor(0xffc3c5)
       .setAuthor({

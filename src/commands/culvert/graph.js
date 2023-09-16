@@ -7,11 +7,11 @@ const dayjs = require("dayjs");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("graph")
-    .setDescription("Preview the progression graph of a character")
+    .setDescription("View the progression graph of a character")
     .addStringOption((option) =>
       option
         .setName("character_name")
-        .setDescription("The character's graph to be visualized")
+        .setDescription("The character's graph to be rendered")
         .setRequired(true)
         .setAutocomplete(true)
     )

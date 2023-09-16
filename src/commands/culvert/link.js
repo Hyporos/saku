@@ -7,7 +7,7 @@ const axios = require("axios");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("link")
-    .setDescription("Link a character to your Discord ID")
+    .setDescription("Link a character to a Discord ID")
     .addStringOption((option) =>
       option
         .setName("character_name")
