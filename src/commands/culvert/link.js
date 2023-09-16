@@ -94,7 +94,7 @@ module.exports = {
             },
             {
               _id: discordUser.id,
-              graphColor: "31,119,180",
+              graphColor: "255,189,213",
               $addToSet: {
                 characters: {
                   name: res.data[0].CharacterName,

@@ -104,7 +104,7 @@ module.exports = {
                   {
                     $set: {
                       "characters.$[nameElem].memberSince": memberSince[i],
-                      graphColor: "31,119,180"
+                      graphColor: "237,175,198"
                     },
                   },
                   {

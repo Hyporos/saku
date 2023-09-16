@@ -60,9 +60,6 @@ module.exports = {
     const numOfWeeks = interaction.options.getInteger("number_of_weeks") || 8; //TODO: When inputting 0 (instead of nothing), it will be changed to 8
     const omitMissed = interaction.options.getBoolean("omit_unsubmitted");
 
-    // Day of the week the culvert score gets reset (sunday)
-    const reset = dayjs().day(0).format("YYYY-MM-DD");
-
     // Find the character with the given name
     const user = await culvertSchema.findOne(
       {
