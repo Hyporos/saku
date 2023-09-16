@@ -18,7 +18,11 @@ module.exports = {
   async autocomplete(interaction) {
     const value = interaction.options.getFocused().toLowerCase();
 
-    let choices = [];
+    const isBee = interaction.member.roles.cache.has("720001044746076181");
+
+    let choices = ["gpq", "profile", "graph", "graphcolor", "rankings", "roll", "help", "ping"];
+
+    isBee && choices.push("link", "scan", "wos");
 
     const filtered = choices
       .filter((choice) => choice.toLowerCase().includes(value))
@@ -131,7 +135,7 @@ module.exports = {
     // Display responses
     let response = "";
 
-    if (!getCommandInfo("description")) {
+    if (!getCommandInfo("description") && selectedCommand !== null) {
       response = `Error ⎯ The command **${selectedCommand}** could not be found`;
     } else {
       response = { embeds: [selectedCommand ? specificHelp : help] };
