@@ -16,7 +16,7 @@ module.exports = {
 
   async execute(client, interaction) {
 
-    if (interaction.user.id === "6313576407671725") {
+    if (interaction.user.id === "631357407671725") {
       await interaction.deferReply();
 
       fs.createReadStream("./culv.csv")

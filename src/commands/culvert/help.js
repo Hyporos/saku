@@ -18,7 +18,7 @@ module.exports = {
   async autocomplete(interaction) {
     const value = interaction.options.getFocused().toLowerCase();
 
-    const isBee = interaction.member.roles.cache.has("720001044746076181");
+    const isBee = interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725";
 
     let choices = ["gpq", "profile", "graph", "graphcolor", "rankings", "roll", "help", "ping"];
 

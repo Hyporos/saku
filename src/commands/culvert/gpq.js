@@ -56,7 +56,7 @@ module.exports = {
 
   async execute(client, interaction) {
     const selectedCharacter = interaction.options.getString("character");
-    const culvertScore = interaction.options.getInteger("culvert_score");
+    const culvertScore = interaction.options.getInteger("score");
 
     // Check if the sender is a Bee
     const isBee = interaction.member.roles.cache.has("720001044746076181");
