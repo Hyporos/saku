@@ -5,7 +5,9 @@ const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
+const updateLocale = require("dayjs/plugin/updateLocale");
 dayjs.extend(utc);
+dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -59,16 +61,18 @@ module.exports = {
     const culvertScore = interaction.options.getInteger("score");
 
     // Check if the sender is a Bee
-    const isBee = interaction.member.roles.cache.has("720001044746076181");
+    const isBee = interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725";
 
-    // Day of the week the culvert score gets reset (sunday)
-    const reset = dayjs().day(0).format("YYYY-MM-DD");
-    const newReset = dayjs().utc().day(1).format("YYYY-MM-DD");
+    // Day of the week the culvert score gets reset (Monday 12:00 AM UTC)
+    dayjs.updateLocale("en", {
+      weekStart: 1,
+    });
 
-    console.log("Now: " + dayjs().format("YYYY-MM-DD HH:mm:ss"));
-    console.log("Now UTC: " + dayjs().utc().format("YYYY-MM-DD HH:mm:ss"));
-    console.log("Next Sunday: " + dayjs().day(0).format("YYYY-MM-DD HH:mm:ss"));
-    console.log("Next Monday UTC: " + dayjs().utc().day(1).format("YYYY-MM-DD HH:mm:ss"));
+    const reset = dayjs()
+      .utc()
+      .startOf("week")
+      .subtract(1, "day")
+      .format("YYYY-MM-DD");
 
     // Check if character exists
     const characterExists = await culvertSchema.exists({

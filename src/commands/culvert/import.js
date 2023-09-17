@@ -122,11 +122,10 @@ module.exports = {
         }
       })
       .on("end", async function () {
-        console.log("finished");
         await interaction.editReply("Finished");
       })
       .on("error", async function (error) {
-        console.log(error.message);
+        console.error(error.message);
         await interaction.editReply("Error");
       });
   },

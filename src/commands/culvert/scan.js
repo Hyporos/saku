@@ -2,6 +2,10 @@ const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const { createWorker } = require("tesseract.js");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const updateLocale = require("dayjs/plugin/updateLocale");
+dayjs.extend(utc);
+dayjs.extend(updateLocale);
 const Jimp = require("jimp");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -30,8 +34,21 @@ module.exports = {
     await interaction.deferReply();
 
     // Day of the week the culvert score gets reset (sunday)
-    const reset = dayjs().day(0).format("YYYY-MM-DD");
-    const lastReset = dayjs().day(-7).format("YYYY-MM-DD");
+    dayjs.updateLocale("en", {
+      weekStart: 1,
+    });
+
+    const reset = dayjs()
+    .utc()
+    .startOf("week")
+    .subtract(1, "day")
+    .format("YYYY-MM-DD");
+
+    const lastReset = dayjs()
+    .utc()
+    .startOf("week")
+    .subtract(8, "day")
+    .format("YYYY-MM-DD");
 
     // Create individual exceptions for recurring un-scannable names
     function exceptions(name) {
@@ -246,7 +263,6 @@ module.exports = {
       }
 
       interaction.editReply(response);
-      console.log(characters);
     })();
   },
 };

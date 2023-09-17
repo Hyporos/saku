@@ -8,6 +8,10 @@ const {
 } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const updateLocale = require("dayjs/plugin/updateLocale");
+dayjs.extend(utc);
+dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -29,7 +33,7 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    const category = interaction.options.getString("category");
+    const category = interaction.options.getString("timeframe");
 
     await interaction.deferReply();
 
@@ -45,6 +49,17 @@ module.exports = {
       .setStyle(ButtonStyle.Secondary);
 
     const pagination = new ActionRowBuilder().addComponents(previous, next);
+
+    // Last reset
+    dayjs.updateLocale("en", {
+      weekStart: 1,
+    });
+
+    const lastReset = dayjs()
+      .utc()
+      .startOf("week")
+      .subtract(8, "day")
+      .format("YYYY-MM-DD");
 
     // Find the name of all characters
     const users = await culvertSchema.aggregate([
@@ -74,7 +89,8 @@ module.exports = {
       if (a.score === undefined) {
         return 1;
       }
-      if (b.score === undefined) { // make this return (b.score ?? 0) - (a.score ?? 0)
+      if (b.score === undefined) {
+        // make this return (b.score ?? 0) - (a.score ?? 0)
         return -1;
       }
       return b.score - a.score;
@@ -85,7 +101,7 @@ module.exports = {
 
     for (const user of users) {
       const scoreObject = user.characters.scores.find(
-        (score) => score.date === dayjs().day(-7).format("YYYY-MM-DD")
+        (score) => score.date === lastReset
       );
 
       if (scoreObject) {
@@ -171,7 +187,7 @@ module.exports = {
       .addFields({
         name: `${
           category === "weekly"
-            ? `Weekly Score (${dayjs().day(-7).format("YYYY-MM-DD")})`
+            ? `Weekly Score (${lastReset})`
             : "Lifetime Score"
         }`,
         value: `${category === "weekly" ? getWeeklyRank() : getLifetimeRank()}`,
@@ -225,7 +241,7 @@ module.exports = {
         .addFields({
           name: `${
             category === "weekly"
-              ? `Weekly Score (${dayjs().day(-7).format("YYYY-MM-DD")})`
+              ? `Weekly Score (${lastReset})`
               : "Lifetime Score"
           }`,
           value: `${
@@ -264,7 +280,7 @@ module.exports = {
         .addFields({
           name: `${
             category === "weekly"
-              ? `Weekly Score (${dayjs().day(-7).format("YYYY-MM-DD")})`
+              ? `Weekly Score (${lastReset})`
               : "Lifetime Score"
           }`,
           value: `${

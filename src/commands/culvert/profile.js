@@ -1,6 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const updateLocale = require("dayjs/plugin/updateLocale");
+dayjs.extend(utc); // ? needed in all files?
+dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -47,13 +51,25 @@ module.exports = {
     const selectedCharacter = interaction.options.getString("character");
 
     // Day of the week the culvert score gets reset (sunday)
-    const reset = dayjs().day(0).format("YYYY-MM-DD");
+    dayjs.updateLocale("en", {
+      weekStart: 1,
+    });
+
+    const reset = dayjs()
+    .utc()
+    .startOf("week")
+    .subtract(1, "day")
+    .format("YYYY-MM-DD");
+
+    const lastReset = dayjs()
+    .utc()
+    .startOf("week")
+    .subtract(8, "day")
+    .format("YYYY-MM-DD");
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
-      {
-        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      },
+      {"characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" }},
       { "characters.$": 1 }
     );
 
@@ -186,7 +202,7 @@ module.exports = {
 
     for (const user of users) {
       const scoreObject = user.characters.scores.find(
-        (score) => score.date === dayjs().day(-7).format("YYYY-MM-DD")
+        (score) => score.date === lastReset
       );
 
       if (scoreObject) {
@@ -363,7 +379,7 @@ module.exports = {
       interaction.reply(
         `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
       );
-      console.log(error);
+      console.error(error);
     }
   },
 };
