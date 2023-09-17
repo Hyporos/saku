@@ -26,38 +26,39 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(client, interaction) {
+    // Get the parameter options
     const newColor = interaction.options.getString("color");
 
-    function getGraphColor() {
-      if (newColor === "blue") return "31,119,180";
-      if (newColor === "purple") return "124,48,184";
-      if (newColor === "pink") return "255,189,213";
-      if (newColor === "red") return "180,31,31";
-      if (newColor === "orange") return "180,88,31";
-      if (newColor === "yellow") return "180,170,31";
-      if (newColor === "green") return "58,180,31";
+    // Get the RGB values for the selected color
+    function getGraphColor(color) {
+      const colors = {
+        blue: "31,119,180",
+        purple: "124,48,184",
+        pink: "255,189,213",
+        red: "180,31,31",
+        orange: "180,88,31",
+        yellow: "180,170,31",
+        green: "58,180,31",
+      };
+
+      return colors[color];
     }
 
+    // Update the user's graph color
     const oldUser = await culvertSchema.findOneAndUpdate(
-      {
-        _id: interaction.user.id,
-      },
-      {
-        $set: {
-          graphColor: getGraphColor(),
-        },
-      }
+      { _id: interaction.user.id },
+      { $set: { graphColor: getGraphColor(newColor) } }
     );
 
-    // Display responses
-    let response = "";
+    // Display user responses
+    let content;
 
-    if (oldUser.graphColor === getGraphColor()) {
-      response = {content: `Error ⎯ Your graph color is already set to ${newColor}`, ephemeral: true};
+    if (oldUser.graphColor === getGraphColor(newColor)) {
+      content = `Error ⎯ Your graph color is already set to ${newColor}`;
     } else {
-      response = {content: `Your graph color has been changed to ${newColor}`, ephemeral: true};
+      content = `Your graph color has been changed to ${newColor}`;
     }
 
-    interaction.reply(response);
+    interaction.reply({ content, ephemeral: true });
   },
 };

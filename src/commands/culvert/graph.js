@@ -96,7 +96,7 @@ module.exports = {
     }
 
     // QuickChart Template Link
-    const url = `https://quickchart.io/chart/render/sf-2ee241ce-43cc-4fea-96bf-0e41120ddeed?labels=${getLabels(
+    const url = `https://quickchart.io/chart/render/sf-b3492adc-c626-40cb-87d6-5914f018c018?labels=${getLabels(
       "x"
     )}&data1=${getLabels("y")}&borderColor1=rgba(${
       user?.graphColor

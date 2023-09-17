@@ -74,7 +74,7 @@ module.exports = {
       if (a.score === undefined) {
         return 1;
       }
-      if (b.score === undefined) {
+      if (b.score === undefined) { // make this return (b.score ?? 0) - (a.score ?? 0)
         return -1;
       }
       return b.score - a.score;
