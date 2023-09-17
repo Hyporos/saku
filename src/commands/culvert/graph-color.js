@@ -31,7 +31,7 @@ module.exports = {
     function getGraphColor() {
       if (newColor === "blue") return "31,119,180";
       if (newColor === "purple") return "124,48,184";
-      if (newColor === "pink") return "237,175,198";
+      if (newColor === "pink") return "255,189,213";
       if (newColor === "red") return "180,31,31";
       if (newColor === "orange") return "180,88,31";
       if (newColor === "yellow") return "180,170,31";

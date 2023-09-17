@@ -100,7 +100,7 @@ module.exports = {
       "x"
     )}&data1=${getLabels("y")}&borderColor1=rgba(${
       user?.graphColor
-    },0.7)&backgroundColor1=rgba(${user?.graphColor},0.4)`;
+    },${user?.graphColor !== "255,189,213" ? 0.7 : 0.5})&backgroundColor1=rgba(${user?.graphColor},0.4)`;
 
     // Display responses
     let response = "";

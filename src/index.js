@@ -78,6 +78,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`Ready! Logged in as ${c.user.tag}`);
+  client.user.setActivity('Maplestory | /help');
   mongoose.connect(MONGO_URI, { keepAlive: true });
 });
 

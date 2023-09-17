@@ -16,7 +16,7 @@ module.exports = {
 
   async execute(client, interaction) {
 
-    if (interaction.user.id === "631357407671725") {
+    if (interaction.user.id === "631337640754675725") {
       await interaction.deferReply();
 
       fs.createReadStream("./culv.csv")
@@ -104,7 +104,7 @@ module.exports = {
                   {
                     $set: {
                       "characters.$[nameElem].memberSince": memberSince[i],
-                      graphColor: "237,175,198"
+                      graphColor: "255,189,213"
                     },
                   },
                   {
