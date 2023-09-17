@@ -6,7 +6,7 @@ require("dotenv").config();
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// Compose all of the slash commands
+// Grab all of the slash command files
 client.commands = new Collection();
 
 const foldersPath = path.join(__dirname, "commands");
@@ -32,7 +32,7 @@ for (const folder of commandFolders) {
   }
 }
 
-// Compose all of the event handlers
+// Grab all of the event handler files
 const eventsPath = path.join(__dirname, "events");
 const eventFiles = fs
   .readdirSync(eventsPath)

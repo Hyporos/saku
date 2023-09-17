@@ -30,13 +30,6 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    // Check if the sender is a Bee
-    if (!interaction.member.roles.cache.has("720001044746076181") && interaction.user.id !== "631337640754675725") {
-      return interaction.reply(
-        "Error ⎯ You do not have permission to use this command"
-      );
-    }
-
     const characterName = interaction.options.getString("character_name");
     const discordUser = interaction.options.getUser("discord_user");
     const memberSince = interaction.options.getString("member_since");

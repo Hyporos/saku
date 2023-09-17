@@ -1,5 +1,7 @@
 const { Schema, model, models } = require("mongoose");
 
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
 const culvertSchema = new Schema(
   {
     _id: {
@@ -20,7 +22,7 @@ const culvertSchema = new Schema(
         },
         avatar: {
           type: String,
-          required: true
+          required: true,
         },
         class: {
           type: String,
@@ -53,5 +55,7 @@ const culvertSchema = new Schema(
   { versionKey: false }
 );
 
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
 const name = "culvert";
-module.exports = models[name] || model(name, culvertSchema);
+module.exports = models[name] || model(name, culvertSchema, name);

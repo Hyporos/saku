@@ -40,7 +40,7 @@ module.exports = {
     const selectedCommand = interaction.options.getString("command");
 
     // Check if the sender is a Bee
-    const isBee = interaction.member.roles.cache.has("720001044746076181");
+    const isBee = interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725";
 
     // Get command info
     function getCommandInfo(type) {

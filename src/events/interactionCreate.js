@@ -16,6 +16,52 @@ module.exports = {
         return;
       }
 
+      const culvertCommands = [
+        "gpq",
+        "profile",
+        "graph",
+        "graphcolor",
+        "rankings",
+        "link",
+        "scan",
+        "wos",
+      ];
+
+      if (
+        interaction.member.roles.cache.has("720006084252663868") &&
+        culvertCommands.includes(interaction.commandName)
+      ) {
+        interaction.reply(
+          `Error ⎯ Guests do not have permission to use this command`
+        );
+        return;
+      }
+
+      const beeCommands = ["link", "scan", "wos"];
+
+      if (
+        interaction.member.roles.cache.has("750000646345719899") &&
+        interaction.user.id !== "631337640754675725" && // Add me as an exception to use the commands
+        beeCommands.includes(interaction.commandName)
+      ) {
+        interaction.reply(
+          `Error ⎯ Members do not have permission to use this command`
+        );
+        return;
+      }
+
+      const ownerCommands = ["import", "reload"];
+
+      if (
+        interaction.user.id !== "631337640754675725" &&
+        ownerCommands.includes(interaction.commandName)
+      ) {
+        interaction.reply(
+          `Error ⎯ You do not have permission to use this command`
+        );
+        return;
+      }
+
       try {
         await command.execute(interaction);
       } catch (error) {

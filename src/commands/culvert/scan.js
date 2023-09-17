@@ -24,13 +24,6 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    // Check if the sender is a Bee
-    if (!interaction.member.roles.cache.has("720001044746076181") && interaction.user.id !== "631337640754675725") {
-      return interaction.reply(
-        "Error ⎯ You do not have permission to use this command"
-      );
-    }
-
     const image = interaction.options.getAttachment("attach");
     const lastWeek = interaction.options.getBoolean("last_week");
 
@@ -67,7 +60,7 @@ module.exports = {
         .grayscale()
         .invert()
         .scale(1.4)
-        .write("processedImage.jpg");
+        .write("./processedImage.jpg");
     });
 
     const worker = await createWorker({
@@ -87,7 +80,7 @@ module.exports = {
 
       await worker.terminate();
 
-      const entryArray = text.split(/\r?\n/);
+      const entryArray = text.split(/\r?\n/); // make this return text then work on it
 
       const characters = [];
       const notFound = [];
@@ -219,7 +212,7 @@ module.exports = {
         for (const character of characters) {
           content = content.concat(
             `${character.name}: **${
-              !isNaN(character.score) ? character.score : "0 (NaN)"
+              !isNaN(character.score) ? character.score.toLocaleString("en-US") : "0 (NaN)"
             }**\n`
           );
         }
