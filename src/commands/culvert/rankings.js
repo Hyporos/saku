@@ -61,6 +61,8 @@ module.exports = {
       .subtract(8, "day")
       .format("YYYY-MM-DD");
 
+    const nextReset = dayjs().utc().startOf("week").add(7, "day");
+
     // Find the name of all characters
     const users = await culvertSchema.aggregate([
       {
@@ -134,7 +136,21 @@ module.exports = {
     let page = 1;
     let placement = 1;
     const maxPage = Math.ceil(lifetimeList.length / 8);
-    const nextUpdate = dayjs().day(7).diff(dayjs(), "day");
+
+    // Handle update time
+    function getUpdateTime() {
+      const nextUpdateDays = dayjs(nextReset).diff(dayjs().utc(), "day");
+      const nextUpdateHours = dayjs(nextReset).diff(dayjs().utc(), "hour");
+      const nextUpdateMinutes = dayjs(nextReset).diff(dayjs().utc(), "minute");
+
+      if (nextUpdateDays >= 1) {
+        return `${nextUpdateDays} day${nextUpdateDays > 1 ? "s" : ""}`;
+      } else if (nextUpdateHours >= 1) {
+        return `${nextUpdateHours} hour${nextUpdateHours > 1 ? "s" : ""}`;
+      } else {
+        return `${nextUpdateMinutes} minute${nextUpdateMinutes > 1 ? "s" : ""}`;
+      }
+    }
 
     // Create the lifetime rankings list embed field
     function getLifetimeRank() {
@@ -195,7 +211,7 @@ module.exports = {
       })
       .setFooter({
         text: `Page ${page}/${maxPage} ${
-          category === "weekly" ? `• Updates in ${nextUpdate} days` : ""
+          category === "weekly" ? `• Updates in ${getUpdateTime()}` : ""
         }`,
       });
 
@@ -251,7 +267,7 @@ module.exports = {
         })
         .setFooter({
           text: `Page ${page}/${maxPage} ${
-            category === "weekly" ? `• Updates in ${nextUpdate} days` : ""
+            category === "weekly" ? `• Updates in ${getUpdateTime()}` : ""
           }`,
         });
 
@@ -290,7 +306,7 @@ module.exports = {
         })
         .setFooter({
           text: `Page ${page}/${maxPage} ${
-            category === "weekly" ? `• Updates in ${nextUpdate} days` : ""
+            category === "weekly" ? `• Updates in ${getUpdateTime()}` : ""
           }`,
         });
 
