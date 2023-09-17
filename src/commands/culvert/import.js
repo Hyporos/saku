@@ -14,7 +14,7 @@ module.exports = {
 
   // ! WELCOME TO MY TWO TIME USE SPAGHETTI CODE ! NO POINT IN OPTIMIZING THIS !
 
-  async execute(client, interaction) {
+  async execute(interaction) {
 
     if (interaction.user.id === "631337640754675725") {
       await interaction.deferReply();

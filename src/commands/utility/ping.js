@@ -9,7 +9,7 @@ module.exports = {
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-  async execute(client, interaction) {
+  async execute(interaction) {
     const message = await interaction.deferReply({ fetchReply: true });
     
     const pong = new EmbedBuilder()
@@ -22,7 +22,7 @@ module.exports = {
       .setDescription(
         `**Latency** ⎯ ${
           message.createdTimestamp - interaction.createdTimestamp
-        }ms\n**API** ⎯ ${client.ws.ping}ms`
+        }ms\n**API** ⎯ ${interaction.client.ws.ping}ms`
       );
 
     interaction.editReply({ embeds: [pong] });
