@@ -56,8 +56,9 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
+    // Parse the command arguments
     const selectedCharacter = interaction.options.getString("character_name");
-    const numOfWeeks = interaction.options.getInteger("number_of_weeks") || 8; //TODO: When inputting 0 (instead of nothing), it will be changed to 8
+    const numOfWeeks = interaction.options.getInteger("number_of_weeks") ?? 8;
     const omitMissed = interaction.options.getBoolean("omit_unsubmitted");
 
     // Find the character with the given name
@@ -70,39 +71,46 @@ module.exports = {
 
     // Fetch the x and y axis labels for the graph
     function getLabels(axis) {
-      if (user) {
-        const scores = user.characters[0]?.scores;
+      if (!user) return;
 
-        let threshold = !numOfWeeks ? 8 : numOfWeeks;
-        let content = "";
+      const scores = user.characters[0].scores || [];
 
-        for (let i = scores.length - 1; i >= scores.length - threshold; i--) {
-          if (scores[i]) {
-            if (omitMissed && scores[i].score === 0) {
-              threshold++; // Run one more iteration if no score is found
-            } else {
-              content = content.concat(
-                axis === "x"
-                  ? dayjs(scores[i].date).format("MM/DD")
-                  : scores[i].score,
-                ","
-              );
-            }
-          }
+      let weekCount = numOfWeeks || 8;
+      let content = "";
+
+      for (let i = scores.length - 1; i >= scores.length - weekCount; i--) {
+        if (!scores[i]) continue;
+
+        if (omitMissed && scores[i].score === 0) {
+          weekCount++; // Run one more iteration if no score is found
+        } else {
+          content = content.concat(
+            axis === "x"
+              ? dayjs(scores[i].date).format("MM/DD")
+              : scores[i].score,
+            ","
+          );
         }
-
-        return content.slice(0, -1); // Remove the unnecessary comma at the end
       }
+
+      return content.slice(0, -1); // Remove the unnecessary comma at the end
     }
 
-    // QuickChart Template Link
-    const url = `https://quickchart.io/chart/render/sf-b3492adc-c626-40cb-87d6-5914f018c018?labels=${getLabels(
-      "x"
-    )}&data1=${getLabels("y")}&borderColor1=rgba(${
-      user?.graphColor
-    },${user?.graphColor !== "255,189,213" ? 0.7 : 0.5})&backgroundColor1=rgba(${user?.graphColor},0.4)`;
+    // Total number of weeks rendered
+    const renderedWeeks = Math.min(
+      numOfWeeks,
+      user.characters[0].scores.length
+    );
 
-    // Display responses
+    // QuickChart Template Link
+    const xLabels = getLabels("x");
+    const yLabels = getLabels("y");
+    const graphColor = user.graphColor || "255,189,213";
+    const borderColorAlpha = graphColor !== "255,189,213" ? 0.7 : 0.6;
+
+    const url = `https://quickchart.io/chart/render/sf-b3492adc-c626-40cb-87d6-5914f018c018?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
+
+    // Display user responses
     let response = "";
 
     if (!user) {
@@ -110,7 +118,7 @@ module.exports = {
     } else if (user.characters[0].scores.length <= 2) {
       response = `Error ⎯ The character **${selectedCharacter}** must have at least two scores submitted`;
     } else if (numOfWeeks <= 1) {
-      response = "Error ⎯ The number of weeks must be greater than 1";
+      response = "Error ⎯ The number of weeks to display must be greater than 1";
     } else {
       const graph = new EmbedBuilder()
         .setColor(0x202222)
@@ -121,14 +129,11 @@ module.exports = {
           `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
         )
         .setFooter({
-          text: `Rendering the last ${
-            numOfWeeks > user.characters[0].scores.length
-              ? user.characters[0].scores.length
-              : numOfWeeks
-          } weeks • ${
+          text: `Rendering the last ${renderedWeeks} weeks • ${
             omitMissed ? "Omitting" : "Displaying"
           } unsubmitted scores`,
         });
+
       response = { embeds: [graph] };
     }
 

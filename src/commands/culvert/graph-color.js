@@ -31,21 +31,21 @@ module.exports = {
 
     // Get the RGB values for the selected color
     function getGraphColor(color) {
-      const colors = {
+      const colorMap = {
         blue: "31,119,180",
         purple: "124,48,184",
         pink: "255,189,213",
-        red: "180,31,31",
-        orange: "180,88,31",
+        red: "189,36,36",
+        orange: "214,110,45",
         yellow: "180,170,31",
         green: "58,180,31",
       };
 
-      return colors[color];
+      return colorMap[color];
     }
 
     // Update the user's graph color
-    const oldUser = await culvertSchema.findOneAndUpdate(
+    const user = await culvertSchema.findOneAndUpdate(
       { _id: interaction.user.id },
       { $set: { graphColor: getGraphColor(newColor) } }
     );
@@ -53,7 +53,7 @@ module.exports = {
     // Display user responses
     let content;
 
-    if (oldUser.graphColor === getGraphColor(newColor)) {
+    if (user.graphColor === getGraphColor(newColor)) {
       content = `Error ⎯ Your graph color is already set to ${newColor}`;
     } else {
       content = `Your graph color has been changed to ${newColor}`;

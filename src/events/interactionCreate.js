@@ -26,6 +26,9 @@ module.exports = {
         "scan",
         "wos",
       ];
+      
+      const beeCommands = ["link", "scan", "wos"];
+      const ownerCommands = ["import", "reload"];
 
       if (
         interaction.member.roles.cache.has("720006084252663868") &&
@@ -37,8 +40,6 @@ module.exports = {
         return;
       }
 
-      const beeCommands = ["link", "scan", "wos"];
-
       if (
         interaction.member.roles.cache.has("750000646345719899") &&
         interaction.user.id !== "631337640754675725" && // Add me as an exception to use the commands
@@ -49,8 +50,6 @@ module.exports = {
         );
         return;
       }
-
-      const ownerCommands = ["import", "reload"];
 
       if (
         interaction.user.id !== "631337640754675725" &&
