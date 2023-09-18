@@ -33,7 +33,7 @@ module.exports = {
     function getGraphColor(color) {
       const colorMap = {
         blue: "31,119,180",
-        purple: "124,48,184",
+        purple: "145,68,207",
         pink: "255,189,213",
         red: "189,36,36",
         orange: "214,110,45",

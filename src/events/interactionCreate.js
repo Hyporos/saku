@@ -23,11 +23,12 @@ module.exports = {
         "graphcolor",
         "rankings",
         "link",
+        "correct",
         "scan",
         "wos",
       ];
-      
-      const beeCommands = ["link", "scan", "wos"];
+
+      const beeCommands = ["link", "correct", "scan", "wos"];
       const ownerCommands = ["import", "reload"];
 
       if (
@@ -41,7 +42,7 @@ module.exports = {
       }
 
       if (
-        interaction.member.roles.cache.has("750000646345719899") &&
+        !interaction.member.roles.cache.has("720001044746076181") &&
         interaction.user.id !== "631337640754675725" && // Add me as an exception to use the commands
         beeCommands.includes(interaction.commandName)
       ) {

@@ -17,11 +17,14 @@ module.exports = {
     .addAttachmentOption((option) =>
       option.setName("attach").setDescription("Image").setRequired(true)
     )
-    .addBooleanOption((option) =>
+    .addStringOption((option) =>
       option
-        .setName("last_week")
-        .setDescription(
-          "Submit the scores for last week instead (default: false)"
+        .setName("week")
+        .setDescription("The specific week to submit the scores to")
+        .setRequired(true)
+        .addChoices(
+          { name: "This week", value: "this_week" },
+          { name: "Last week", value: "last_week" }
         )
     ),
 
@@ -29,7 +32,7 @@ module.exports = {
 
   async execute(interaction) {
     const image = interaction.options.getAttachment("attach");
-    const lastWeek = interaction.options.getBoolean("last_week");
+    const selectedWeek = interaction.options.getString("week");
 
     await interaction.deferReply();
 
@@ -39,20 +42,20 @@ module.exports = {
     });
 
     const reset = dayjs()
-    .utc()
-    .startOf("week")
-    .subtract(1, "day")
-    .format("YYYY-MM-DD");
+      .utc()
+      .startOf("week")
+      .subtract(1, "day")
+      .format("YYYY-MM-DD");
 
     const lastReset = dayjs()
-    .utc()
-    .startOf("week")
-    .subtract(8, "day")
-    .format("YYYY-MM-DD");
+      .utc()
+      .startOf("week")
+      .subtract(8, "day")
+      .format("YYYY-MM-DD");
 
     // Create individual exceptions for recurring un-scannable names
     function exceptions(name) {
-      if (name === "dissatisfiedrhunder" || name === "dissatisfiedhunder")
+      if (name === "dissatisfiedThunder" || name === "dissatisfiedhunder")
         return "dìssatisfied";
       if (name === "lgniteChee") return "IgniteCheese";
       if (name === "Idiot") return "ldìot";
@@ -151,7 +154,8 @@ module.exports = {
                   $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
-                "characters.scores.date": lastWeek ? lastReset : reset,
+                "characters.scores.date":
+                  selectedWeek === "this_week" ? reset : lastReset,
               },
             },
           ]);
@@ -169,7 +173,7 @@ module.exports = {
                 $addToSet: {
                   "characters.$[nameElem].scores": {
                     score: !isNaN(character.score) ? character.score : 0,
-                    date: lastWeek ? lastReset : reset,
+                    date: selectedWeek === "this_week" ? reset : lastReset,
                   },
                 },
               },
@@ -193,7 +197,8 @@ module.exports = {
                   $regex: `^${splicedFirst}|${splicedLast}$`,
                   $options: "i",
                 },
-                "characters.scores.date": lastWeek ? lastReset : reset,
+                "characters.scores.date":
+                  selectedWeek === "this_week" ? reset : lastReset,
               },
               {
                 $set: {
@@ -212,7 +217,10 @@ module.exports = {
                       $options: "i",
                     },
                   },
-                  { "dateElem.date": lastWeek ? lastReset : reset },
+                  {
+                    "dateElem.date":
+                      selectedWeek === "this_week" ? reset : lastReset,
+                  },
                 ],
                 new: true,
               }
@@ -229,7 +237,9 @@ module.exports = {
         for (const character of characters) {
           content = content.concat(
             `${character.name}: **${
-              !isNaN(character.score) ? character.score.toLocaleString("en-US") : "0 (NaN)"
+              !isNaN(character.score)
+                ? character.score.toLocaleString("en-US")
+                : "0 (NaN)"
             }**\n`
           );
         }
@@ -238,9 +248,13 @@ module.exports = {
       }
 
       // Display responses
-      let response = `Submitted scores for **${
+      let response = `Submitted **${
         successCount - numberNaN.length
-      }/${characters.length}** characters\n\n${getSuccessList()}`;
+      }/${characters.length}** scores for ${
+        selectedWeek === "this_week"
+          ? `this week (${reset})`
+          : `last week (${lastReset})`
+      }\n\n${getSuccessList()}`;
 
       if (notFound.length > 0) {
         response = response.concat(

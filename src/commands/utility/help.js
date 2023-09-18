@@ -18,9 +18,20 @@ module.exports = {
   async autocomplete(interaction) {
     const value = interaction.options.getFocused().toLowerCase();
 
-    const isBee = interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725";
+    const isBee =
+      interaction.member.roles.cache.has("720001044746076181") ||
+      interaction.user.id === "631337640754675725";
 
-    let choices = ["gpq", "profile", "graph", "graphcolor", "rankings", "roll", "help", "ping"];
+    let choices = [
+      "gpq",
+      "profile",
+      "graph",
+      "graphcolor",
+      "rankings",
+      "roll",
+      "help",
+      "ping",
+    ];
 
     isBee && choices.push("link", "scan", "wos");
 
@@ -40,7 +51,9 @@ module.exports = {
     const selectedCommand = interaction.options.getString("command");
 
     // Check if the sender is a Bee
-    const isBee = interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725";
+    const isBee =
+      interaction.member.roles.cache.has("720001044746076181") ||
+      interaction.user.id === "631337640754675725";
 
     // Get command info
     function getCommandInfo(type) {
@@ -58,12 +71,14 @@ module.exports = {
             return "View the culvert leaderboard. You can choose between displaying weekly or lifetime scores";
           case "link":
             return "Link a character to a Discord ID. You must include the join date as well in a proper, common form (ex: YYYY-MM-DD)";
+          case "correct":
+            return "Correct a character's score for any given date. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert";
           case "wos":
             return "View the wall of shame. On the wall there will be a list of users sorted by their participation rate, from lowest to 60%";
           case "roll":
-            return "Roll a number between 1 and 100. If you get a certain number, maybe you'll see something more...";
+            return "Roll a number between 1 and 100";
           case "help":
             return "Display a list of all commands. You can choose to use /help followed by a command name to view more details about that particular command. Did you really just do /help help?";
           case "ping":
@@ -83,6 +98,8 @@ module.exports = {
             return `\u0060[timeframe]\u0060 ⎯ The timeframe that the leaderboard will display`;
           case "link":
             return `\u0060[character_name]\u0060 ⎯ The character name to be linked\n\u0060[discord_user]\u0060 ⎯ The Discord user to be paired with the character\n\u0060[member_since]\u0060 ⎯ The date that the character joined the guild`;
+          case "correct":
+            return `\u0060[character]\u0060 ⎯ The character to be corrected\n\u0060[date]\u0060 ⎯ The date of the score\n\u0060[score]\u0060 ⎯ The new score to submit`;
           case "scan":
             return `\u0060[last_week]\u0060 ⎯ Submit the scores for last week instead (default: false)`;
           case "wos":
