@@ -1,12 +1,12 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const { createWorker } = require("tesseract.js");
+const Jimp = require("jimp");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const updateLocale = require("dayjs/plugin/updateLocale");
 dayjs.extend(utc);
 dayjs.extend(updateLocale);
-const Jimp = require("jimp");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -55,7 +55,7 @@ module.exports = {
 
     // Create individual exceptions for recurring un-scannable names
     function exceptions(name) {
-      if (name === "dissatisfiedThunder" || name === "dissatisfiedhunder")
+      if (name === "dissatisfiedThunder" || name === "dissatisfiedhunder" || name === "dissatisfiedrhunder")
         return "dìssatisfied";
       if (name === "lgniteChee") return "IgniteCheese";
       if (name === "Idiot") return "ldìot";
@@ -63,13 +63,22 @@ module.exports = {
       if (name === "YapeOnurG") return "VapeOnurGirl";
       if (name === "WhylCry") return "WhyICry";
       if (name === "miche") return "míche";
-      if (name === "Náro") return "Nàro";
+      if (name === "Náro" || name === "Naro") return "Nàro";
       if (name === "Migs") return "Mïgs";
       if (name === "Cehba") return "Cebba";
       if (name === "Kyéra") return "Kyêra";
       if (name === "Jdéy") return "Jòéy";
       if (name === "yuhing") return "yubin8";
-      if (name === "Méllgw") return "Mëlløw";
+      if (name === "Méllgw" || name === "Méllaw") return "Mëlløw";
+      if (name === "¡AmPunny") return "iAmPunny";
+      if (name === "eGirl") return "egirI";
+      if (name === "Kürea") return "Kùrea";
+      if (name === "Aski") return "Aøki";
+      if (name === "Laved") return "Løved";
+      if (name === "Aina") return "Ainà";
+      if (name === "Hikåri") return "Hikárì";
+      if (name === "Cukeu") return "Cukcu";
+      if (name === "téee") return "táee";
       return name;
     }
 
@@ -106,6 +115,8 @@ module.exports = {
       const notFound = [];
       const numberNaN = [];
 
+      const dupes = [];
+
       let successCount = 0;
 
       // Split each entry into its own array
@@ -127,16 +138,62 @@ module.exports = {
         const splicedFirst = character.name.substring(0, 4);
         const splicedLast = character.name.substring(character.name.length - 4);
 
-        // Find the character that contains the spliced strings
-        const user = await culvertSchema.findOne(
+        // Find the number of characters that match the query
+        const dupes = await culvertSchema.aggregate([
           {
-            "characters.name": {
-              $regex: `^${splicedFirst}|${splicedLast}$`,
-              $options: "i",
-            },
+            $unwind: "$characters",
           },
-          { "characters.$": 1 }
-        );
+        ]);
+
+        const duplicate = [];
+
+        for (const char of dupes) {
+          const name = char.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
+
+          // Use regular expression to find all occurrences of splicedLast in the name
+          const matches = name.match(
+            new RegExp(`^${splicedFirst}|${splicedLast}$`, "gi")
+          );
+
+          if (matches && matches.length > 0) {
+            duplicate.push(char.characters.name.toLowerCase());
+          }
+        }
+
+        console.log(duplicate);
+        
+        let user;
+
+        if (duplicate.length > 1) {
+          for (const dupe of duplicate) {
+            if (dupe.includes(character.name.toLowerCase())) {
+              user = await culvertSchema.findOne(
+                {
+                  "characters.name": {
+                    $regex: `^${dupe}$`,
+                    $options: "i",
+                  },
+                },
+                { "characters.$": 1 }
+              );
+              console.log(user);
+            } else {
+              console.log("none found");
+            }
+          }
+        } else {
+          user = await culvertSchema.findOne(
+            {
+              "characters.name": {
+                $regex: `^${splicedFirst}|${splicedLast}$`,
+                $options: "i",
+              },
+            }, // ! MAKE NEW CHARS ARRAY
+            { "characters.$": 1 }
+          );
+        }
+
+        // Find the character that contains the spliced strings
 
         if (user) {
           successCount++;
@@ -150,10 +207,7 @@ module.exports = {
             },
             {
               $match: {
-                "characters.name": {
-                  $regex: `^${splicedFirst}|${splicedLast}$`,
-                  $options: "i",
-                },
+                "characters.name": user?.characters[0]?.name,
                 "characters.scores.date":
                   selectedWeek === "this_week" ? reset : lastReset,
               },
@@ -164,10 +218,7 @@ module.exports = {
             // Create a new score on the selected character
             await culvertSchema.findOneAndUpdate(
               {
-                "characters.name": {
-                  $regex: `^${splicedFirst}|${splicedLast}$`,
-                  $options: "i",
-                },
+                "characters.name": user?.characters[0]?.name || "",
               },
               {
                 $addToSet: {
@@ -180,10 +231,7 @@ module.exports = {
               {
                 arrayFilters: [
                   {
-                    "nameElem.name": {
-                      $regex: `^${splicedFirst}|${splicedLast}$`,
-                      $options: "i",
-                    },
+                    "nameElem.name": user?.characters[0]?.name || "",
                   },
                 ],
                 new: true,
@@ -193,10 +241,7 @@ module.exports = {
             // Update an existing score on the selected character
             await culvertSchema.findOneAndUpdate(
               {
-                "characters.name": {
-                  $regex: `^${splicedFirst}|${splicedLast}$`,
-                  $options: "i",
-                },
+                "characters.name": user?.characters[0]?.name || "",
                 "characters.scores.date":
                   selectedWeek === "this_week" ? reset : lastReset,
               },
@@ -212,10 +257,7 @@ module.exports = {
               {
                 arrayFilters: [
                   {
-                    "nameElem.name": {
-                      $regex: `^${splicedFirst}|${splicedLast}$`,
-                      $options: "i",
-                    },
+                    "nameElem.name": user?.characters[0]?.name || "",
                   },
                   {
                     "dateElem.date":
@@ -227,6 +269,8 @@ module.exports = {
             );
           }
         } else {
+          index = characters.indexOf(character.name);
+          characters.splice(index, 1);
           notFound.push(character.name);
         }
       }
@@ -247,10 +291,12 @@ module.exports = {
         return content;
       }
 
+      console.log(dupes);
+
       // Display responses
-      let response = `Submitted **${
-        successCount - numberNaN.length
-      }/${characters.length}** scores for ${
+      let response = `Submitted **${successCount - numberNaN.length}/${
+        characters.length
+      }** scores for ${
         selectedWeek === "this_week"
           ? `this week (${reset})`
           : `last week (${lastReset})`

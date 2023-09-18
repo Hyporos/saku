@@ -128,7 +128,7 @@ module.exports = {
       .addFields({
         name: "Culvert",
         value: `\u0060gpq\u0060, \u0060profile\u0060, \u0060graph\u0060, \u0060graphcolor\u0060, \u0060rankings\u0060${
-          isBee ? ", \u0060link\u0060, \u0060scan\u0060, \u0060wos\u0060" : ""
+          isBee ? ", \u0060link\u0060, \u0060correct\u0060, \u0060scan\u0060, \u0060wos\u0060" : ""
         }`,
       })
       .addFields({ name: "Fun", value: "`roll`" })
