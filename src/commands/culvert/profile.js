@@ -5,6 +5,7 @@ const utc = require("dayjs/plugin/utc");
 const updateLocale = require("dayjs/plugin/updateLocale");
 dayjs.extend(utc); // ? needed in all files?
 dayjs.extend(updateLocale);
+const axios = require("axios");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -56,20 +57,22 @@ module.exports = {
     });
 
     const reset = dayjs()
-    .utc()
-    .startOf("week")
-    .subtract(1, "day")
-    .format("YYYY-MM-DD");
+      .utc()
+      .startOf("week")
+      .subtract(1, "day")
+      .format("YYYY-MM-DD");
 
     const lastReset = dayjs()
-    .utc()
-    .startOf("week")
-    .subtract(8, "day")
-    .format("YYYY-MM-DD");
+      .utc()
+      .startOf("week")
+      .subtract(8, "day")
+      .format("YYYY-MM-DD");
 
     // Find the character with the given name
     const user = await culvertSchema.findOne(
-      {"characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" }},
+      {
+        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+      },
       { "characters.$": 1 }
     );
 
@@ -285,96 +288,111 @@ module.exports = {
       return content;
     }
 
+      // Ranking API
+      const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${selectedCharacter}&page_index=1`;
+
     // Create and display a profile embed for the selected character (if they exist)
     try {
-      const profile = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setTitle(user.characters[0].name)
-        .setAuthor({ name: "Culvert Profile" })
-        .setURL(
-          `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
-        )
-        .setThumbnail(user.characters[0].avatar)
-        .addFields(
-          {
-            name: "Class",
-            value: user.characters[0].class,
-            inline: true,
-          },
-          {
-            name: "Level",
-            value: `${user.characters[0].level}`,
-            inline: true,
-          },
-          {
-            name: "Member Since",
-            value: `${dayjs(user.characters[0].memberSince).format("MMM DD, YYYY")}`,
-            inline: true,
-          }
-        )
-        .addFields(
-          {
-            name: "Current Score",
-            value: `${
-              user.characters[0].scores[user.characters[0].scores.length - 1]
-                ?.date !== reset
-                ? 0
-                : user.characters[0].scores[
-                    user.characters[0].scores.length - 1
-                  ].score?.toLocaleString("en-US") || "0"
-            }`,
-            inline: true,
-          },
-          {
-            name: "Weekly Rank",
-            value: `${weeklyRank}`,
-            inline: true,
-          },
-          {
-            name: "Personal Best",
-            value: `${
-              bestScore[0].characters.scores[0]?.score.toLocaleString(
-                "en-US"
-              ) || "0"
-            }`,
-            inline: true,
-          }
-        )
-        .addFields({
-          name: "Previous Scores",
-          value: getPreviousScores(),
-          inline: false,
-        })
-        .addFields(
-          {
-            name: "Lifetime Score",
-            value: `${
-              totalScore[0]?.total_score.toLocaleString("en-US") || "0"
-            }`,
-            inline: true,
-          },
-          {
-            name: "Lifetime Rank",
-            value: `${lifetimeRank}`,
-            inline: true,
-          },
-          {
-            name: "Participation",
-            value: `${participationRatio.length}/${
-              totalWeeks.length
-            } (${Math.round(
-              (participationRatio.length / totalWeeks.length || 0) * 100
-            )}%)`,
-            inline: true,
-          }
-        )
-        .setFooter({
-          text: "Submit scores with /gpq • Visualize progress with /graph",
-          iconURL:
-            "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
-        });
-      // Display responses
-      interaction.reply({ embeds: [profile] });
+      axios.get(url).then(async function (res) {
+        if (!user?.characters[0]) {
+          return interaction.reply(
+            `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
+          );
+        }
+        const profile = new EmbedBuilder()
+          .setColor(0xffc3c5)
+          .setTitle(user.characters[0]?.name || "")
+          .setAuthor({ name: "Culvert Profile" })
+          .setURL(
+            `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0]?.name}&search=true`
+          )
+          .setThumbnail(
+            "https://i.mapleranks.com/u/" +
+              res.data[0].CharacterImgUrl.slice(38)
+          )
+          .addFields(
+            {
+              name: "Class",
+              value: user.characters[0].class,
+              inline: true,
+            },
+            {
+              name: "Level",
+              value: `${res.data[0].Level}`,
+              inline: true,
+            },
+            {
+              name: "Member Since",
+              value: `${dayjs(user.characters[0].memberSince).format(
+                "MMM DD, YYYY"
+              )}`,
+              inline: true,
+            }
+          )
+          .addFields(
+            {
+              name: "Current Score",
+              value: `${
+                user.characters[0].scores[user.characters[0].scores.length - 1]
+                  ?.date !== reset
+                  ? 0
+                  : user.characters[0].scores[
+                      user.characters[0].scores.length - 1
+                    ].score?.toLocaleString("en-US") || "0"
+              }`,
+              inline: true,
+            },
+            {
+              name: "Weekly Rank",
+              value: `${weeklyRank}`,
+              inline: true,
+            },
+            {
+              name: "Personal Best",
+              value: `${
+                bestScore[0].characters.scores[0]?.score.toLocaleString(
+                  "en-US"
+                ) || "0"
+              }`,
+              inline: true,
+            }
+          )
+          .addFields({
+            name: "Previous Scores",
+            value: getPreviousScores(),
+            inline: false,
+          })
+          .addFields(
+            {
+              name: "Lifetime Score",
+              value: `${
+                totalScore[0]?.total_score.toLocaleString("en-US") || "0"
+              }`,
+              inline: true,
+            },
+            {
+              name: "Lifetime Rank",
+              value: `${lifetimeRank}`,
+              inline: true,
+            },
+            {
+              name: "Participation",
+              value: `${participationRatio.length}/${
+                totalWeeks.length
+              } (${Math.round(
+                (participationRatio.length / totalWeeks.length || 0) * 100
+              )}%)`,
+              inline: true,
+            }
+          )
+          .setFooter({
+            text: "Submit scores with /gpq • Visualize progress with /graph",
+            iconURL:
+              "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
+          });
+        // Display responses
+        interaction.reply({ embeds: [profile] });
+      });
     } catch (error) {
       interaction.reply(
         `Error ⎯ The character **${selectedCharacter}** is not linked to any user`

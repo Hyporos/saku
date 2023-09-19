@@ -1,12 +1,13 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const dayjs = require ("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("correct")
-    .setDescription("Correct a character's score for any given date")
+    .setDescription("Edit or create a new score for a character")
     .addStringOption((option) =>
       option
         .setName("character")
@@ -30,48 +31,84 @@ module.exports = {
 
   async execute(interaction) {
     // Parse the command arguments
-    const selectedCharacter = interaction.options.getString("character");
-    const selectedDate = interaction.options.getString("date");
-    const culvertScore = interaction.options.getInteger("score");
+    const characterOption = interaction.options.getString("character");
+    const dateOption = interaction.options.getString("date");
+    const scoreOption = interaction.options.getInteger("score");
 
-    // Check if character exists
-    const characterExists = await culvertSchema.exists({
-      "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+    // Check if the date is valid (formatted properly, falls on a sunday)
+    const dateFormat = /^\d{4}-\d{2}-\d{2}$/;
+    const isFormatted = dateFormat.test(dateOption);
+
+    const isSunday = dayjs(dateOption).day() === 0;
+
+    if (!isFormatted) {
+      return interaction.reply(
+        `Error ⎯ The date **${dateOption}** is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
+      );
+    }
+
+    if (!isSunday) {
+      return interaction.reply(
+        `Error ⎯ The date **${dateOption}** is not valid. Make sure that the day lands on a sunday`
+      );
+    }
+
+    // Find the user with the specified character
+    const user = await culvertSchema.findOne({
+      "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
     });
 
-    // Check if a score has already been set for the given week
-    const weekLogged = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $unwind: "$characters.scores",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${selectedCharacter}$`,
-            $options: "i",
-          },
-          "characters.scores.date": selectedDate,
-        },
-      },
-    ]);
+    if (!user) {
+      return interaction.reply(
+        `Error ⎯ The character **${characterOption}** has not yet been linked`
+      );
+    }
+    
+    // Check if the character has a score on the given date
+    const scoreExists = user.characters[0].scores.find(
+      (score) => score.date === dateOption
+    );
 
     // Create or update an existing score on the selected character
-    if (weekLogged.length < 1) {
+    if (scoreExists) {
       await culvertSchema.findOneAndUpdate(
         {
           "characters.name": {
-            $regex: `^${selectedCharacter}$`,
+            $regex: `^${characterOption}$`,
+            $options: "i",
+          },
+          "characters.scores.date": dateOption,
+        },
+        {
+          $set: {
+            "characters.$[nameElem].scores.$[dateElem].score": scoreOption,
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              "nameElem.name": {
+                $regex: `^${characterOption}$`,
+                $options: "i",
+              },
+            },
+            { "dateElem.date": dateOption },
+          ],
+        }
+      );
+    } else {
+      await culvertSchema.findOneAndUpdate(
+        {
+          "characters.name": {
+            $regex: `^${characterOption}$`,
             $options: "i",
           },
         },
         {
           $addToSet: {
-            "characters.$[nameElem].scores": { 
-              score: culvertScore,
-              date: selectedDate,
+            "characters.$[nameElem].scores": {
+              score: scoreOption,
+              date: dateOption,
             },
           },
         },
@@ -79,52 +116,16 @@ module.exports = {
           arrayFilters: [
             {
               "nameElem.name": {
-                $regex: `^${selectedCharacter}$`,
+                $regex: `^${characterOption}$`,
                 $options: "i",
               },
             },
           ],
-          new: true,
-        }
-      );
-    } else {
-      await culvertSchema.findOneAndUpdate(
-        {
-          "characters.name": {
-            $regex: `^${selectedCharacter}$`,
-            $options: "i",
-          },
-          "characters.scores.date": selectedDate,
-        },
-        {
-          $set: {
-            "characters.$[nameElem].scores.$[dateElem].score": culvertScore,
-          },
-        },
-        {
-          arrayFilters: [
-            {
-              "nameElem.name": {
-                $regex: `^${selectedCharacter}$`,
-                $options: "i",
-              },
-            },
-            { "dateElem.date": selectedDate },
-          ],
-          new: true,
         }
       );
     }
 
     // Display user responses
-    let response = "";
-
-    if (!characterExists) {
-      response = `Error ⎯ The character **${selectedCharacter}** has not yet been linked`;
-    } else {
-      response = `${selectedCharacter}'s score has been set to **${culvertScore}** for the week of ${selectedDate}`;
-    }
-
-    interaction.reply(response);
+    interaction.reply(`${characterOption}'s score has been set to **${scoreOption}** for the week of ${dateOption}`);
   },
 };

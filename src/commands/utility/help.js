@@ -72,7 +72,7 @@ module.exports = {
           case "link":
             return "Link a character to a Discord ID. You must include the join date as well in a proper, common form (ex: YYYY-MM-DD)";
           case "correct":
-            return "Correct a character's score for any given date. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format";
+            return "Edit or create a new score for a character. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert";
           case "wos":
