@@ -27,7 +27,7 @@ module.exports = {
 
   async execute(interaction) {
     // Parse the command arguments
-    const newColor = interaction.options.getString("color");
+    const colorOption = interaction.options.getString("color");
 
     // Get the RGB values for the selected color
     function getGraphColor(color) {
@@ -47,16 +47,16 @@ module.exports = {
     // Update the user's graph color
     const user = await culvertSchema.findOneAndUpdate(
       { _id: interaction.user.id },
-      { $set: { graphColor: getGraphColor(newColor) } }
+      { $set: { graphColor: getGraphColor(colorOption) } }
     );
 
     // Display user responses
     let content;
 
-    if (user.graphColor === getGraphColor(newColor)) {
-      content = `Error ⎯ Your graph color is already set to ${newColor}`;
+    if (user.graphColor === getGraphColor(colorOption)) {
+      content = `Error ⎯ Your graph color is already set to ${colorOption}`;
     } else {
-      content = `Your graph color has been changed to ${newColor}`;
+      content = `Your graph color has been changed to ${colorOption}`;
     }
 
     interaction.reply({ content, ephemeral: true });

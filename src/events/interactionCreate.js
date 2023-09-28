@@ -23,12 +23,13 @@ module.exports = {
         "graphcolor",
         "rankings",
         "link",
+        "unlink",
         "correct",
         "scan",
         "wos",
       ];
 
-      const beeCommands = ["link", "correct", "scan", "wos"];
+      const beeCommands = ["link", "unlink", "correct", "scan", "wos"];
       const ownerCommands = ["import", "reload"];
 
       if (

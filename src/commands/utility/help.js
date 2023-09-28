@@ -71,6 +71,8 @@ module.exports = {
             return "View the culvert leaderboard. You can choose between displaying weekly or lifetime scores";
           case "link":
             return "Link a character to a Discord ID. You must include the join date as well in a proper, common form (ex: YYYY-MM-DD)";
+          case "unlink":
+            return "Unlink and remove a character from the database. All of their data, such as submitted scores, will be gone";
           case "correct":
             return "Edit or create a new score for a character. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format";
           case "scan":
@@ -97,7 +99,9 @@ module.exports = {
           case "rankings":
             return `\u0060[timeframe]\u0060 ⎯ The timeframe that the leaderboard will display`;
           case "link":
-            return `\u0060[character_name]\u0060 ⎯ The character name to be linked\n\u0060[discord_user]\u0060 ⎯ The Discord user to be paired with the character\n\u0060[member_since]\u0060 ⎯ The date that the character joined the guild`;
+            return `\u0060[character]\u0060 ⎯ The character to be linked\n\u0060[discord_user]\u0060 ⎯ The Discord user to be paired with the character\n\u0060[member_since]\u0060 ⎯ The date that the character joined the guild`;
+          case "unlink":
+            return `\u0060[character]\u0060 ⎯ The character to be unlinked`;
           case "correct":
             return `\u0060[character]\u0060 ⎯ The character to be corrected\n\u0060[date]\u0060 ⎯ The date of the score\n\u0060[score]\u0060 ⎯ The new score to submit`;
           case "scan":
@@ -128,7 +132,9 @@ module.exports = {
       .addFields({
         name: "Culvert",
         value: `\u0060gpq\u0060, \u0060profile\u0060, \u0060graph\u0060, \u0060graphcolor\u0060, \u0060rankings\u0060${
-          isBee ? ", \u0060link\u0060, \u0060correct\u0060, \u0060scan\u0060, \u0060wos\u0060" : ""
+          isBee
+            ? ", \u0060link\u0060,\u0060unlink\u0060, \u0060correct\u0060, \u0060scan\u0060, \u0060wos\u0060"
+            : ""
         }`,
       })
       .addFields({ name: "Fun", value: "`roll`" })

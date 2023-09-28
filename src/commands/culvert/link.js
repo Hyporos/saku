@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const axios = require("axios");
+const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -10,8 +11,8 @@ module.exports = {
     .setDescription("Link a character to a Discord ID")
     .addStringOption((option) =>
       option
-        .setName("character_name")
-        .setDescription("The character name to be linked")
+        .setName("character")
+        .setDescription("The character to be linked")
         .setRequired(true)
     )
     .addUserOption((option) =>
@@ -30,98 +31,101 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    const characterName = interaction.options.getString("character_name");
-    const discordUser = interaction.options.getUser("discord_user");
-    const memberSince = interaction.options.getString("member_since");
+    // Parse the command arguments
+    const characterOption = interaction.options.getString("character");
+    const userOption = interaction.options.getUser("discord_user");
+    const memberSinceOption = interaction.options.getString("member_since");
 
-    // Ranking API
-    const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${characterName}&page_index=1`;
+    if (!dayjs(memberSinceOption).isValid()) {
+      return interaction.reply(
+        `Error ⎯ The date **${memberSinceOption}** is not valid. Make sure that it is properly formatted (ex: April 28, 2023 or 04-28-2023)`
+      );
+    }
 
-    // Check if character is linked to a user
+    // Check if the character is already linked to a user
     const characterLinked = await culvertSchema.exists({
-      "characters.name": { $regex: `^${characterName}$`, $options: "i" },
+      "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
     });
+
+    if (characterLinked) {
+      return interaction.reply(
+        `Error ⎯ The character **${characterOption}** is already linked to a user`
+      );
+    }
 
     // Determine class name based on JobDetail
     function getClassName(res) {
-      if (res.data[0].JobName === "Warrior") {
-        if (res.data[0].JobDetail === 12) return "Hero";
-        if (res.data[0].JobDetail === 22) return "Paladin";
-        if (res.data[0].JobDetail === 32) return "Dark Knight";
-      }
+      const jobMap = {
+        Warrior: {
+          12: "Hero",
+          22: "Paladin",
+          32: "Dark Knight",
+        },
+        Magician: {
+          12: "Arch Mage (F/P)",
+          22: "Arch Mage (I/L)",
+          32: "Bishop",
+        },
+        Bowman: {
+          12: "Bowmaster",
+          22: "Marksman",
+        },
+        Thief: {
+          12: "Night Lord",
+          22: "Shadower",
+        },
+        Pirate: {
+          12: "Buccaneer",
+          22: "Corsair",
+          32: "Cannoneer",
+        },
+      };
 
-      if (res.data[0].JobName === "Magician") {
-        if (res.data[0].JobDetail === 12) return "Arch Mage (F/P)";
-        if (res.data[0].JobDetail === 22) return "Arch Mage (I/L)";
-        if (res.data[0].JobDetail === 32) return "Bishop";
-      }
+      const jobName = res.data[0].JobName;
+      const jobDetail = res.data[0].JobDetail;
 
-      if (res.data[0].JobName === "Bowman") {
-        if (res.data[0].JobDetail === 12) return "Bowmaster";
-        if (res.data[0].JobDetail === 22) return "Marksman";
-      }
-
-      if (res.data[0].JobName === "Thief") {
-        if (res.data[0].JobDetail === 12) return "Night Lord";
-        if (res.data[0].JobDetail === 22) return "Shadower";
-      }
-
-      if (res.data[0].JobName === "Pirate") {
-        if (res.data[0].JobDetail === 12) return "Buccaneer";
-        if (res.data[0].JobDetail === 22) return "Corsair";
-        if (res.data[0].JobDetail === 32) return "Cannoneer";
-      }
-
-      return res.data[0].JobName;
+      return (jobMap[jobName] && jobMap[jobName][jobDetail]) || jobName;
     }
 
     // Fetch Maplestory ranking data
+    const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${characterOption}&page_index=1`;
+
+    const joinDate = dayjs(memberSinceOption).format("MMM DD, YYYY");
+
     axios
       .get(url)
       .then(async function (res) {
-        // Create or update a user entry and link a character (if not already linked)
-        if (!characterLinked) {
-          await culvertSchema.findOneAndUpdate(
-            {
-              _id: discordUser.id,
-            },
-            {
-              _id: discordUser.id,
-              graphColor: "255,189,213",
-              $addToSet: {
-                characters: {
-                  name: res.data[0].CharacterName,
-                  avatar:
-                    "https://i.mapleranks.com/u/" +
-                    res.data[0].CharacterImgUrl.slice(38), // Maplestory URL won't display an image, use the mapleranks URL instead
-                  class: getClassName(res),
-                  level: res.data[0].Level,
-                  memberSince: memberSince,
-                },
+        // Create or update a user with the new character
+        await culvertSchema.findOneAndUpdate(
+          {
+            _id: userOption.id,
+          },
+          {
+            _id: userOption.id,
+            graphColor: "255,189,213",
+            $addToSet: {
+              characters: {
+                name: res.data[0].CharacterName,
+                class: getClassName(res),
+                memberSince: joinDate,
               },
             },
-            {
-              upsert: true,
-            }
-          );
-        }
-        // Display responses
-        if (characterLinked) {
-          interaction.reply(
-            `Error ⎯ The character **${characterName}** is already linked`
-          );
-        } else {
-          interaction.reply(
-            `Linked **${characterName}** to ${discordUser}\nUser ID: ${discordUser.id}`
-          );
-        }
+          },
+          {
+            upsert: true,
+          }
+        );
+
+        interaction.reply(
+          `Linked **${res.data[0].CharacterName}** to ${userOption}\nMember since: ${joinDate}`
+        );
       })
       .catch(function (error) {
-        const rankings =
-          "https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1";
         interaction.reply(
-          `Error ⎯ The character **${characterName}** could not be found on the [rankings](<${rankings}>)`
+          `Error ⎯ The character **${characterOption}** could not be found on the rankings`
         );
+
+        console.error(error);
       });
   },
 };
