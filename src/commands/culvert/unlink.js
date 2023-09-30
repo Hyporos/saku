@@ -32,8 +32,8 @@ module.exports = {
     }
 
     // Remove the character from the database
-    await culvertSchema.updateMany(
-      {},
+    await culvertSchema.findOneAndUpdate(
+      { "characters.name": { $regex: `^${characterOption}$`, $options: "i" } },
       {
         $pull: {
           characters: {
@@ -47,7 +47,7 @@ module.exports = {
     );
 
     interaction.reply(
-      `Unlinked and removed all of **${characterOption}**'s scores from the database` // Make this display the real name
+      `Unlinked and removed all of **${characterOption}**'s scores from the database` //TODO: Make this display the real name
     );
   },
 };

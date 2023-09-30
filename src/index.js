@@ -4,7 +4,7 @@ const path = require("node:path");
 require("dotenv").config();
 
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds] | [GatewayIntentBits.GuildMembers] | [GatewayIntentBits.MessageContent] | [GatewayIntentBits.GuildMessages] });
 
 // Grab all of the slash command files
 client.commands = new Collection();

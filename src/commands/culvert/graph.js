@@ -120,7 +120,7 @@ module.exports = {
 
     const url = `https://quickchart.io/chart/render/sf-55512261-85dd-4f7b-9eb9-c79be6acf04b?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
 
-    // Create graph embed 
+    // Create the graph embed 
     const graph = new EmbedBuilder()
     .setColor(0x202222)
     .setAuthor({ name: "Culvert Graph" })
