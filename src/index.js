@@ -1,10 +1,22 @@
-const { Client, Collection, GatewayIntentBits } = require("discord.js");
+const {
+  Client,
+  Collection,
+  GatewayIntentBits,
+  Partials,
+} = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
 require("dotenv").config();
 
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds] | [GatewayIntentBits.GuildMembers] | [GatewayIntentBits.MessageContent] | [GatewayIntentBits.GuildMessages] });
+const client = new Client({
+  intents:
+    [GatewayIntentBits.Guilds] |
+    [GatewayIntentBits.GuildMembers] |
+    [GatewayIntentBits.MessageContent] |
+    [GatewayIntentBits.GuildMessages],
+  partials: [Partials.GuildMember],
+});
 
 // Grab all of the slash command files
 client.commands = new Collection();
