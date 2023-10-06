@@ -26,7 +26,7 @@ module.exports = {
           "https://cdn.discordapp.com/icons/719788426022617138/a_2ed98f7952ca3456a52008c11a6b79cf.png",
       })
       .setDescription(
-        `Hey ${member.user}!\n\nTo gain access to our Discord, please write a little introduction about yourself and change your Discord nickname to your Preferred Name (IGN).\n\nFor example: miche (superbbzzzzz)\n\n✦ • ────────────── · · · · · · · · ✦`
+        `Hey ${member.user}!\n\nTo gain access to our Discord, please write a little introduction about yourself and change your Discord nickname to your Preferred Name (IGN). For example: miche (superbbzzzzz)\n\n✦ • ────────────── · · · · · · · · ✦`
       )
       .setImage(
         "https://media.discordapp.net/attachments/670464920198053891/1128866120561070160/Welcome.png"
@@ -56,7 +56,7 @@ module.exports = {
       });
 
     // Display event responses
-    logChannel.send({ content: `${member.user}`, embeds: [welcome] });
+    welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
     logChannel.send({ embeds: [log] });
   },
 };

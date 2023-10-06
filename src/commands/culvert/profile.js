@@ -308,7 +308,7 @@ module.exports = {
           )
           .setThumbnail(
             "https://i.mapleranks.com/u/" +
-              res.data[0].CharacterImgUrl.slice(38)
+              res.data[0]?.CharacterImgUrl.slice(38) || "a.png"
           )
           .addFields(
             {
@@ -318,7 +318,7 @@ module.exports = {
             },
             {
               name: "Level",
-              value: `${res.data[0].Level}`,
+              value: `${res.data[0]?.Level || "?"}`,
               inline: true,
             },
             {

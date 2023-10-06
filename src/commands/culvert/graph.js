@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const botSchema = require("../../botSchema.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -113,12 +114,16 @@ module.exports = {
     );
 
     // QuickChart Template Link
+    const bot = await botSchema.find({});
+
+    console.log(bot[0].graphTemplate);
+
     const xLabels = getLabels("x");
     const yLabels = getLabels("y");
     const graphColor = user.graphColor || "255,189,213";
     const borderColorAlpha = graphColor !== "255,189,213" ? 0.7 : 0.6;
 
-    const url = `https://quickchart.io/chart/render/sf-55512261-85dd-4f7b-9eb9-c79be6acf04b?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
+    const url = `${bot[0].graphTemplate}?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
 
     // Create the graph embed 
     const graph = new EmbedBuilder()

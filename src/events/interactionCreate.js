@@ -29,7 +29,7 @@ module.exports = {
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "correct", "scan", "wos"];
+      const beeCommands = ["link", "unlink", "correct", "scan", "wos", "graphtemplate"];
       const ownerCommands = ["import", "reload"];
 
       if (
