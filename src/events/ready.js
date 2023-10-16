@@ -8,7 +8,7 @@ module.exports = {
   once: true,
   async execute(client) {
     // Set the activity of the bot
-    client.user.setActivity("Maplestory | /help");
+    client.user.setActivity("MapleStory | /help");
 
     // Connect to the database
     mongoose.connect(process.env.MONGO_URI);
