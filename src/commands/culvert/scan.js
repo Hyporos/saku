@@ -78,7 +78,8 @@ module.exports = {
       if (name === "Aina") return "Ainà";
       if (name === "Hikåri") return "Hikárì";
       if (name === "Cukeu") return "Cukcu";
-      if (name === "téee") return "táee";
+      if (name === "téee" || name === "tåee") return "táee";
+      if (name === "Kaküja") return "kakúja";
       return name;
     }
 

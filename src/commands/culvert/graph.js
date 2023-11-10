@@ -86,6 +86,10 @@ module.exports = {
     function getLabels(axis) {
       const scores = user.characters[0].scores || [];
 
+      scores.sort(function(a,b){ // Sort just in case the /scan has submitted a score in the wrong place
+        return new Date(a.date) - new Date(b.date);
+      });
+
       let weekCount = weeksOption || 8;
       let content = "";
 

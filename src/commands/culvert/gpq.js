@@ -84,6 +84,33 @@ module.exports = {
       _id: interaction.user.id,
       "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
     });
+    
+    // Find the biggest (best) score of the character
+    const bestScore = await culvertSchema.aggregate([
+      {
+        $unwind: "$characters",
+      },
+      {
+        $match: {
+          "characters.name": {
+            $regex: `^${selectedCharacter}$`,
+            $options: "i",
+          },
+        },
+      },
+      {
+        $set: {
+          "characters.scores": {
+            $sortArray: {
+              input: "$characters.scores",
+              sortBy: {
+                score: -1,
+              },
+            },
+          },
+        },
+      },
+    ]);
 
     // Check if a score has already been set for this week
     const weekLogged = await culvertSchema.aggregate([
@@ -164,6 +191,16 @@ module.exports = {
       );
     }
 
+    // Check if the character has set a new personal best
+    function hasNewBest() {
+      console.log(bestScore[0].characters.scores[0]?.score);
+      if (culvertScore > bestScore[0].characters.scores[0]?.score) {
+        return " :trophy:";
+      } else {
+        return "";
+      }
+    }
+
     // Display responses
     let response = "";
 
@@ -172,9 +209,9 @@ module.exports = {
     } else if (!characterExists) {
       response = `Error ⎯ The character **${selectedCharacter}** has not yet been linked`;
     } else if (weekLogged.length > 0) {
-      response = `${selectedCharacter}'s score has been updated to **${culvertScore}** for this week! (${reset})`;
+      response = `${selectedCharacter}'s score has been updated to **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
     } else {
-      response = `${selectedCharacter} has scored **${culvertScore}** for this week! (${reset})`;
+      response = `${selectedCharacter} has scored **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
     }
 
     interaction.reply(response);

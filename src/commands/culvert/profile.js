@@ -248,6 +248,10 @@ module.exports = {
     function getPreviousScores() {
       const scores = user.characters[0].scores;
 
+      scores.sort(function(a,b){
+        return new Date(a.date) - new Date(b.date);
+      });
+
       let notSubmitted = false;
 
       let content = "\u0060\u0060\u0060";
