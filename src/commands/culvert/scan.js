@@ -75,11 +75,16 @@ module.exports = {
       if (name === "Kürea") return "Kùrea";
       if (name === "Aski") return "Aøki";
       if (name === "Laved") return "Løved";
-      if (name === "Aina") return "Ainà";
-      if (name === "Hikåri") return "Hikárì";
+      if (name === "Aina" || name === "Ainå") return "Ainà";
+      if (name === "Hikåri" || name === "Hikéri") return "Hikárì";
       if (name === "Cukeu") return "Cukcu";
       if (name === "téee" || name === "tåee") return "táee";
       if (name === "Kaküja") return "kakúja";
+      if (name === "Kogå") return "Kogâ";
+      if (name === "ponzi") return "pònzi";
+      if (name === "CaptainWaThunder" || name === "CaptainvaThunder") return "CaptainWater";
+      if (name === "Hakgs") return "Hakøs";
+      if (name === "JaylTB") return "JayITB";
       return name;
     }
 

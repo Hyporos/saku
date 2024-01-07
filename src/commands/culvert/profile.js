@@ -76,6 +76,12 @@ module.exports = {
       { "characters.$": 1 }
     );
 
+    if (!user?.characters[0]) {
+      return interaction.reply(
+        `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
+      );
+    }
+
     // Find the name of all characters
     const users = await culvertSchema.aggregate([
       {
@@ -298,11 +304,6 @@ module.exports = {
     // Create and display a profile embed for the selected character (if they exist)
     try {
       axios.get(url).then(async function (res) {
-        if (!user?.characters[0]) {
-          return interaction.reply(
-            `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
-          );
-        }
         const profile = new EmbedBuilder()
           .setColor(0xffc3c5)
           .setTitle(user.characters[0]?.name || "")
@@ -399,7 +400,7 @@ module.exports = {
       });
     } catch (error) {
       interaction.reply(
-        `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
+        `Error ⎯ The character **${selectedCharacter}** could not be fetched from the API`
       );
       console.error(error);
     }

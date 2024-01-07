@@ -13,7 +13,7 @@ module.exports = {
     // Connect to the database
     mongoose.connect(process.env.MONGO_URI);
 
-    // Fetch all members for the other events, ignoring the cache
+    // Fetch all members for use on other events, instead of using the cache
     const guild = await client.guilds.fetch("719788426022617138");
 	  await guild.members.fetch();
 

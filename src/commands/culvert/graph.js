@@ -78,7 +78,7 @@ module.exports = {
       return interaction.reply(`Error ⎯ The character **${characterOption}** is not linked to any user`);
     }
 
-    if (user.characters[0].scores.length <= 2) {
+    if (user.characters[0].scores.length < 2) {
       return interaction.reply(`Error ⎯ The character **${characterOption}** must have at least two scores submitted`);
     } 
 
