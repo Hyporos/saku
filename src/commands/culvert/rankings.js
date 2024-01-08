@@ -40,15 +40,30 @@ module.exports = {
     // Create buttons & row
     const previous = new ButtonBuilder()
       .setCustomId("previous")
-      .setLabel("Prev")
-      .setStyle(ButtonStyle.Secondary);
+      .setEmoji("<:singleleftchevron:1193783932366372907>")
+      .setStyle(ButtonStyle.Primary);
 
     const next = new ButtonBuilder()
       .setCustomId("next")
-      .setLabel("Next")
+      .setEmoji("<:singlerightchevron:1193783934052470835>")
+      .setStyle(ButtonStyle.Primary);
+
+    const first = new ButtonBuilder()
+      .setCustomId("first")
+      .setEmoji("<:doubleleftchevron:1193783344996024350>")
       .setStyle(ButtonStyle.Secondary);
 
-    const pagination = new ActionRowBuilder().addComponents(previous, next);
+    const last = new ButtonBuilder()
+      .setCustomId("last")
+      .setEmoji("<:doublerightchevron:1193783935071682591>")
+      .setStyle(ButtonStyle.Secondary);
+
+    const pagination = new ActionRowBuilder().addComponents(
+      first,
+      previous,
+      next,
+      last
+    );
 
     // Last reset
     dayjs.updateLocale("en", {
@@ -196,6 +211,11 @@ module.exports = {
       return content.concat("\u0060\u0060\u0060");
     }
 
+    if (page === 1) {
+      first.setDisabled(true);
+      previous.setDisabled(true);
+    }
+
     // Original embed
     const rankings = new EmbedBuilder()
       .setColor(0xffc3c5)
@@ -248,6 +268,32 @@ module.exports = {
           lastRank += 8;
           page++;
         }
+      } else if (interaction.customId === "first") {
+        placement = 1;
+        firstRank = 0;
+        lastRank = 8;
+        page = 1;
+      } else if (interaction.customId === "last") {
+        placement += 8 * (maxPage - page - 1);
+        firstRank += 8 * (maxPage - page);
+        lastRank += 8 * (maxPage - page);
+        page = maxPage;
+      }
+
+      if (page === 1) {
+        first.setDisabled(true);
+        previous.setDisabled(true);
+      } else {
+        first.setDisabled(false);
+        previous.setDisabled(false);
+      }
+
+      if (page === maxPage) {
+        last.setDisabled(true);
+        next.setDisabled(true);
+      } else {
+        last.setDisabled(false);
+        next.setDisabled(false);
       }
 
       // New updated embed object // ! This should not be duplicated
@@ -286,6 +332,8 @@ module.exports = {
     collector.on("end", () => {
       previous.setDisabled(true);
       next.setDisabled(true);
+      first.setDisabled(true);
+      last.setDisabled(true);
 
       placement -= 8; // TODO: Figure out why this even goes up +8 when it disables
 

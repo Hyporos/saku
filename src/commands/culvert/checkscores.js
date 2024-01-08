@@ -10,7 +10,7 @@ dayjs.extend(updateLocale);
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("scorecheck")
+    .setName("checkscores")
     .setDescription("Check for scores that were not successfully submitted")
     .addStringOption((option) =>
       option

@@ -33,7 +33,7 @@ module.exports = {
       "ping",
     ];
 
-    isBee && choices.push("link", "unlinl", "rename", "correct", "scan", "scorecheck", "wos");
+    isBee && choices.push("link", "unlink", "rename", "correct", "scan", "checkscores", "wos");
 
     const filtered = choices
       .filter((choice) => choice.toLowerCase().includes(value))
@@ -79,8 +79,8 @@ module.exports = {
             return "Edit or create a new score for a character. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert";
-            case "scorecheck":
-              return "View the wall of shame. On the wall there will be a list of users sorted by their participation rate, from lowest to 60%";
+            case "checkscores":
+              return "View a list of characters that have unsubmitted scores for the given week. Use this to confirm whether or not /scan has missed any characters or if members have left the guild.";
             case "wos":
             return "View the wall of shame. On the wall there will be a list of users sorted by their participation rate, from lowest to 60%";
           case "roll":
@@ -111,9 +111,9 @@ module.exports = {
           case "correct":
             return `\u0060[character]\u0060 ⎯ The character to be corrected\n\u0060[date]\u0060 ⎯ The date of the score\n\u0060[score]\u0060 ⎯ The new score to submit`;
           case "scan":
-            return `\u0060[last_week]\u0060 ⎯ Submit the scores for last week instead (default: false)`;
-            case "scorecheck":
-              return `None`;
+            return `\u0060[week]\u0060 ⎯ Submit the scores for either the current or the last week`;
+            case "checkscores":
+              return `\u0060[week]\u0060 ⎯ Fetch the character list for either the current or the last week`;
           case "wos":
             return `None`;
           case "roll":
