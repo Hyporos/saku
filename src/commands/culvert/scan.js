@@ -81,10 +81,13 @@ module.exports = {
       if (name === "téee" || name === "tåee") return "táee";
       if (name === "Kaküja") return "kakúja";
       if (name === "Kogå") return "Kogâ";
-      if (name === "ponzi") return "pònzi";
+      if (name === "ponzi" || name === "pånzi") return "pònzi";
       if (name === "CaptainWaThunder" || name === "CaptainvaThunder") return "CaptainWater";
       if (name === "Hakgs") return "Hakøs";
       if (name === "JaylTB") return "JayITB";
+      if (name === "Mipd" || name === "Mipû") return "Mipú";
+      if (name === "Nåro") return "Nàro";
+      if (name === "Sasåri" || name === "Sasóri") return "Sasôri";
       return name;
     }
 
@@ -320,7 +323,7 @@ module.exports = {
 
       if (numberNaN.length > 0) {
         response = response.concat(
-          "\n\nThe following characters' scores could not be read:\n- "
+          "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
         );
         for (const name of numberNaN) {
           response = response.concat(`**${name}** ⎯ `);

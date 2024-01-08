@@ -27,10 +27,11 @@ module.exports = {
         "rename",
         "correct",
         "scan",
+        "scorecheck",
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "wos", "graphtemplate"];
+      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "scorecheck", "wos", "graphtemplate"];
       const ownerCommands = ["import", "reload"];
 
       if (
