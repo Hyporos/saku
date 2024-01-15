@@ -31,7 +31,7 @@ module.exports = {
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "checkscores", "wos", "graphtemplate"];
+      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "checkscores", "wos"];
       const ownerCommands = ["import", "reload"];
 
       if (
