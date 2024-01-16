@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const botSchema = require("../../botSchema.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -118,8 +117,6 @@ module.exports = {
     );
 
     // QuickChart Template Link
-    const bot = await botSchema.find({});
-
     const xLabels = getLabels("x");
     const yLabels = getLabels("y");
     const graphColor = user.graphColor || "255,189,213";
