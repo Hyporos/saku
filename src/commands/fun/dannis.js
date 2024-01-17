@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -10,8 +10,7 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-
-    const number = Math.floor(Math.random() * 5) + 1
+    const number = Math.floor(Math.random() * 6) + 1;
 
     function randomPhrase(number) {
       switch (number) {
@@ -25,6 +24,8 @@ module.exports = {
           return "man i love dannis";
         case 5:
           return "Woke up this morning, remembered I'm a fan of dannis, day instantly better";
+        case 6:
+          return "https://media.discordapp.net/attachments/1090002887410729090/1196657634003128451/OIG.png?ex=65b86d44&is=65a5f844&hm=de7145dccb6e16f2e0958e2fb32469d6fd0c4384d18975d7dbc6db03ca399be9&=&format=webp&quality=lossless";
       }
     }
 
