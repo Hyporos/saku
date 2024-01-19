@@ -101,11 +101,12 @@ module.exports = {
         .write("./processedImage.jpg");
     });
 
+    // Use OCR to read all text in the image
     const worker = await createWorker({
       logger: (m) => console.log(m),
     });
 
-    (async () => {
+    const processTextEntries = async () => {
       await worker.loadLanguage("eng+fra+spa+dan+swe+ita");
       await worker.initialize("eng+fra+spa+dan+swe+ita");
       await worker.setParameters({
@@ -118,92 +119,93 @@ module.exports = {
 
       await worker.terminate();
 
-      const entryArray = text.split(/\r?\n/); // make this return text then work on it
+      // Return an array of each entry/line in the culvert score page
+      return text.split(/\r?\n/);
+    }
 
-      const characters = [];
-      const notFound = [];
-      const numberNaN = [];
+      const entryArray = await processTextEntries();
 
-      const dupes = [];
+      const validScores = [];
+      const NaNScores = [];
 
       let successCount = 0;
+      let failureCount = 0;
+      const notFoundChars = [];
 
-      // Split each entry into its own array
+      // Select name and score from each entry and push into a separate array
       entryArray.forEach((entry) => {
-        // Log characters which have invalid scores
+        // Log character names which have invalid scores
         if (isNaN(Number(entry.split(" ").pop()))) {
-          numberNaN.push(entry.split(" ")[0]);
+          NaNScores.push(entry.split(" ")[0]);
         }
+        // If the character name is not valid, store the entry
         if (entry.split(" ")[0] != "") {
-          // Ignore empty entries
-          characters.push({
+          validScores.push({
             name: exceptions(entry.split(" ")[0]),
             score: Number(entry.split(" ").pop()),
           });
         }
       });
 
-      for (const character of characters) {
-        const splicedFirst = character.name.substring(0, 4);
-        const splicedLast = character.name.substring(character.name.length - 4);
+      for (const character of validScores) {
+        // Get the first and last 4 letters of the character name to use for better database matching
+        const nameBeginning = character.name.substring(0, 4);
+        const nameEnd = character.name.substring(character.name.length - 4);
 
-        // Find the number of characters that match the query
-        const dupes = await culvertSchema.aggregate([
+        // Get and unwind the list of character names
+        const characterList = await culvertSchema.aggregate([
           {
             $unwind: "$characters",
           },
         ]);
 
-        const duplicate = [];
+        // Store "half matched" character names in a separate array
+        const halfMatched = [];
 
-        for (const char of dupes) {
-          const name = char.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
+        for (const character of characterList) {
+          const name = character.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
 
-          // Use regular expression to find all occurrences of splicedLast in the name
+          // Find all names which match with the iterated nameBeginning or nameEnd
           const matches = name.match(
-            new RegExp(`^${splicedFirst}|${splicedLast}$`, "gi")
+            new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi")
           );
 
           if (matches && matches.length > 0) {
-            duplicate.push(char.characters.name.toLowerCase());
+            halfMatched.push(character.characters.name.toLowerCase());
           }
         }
-
-        console.log(duplicate);
         
+        // Set the user object to the user in the entry 
         let user;
 
-        if (duplicate.length > 1) {
-          for (const dupe of duplicate) {
-            if (dupe.includes(character.name.toLowerCase())) {
+        // If more than one name was matched, perform a more accurate search
+        if (halfMatched.length > 1) {
+          for (const duplicateName of halfMatched) {
+            if (duplicateName.includes(character.name.toLowerCase())) {
               user = await culvertSchema.findOne(
                 {
                   "characters.name": {
-                    $regex: `^${dupe}$`,
+                    $regex: `^${duplicateName}$`,
                     $options: "i",
                   },
                 },
                 { "characters.$": 1 }
               );
-              console.log(user);
-            } else {
-              console.log("none found");
             }
           }
         } else {
           user = await culvertSchema.findOne(
             {
               "characters.name": {
-                $regex: `^${splicedFirst}|${splicedLast}$`,
+                $regex: `^${nameBeginning}|${nameEnd}$`,
                 $options: "i",
               },
-            }, // ! MAKE NEW CHARS ARRAY
+            },
             { "characters.$": 1 }
           );
         }
 
-        // Find the character that contains the spliced strings
-
+        // Perform the logic to set the score for the character
         if (user) {
           successCount++;
           // Check if a score has already been set for the week
@@ -278,60 +280,61 @@ module.exports = {
             );
           }
         } else {
-          index = characters.indexOf(character.name);
-          characters.splice(index, 1);
-          notFound.push(character.name);
+          failureCount++;
+          notFoundChars.push(character.name);
         }
       }
 
+      // Create the printed list of characters and the scores which were set
       function getSuccessList() {
         let content = "";
 
-        for (const character of characters) {
-          content = content.concat(
-            `${character.name}: **${
-              !isNaN(character.score)
-                ? character.score.toLocaleString("en-US")
-                : "0 (NaN)"
-            }**\n`
-          );
+        for (const character of validScores) {
+          // If the character name is valid, include it in the list
+          if (!notFoundChars.includes(character.name)) {
+            content = content.concat(
+              `${character.name}: **${
+                !isNaN(character.score)
+                  ? character.score.toLocaleString("en-US")
+                  : "0 (NaN)"
+              }**\n`
+            );
+          }
         }
 
         return content;
       }
 
-      console.log(dupes);
-
       // Display responses
-      let response = `Submitted **${successCount - numberNaN.length}/${
-        characters.length
+      let response = `Submitted **${successCount - NaNScores.length}/${
+        validScores.length
       }** scores for ${
         selectedWeek === "this_week"
           ? `this week (${reset})`
           : `last week (${lastReset})`
       }\n\n${getSuccessList()}`;
 
-      if (notFound.length > 0) {
+      if (notFoundChars.length > 0) {
         response = response.concat(
           "\n\nThe following characters could not be found:\n- "
         );
-        for (const name of notFound) {
+        for (const name of notFoundChars) {
           response = response.concat(`**${name}** ⎯ `);
         }
         response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
       }
 
-      if (numberNaN.length > 0) {
+      if (NaNScores.length > 0) {
         response = response.concat(
           "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
         );
-        for (const name of numberNaN) {
+        for (const name of NaNScores) {
           response = response.concat(`**${name}** ⎯ `);
         }
         response = response.slice(0, -3);
       }
 
       interaction.editReply(response);
-    })();
+    
   },
 };
