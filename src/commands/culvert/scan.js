@@ -55,7 +55,11 @@ module.exports = {
 
     // Create individual exceptions for recurring un-scannable names
     function exceptions(name) {
-      if (name === "dissatisfiedThunder" || name === "dissatisfiedhunder" || name === "dissatisfiedrhunder")
+      if (
+        name === "dissatisfiedThunder" ||
+        name === "dissatisfiedhunder" ||
+        name === "dissatisfiedrhunder"
+      )
         return "dìssatisfied";
       if (name === "lgniteChee") return "IgniteCheese";
       if (name === "Idiot") return "ldìot";
@@ -67,7 +71,7 @@ module.exports = {
       if (name === "Migs") return "Mïgs";
       if (name === "Cehba") return "Cebba";
       if (name === "Kyéra") return "Kyêra";
-      if (name === "Jdéy") return "Jòéy";
+      if (name === "Jdéy" || name === "Jèéy") return "Jòéy";
       if (name === "yuhing") return "yubin8";
       if (name === "Méllgw" || name === "Méllaw") return "Mëlløw";
       if (name === "¡AmPunny") return "iAmPunny";
@@ -79,15 +83,17 @@ module.exports = {
       if (name === "Hikåri" || name === "Hikéri") return "Hikárì";
       if (name === "Cukeu") return "Cukcu";
       if (name === "téee" || name === "tåee") return "táee";
-      if (name === "Kaküja") return "kakúja";
+      if (name === "Kaküja" || name === "Kakdja") return "kakúja";
       if (name === "Kogå") return "Kogâ";
       if (name === "ponzi" || name === "pånzi") return "pònzi";
-      if (name === "CaptainWaThunder" || name === "CaptainvaThunder") return "CaptainWater";
+      if (name === "CaptainWaThunder" || name === "CaptainvaThunder")
+        return "CaptainWater";
       if (name === "Hakgs") return "Hakøs";
       if (name === "JaylTB") return "JayITB";
       if (name === "Mipd" || name === "Mipû") return "Mipú";
       if (name === "Nåro") return "Nàro";
       if (name === "Sasåri" || name === "Sasóri") return "Sasôri";
+      if (name === "Druú") return "Drùú";
       return name;
     }
 
@@ -107,6 +113,8 @@ module.exports = {
     });
 
     const processTextEntries = async () => {
+      interaction.editReply("Processing image...")
+
       await worker.loadLanguage("eng+fra+spa+dan+swe+ita");
       await worker.initialize("eng+fra+spa+dan+swe+ita");
       await worker.setParameters({
@@ -121,220 +129,239 @@ module.exports = {
 
       // Return an array of each entry/line in the culvert score page
       return text.split(/\r?\n/);
-    }
+    };
 
-      const entryArray = await processTextEntries();
+    const entryArray = await processTextEntries();
 
-      const validScores = [];
-      const NaNScores = [];
+    interaction.editReply("Submitting scores...")
 
-      let successCount = 0;
-      let failureCount = 0;
-      const notFoundChars = [];
+    const validScores = [];
+    const NaNScores = [];
 
-      // Select name and score from each entry and push into a separate array
-      entryArray.forEach((entry) => {
-        // Log character names which have invalid scores
-        if (isNaN(Number(entry.split(" ").pop()))) {
-          NaNScores.push(entry.split(" ")[0]);
+    let successCount = 0;
+    let failureCount = 0;
+    const notFoundChars = [];
+
+    // Select name and score from each entry and push into a separate array
+    entryArray.forEach((entry) => {
+      // Log character names which have invalid scores
+      if (isNaN(Number(entry.split(" ").pop()))) {
+        NaNScores.push(entry.split(" ")[0]);
+      }
+      // If the character name is not valid, store the entry
+      if (entry.split(" ")[0] != "") {
+        validScores.push({
+          name: exceptions(entry.split(" ")[0]),
+          score: Number(entry.split(" ").pop()),
+        });
+      }
+    });
+
+    for (const character of validScores) {
+      // Get the first and last 4 letters of the character name to use for better database matching
+      const nameBeginning = character.name.substring(0, 4);
+      const nameEnd = character.name.substring(character.name.length - 4);
+
+      // Get and unwind the list of character names
+      const characterList = await culvertSchema.aggregate([
+        {
+          $unwind: "$characters",
+        },
+      ]);
+
+      // Store "half matched" character names in a separate array
+      const halfMatched = [];
+
+      for (const character of characterList) {
+        const name = character.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
+
+        // Find all names which match with the iterated nameBeginning or nameEnd
+        const matches = name.match(
+          new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi")
+        );
+
+        if (matches && matches.length > 0) {
+          halfMatched.push(character.characters.name.toLowerCase());
         }
-        // If the character name is not valid, store the entry
-        if (entry.split(" ")[0] != "") {
-          validScores.push({
-            name: exceptions(entry.split(" ")[0]),
-            score: Number(entry.split(" ").pop()),
-          });
+      }
+
+      // Set the user object to the user in the entry
+      let user;
+
+      // If more than one name was matched, perform a more accurate search
+      if (halfMatched.length > 1) {
+        for (const duplicateName of halfMatched) {
+          if (duplicateName.includes(character.name.toLowerCase())) {
+            user = await culvertSchema.findOne(
+              {
+                "characters.name": {
+                  $regex: `^${duplicateName}$`,
+                  $options: "i",
+                },
+              },
+              { "characters.$": 1 }
+            );
+          }
         }
-      });
+      } else {
+        user = await culvertSchema.findOne(
+          {
+            "characters.name": {
+              $regex: `^${nameBeginning}|${nameEnd}$`,
+              $options: "i",
+            },
+          },
+          { "characters.$": 1 }
+        );
+      }
 
-      for (const character of validScores) {
-        // Get the first and last 4 letters of the character name to use for better database matching
-        const nameBeginning = character.name.substring(0, 4);
-        const nameEnd = character.name.substring(character.name.length - 4);
-
-        // Get and unwind the list of character names
-        const characterList = await culvertSchema.aggregate([
+      // Perform the logic to set the score for the character
+      if (user) {
+        successCount++;
+        // Check if a score has already been set for the week
+        const weekLogged = await culvertSchema.aggregate([
           {
             $unwind: "$characters",
           },
+          {
+            $unwind: "$characters.scores",
+          },
+          {
+            $match: {
+              "characters.name": user?.characters[0]?.name,
+              "characters.scores.date":
+                selectedWeek === "this_week" ? reset : lastReset,
+            },
+          },
         ]);
 
-        // Store "half matched" character names in a separate array
-        const halfMatched = [];
-
-        for (const character of characterList) {
-          const name = character.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
-
-          // Find all names which match with the iterated nameBeginning or nameEnd
-          const matches = name.match(
-            new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi")
-          );
-
-          if (matches && matches.length > 0) {
-            halfMatched.push(character.characters.name.toLowerCase());
-          }
-        }
-        
-        // Set the user object to the user in the entry 
-        let user;
-
-        // If more than one name was matched, perform a more accurate search
-        if (halfMatched.length > 1) {
-          for (const duplicateName of halfMatched) {
-            if (duplicateName.includes(character.name.toLowerCase())) {
-              user = await culvertSchema.findOne(
+        if (weekLogged.length < 1) {
+          // Create a new score on the selected character
+          await culvertSchema.findOneAndUpdate(
+            {
+              "characters.name": user?.characters[0]?.name || "",
+            },
+            {
+              $addToSet: {
+                "characters.$[nameElem].scores": {
+                  score: !isNaN(character.score) ? character.score : 0,
+                  date: selectedWeek === "this_week" ? reset : lastReset,
+                },
+              },
+            },
+            {
+              arrayFilters: [
                 {
-                  "characters.name": {
-                    $regex: `^${duplicateName}$`,
-                    $options: "i",
-                  },
+                  "nameElem.name": user?.characters[0]?.name || "",
                 },
-                { "characters.$": 1 }
-              );
+              ],
+              new: true,
             }
-          }
+          );
         } else {
-          user = await culvertSchema.findOne(
+          // Update an existing score on the selected character
+          await culvertSchema.findOneAndUpdate(
             {
-              "characters.name": {
-                $regex: `^${nameBeginning}|${nameEnd}$`,
-                $options: "i",
+              "characters.name": user?.characters[0]?.name || "",
+              "characters.scores.date":
+                selectedWeek === "this_week" ? reset : lastReset,
+            },
+            {
+              $set: {
+                "characters.$[nameElem].scores.$[dateElem].score": !isNaN(
+                  character.score
+                )
+                  ? character.score
+                  : 0,
               },
             },
-            { "characters.$": 1 }
+            {
+              arrayFilters: [
+                {
+                  "nameElem.name": user?.characters[0]?.name || "",
+                },
+                {
+                  "dateElem.date":
+                    selectedWeek === "this_week" ? reset : lastReset,
+                },
+              ],
+              new: true,
+            }
           );
         }
+      } else {
+        failureCount++;
+        notFoundChars.push(character.name);
+      }
+    }
 
-        // Perform the logic to set the score for the character
-        if (user) {
-          successCount++;
-          // Check if a score has already been set for the week
-          const weekLogged = await culvertSchema.aggregate([
-            {
-              $unwind: "$characters",
-            },
-            {
-              $unwind: "$characters.scores",
-            },
-            {
-              $match: {
-                "characters.name": user?.characters[0]?.name,
-                "characters.scores.date":
-                  selectedWeek === "this_week" ? reset : lastReset,
-              },
-            },
-          ]);
+    // Create the printed list of characters and the scores which were set
+    function getSuccessList() {
+      let content = "";
 
-          if (weekLogged.length < 1) {
-            // Create a new score on the selected character
-            await culvertSchema.findOneAndUpdate(
-              {
-                "characters.name": user?.characters[0]?.name || "",
-              },
-              {
-                $addToSet: {
-                  "characters.$[nameElem].scores": {
-                    score: !isNaN(character.score) ? character.score : 0,
-                    date: selectedWeek === "this_week" ? reset : lastReset,
-                  },
-                },
-              },
-              {
-                arrayFilters: [
-                  {
-                    "nameElem.name": user?.characters[0]?.name || "",
-                  },
-                ],
-                new: true,
-              }
-            );
-          } else {
-            // Update an existing score on the selected character
-            await culvertSchema.findOneAndUpdate(
-              {
-                "characters.name": user?.characters[0]?.name || "",
-                "characters.scores.date":
-                  selectedWeek === "this_week" ? reset : lastReset,
-              },
-              {
-                $set: {
-                  "characters.$[nameElem].scores.$[dateElem].score": !isNaN(
-                    character.score
-                  )
-                    ? character.score
-                    : 0,
-                },
-              },
-              {
-                arrayFilters: [
-                  {
-                    "nameElem.name": user?.characters[0]?.name || "",
-                  },
-                  {
-                    "dateElem.date":
-                      selectedWeek === "this_week" ? reset : lastReset,
-                  },
-                ],
-                new: true,
-              }
-            );
-          }
-        } else {
-          failureCount++;
-          notFoundChars.push(character.name);
+      for (const character of validScores) {
+        // If the character name is valid, include it in the list
+        if (!notFoundChars.includes(character.name)) {
+          content = content.concat(
+            `${character.name}: **${
+              !isNaN(character.score)
+                ? character.score.toLocaleString("en-US")
+                : "0 (NaN)"
+            }**\n`
+          );
         }
       }
 
-      // Create the printed list of characters and the scores which were set
-      function getSuccessList() {
-        let content = "";
+      return content;
+    }
 
-        for (const character of validScores) {
-          // If the character name is valid, include it in the list
-          if (!notFoundChars.includes(character.name)) {
-            content = content.concat(
-              `${character.name}: **${
-                !isNaN(character.score)
-                  ? character.score.toLocaleString("en-US")
-                  : "0 (NaN)"
-              }**\n`
-            );
-          }
-        }
+    // Display responses
+    let response = `Submitted **${successCount - NaNScores.length}/${
+      validScores.length
+    }** scores for ${
+      selectedWeek === "this_week"
+        ? `this week (${reset})`
+        : `last week (${lastReset})`
+    }\n\n${getSuccessList()}`;
 
-        return content;
+    if (notFoundChars.length > 0) {
+      response = response.concat(
+        "\n\nThe following characters could not be found:\n- "
+      );
+      for (const name of notFoundChars) {
+        response = response.concat(`**${name}** ⎯ `);
+      }
+      response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
+    }
+
+    if (NaNScores.length > 0) {
+      response = response.concat(
+        "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
+      );
+      for (const name of NaNScores) {
+        response = response.concat(`**${name}** ⎯ `);
+      }
+      response = response.slice(0, -3);
+    }
+
+    // If message is longer than 2000 characters, split into multiple messages
+    function splitMessage(str, size) {
+      const numChunks = Math.ceil(str.length / size);
+      const chunks = new Array(numChunks);
+
+      for (let i = 0, c = 0; i < numChunks; ++i, c += size) {
+        chunks[i] = str.substr(c, size);
       }
 
-      // Display responses
-      let response = `Submitted **${successCount - NaNScores.length}/${
-        validScores.length
-      }** scores for ${
-        selectedWeek === "this_week"
-          ? `this week (${reset})`
-          : `last week (${lastReset})`
-      }\n\n${getSuccessList()}`;
+      return chunks;
+    }
 
-      if (notFoundChars.length > 0) {
-        response = response.concat(
-          "\n\nThe following characters could not be found:\n- "
-        );
-        for (const name of notFoundChars) {
-          response = response.concat(`**${name}** ⎯ `);
-        }
-        response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
-      }
+    const messageChunks = splitMessage(response, 2000);
 
-      if (NaNScores.length > 0) {
-        response = response.concat(
-          "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
-        );
-        for (const name of NaNScores) {
-          response = response.concat(`**${name}** ⎯ `);
-        }
-        response = response.slice(0, -3);
-      }
+    for (chunk of messageChunks) {
+      await interaction.followUp(chunk);
+    }
 
-      interaction.editReply(response);
-    
+    console.log("Scan complete");
   },
 };
