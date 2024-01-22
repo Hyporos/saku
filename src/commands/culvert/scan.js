@@ -80,12 +80,14 @@ module.exports = {
       if (name === "Aski") return "Aøki";
       if (name === "Laved") return "Løved";
       if (name === "Aina" || name === "Ainå") return "Ainà";
-      if (name === "Hikåri" || name === "Hikéri") return "Hikárì";
+      if (name === "Hikåri" || name === "Hikéri" || name === "Hikari")
+        return "Hikárì";
       if (name === "Cukeu") return "Cukcu";
       if (name === "téee" || name === "tåee") return "táee";
       if (name === "Kaküja" || name === "Kakdja") return "kakúja";
       if (name === "Kogå") return "Kogâ";
-      if (name === "ponzi" || name === "pånzi") return "pònzi";
+      if (name === "ponzi" || name === "pånzi" || name === "pènzi")
+        return "pònzi";
       if (name === "CaptainWaThunder" || name === "CaptainvaThunder")
         return "CaptainWater";
       if (name === "Hakgs") return "Hakøs";
@@ -113,7 +115,7 @@ module.exports = {
     });
 
     const processTextEntries = async () => {
-      interaction.editReply("Processing image...")
+      interaction.editReply("Processing image...");
 
       await worker.loadLanguage("eng+fra+spa+dan+swe+ita");
       await worker.initialize("eng+fra+spa+dan+swe+ita");
@@ -133,10 +135,11 @@ module.exports = {
 
     const entryArray = await processTextEntries();
 
-    interaction.editReply("Submitting scores...")
+    interaction.editReply("Submitting scores...");
 
     const validScores = [];
     const NaNScores = [];
+    let bestScore = 0;
 
     let successCount = 0;
     let failureCount = 0;
@@ -148,11 +151,12 @@ module.exports = {
       if (isNaN(Number(entry.split(" ").pop()))) {
         NaNScores.push(entry.split(" ")[0]);
       }
-      // If the character name is not valid, store the entry
+      // If the character name is valid, store the entry
       if (entry.split(" ")[0] != "") {
         validScores.push({
           name: exceptions(entry.split(" ")[0]),
           score: Number(entry.split(" ").pop()),
+          sandbag: false,
         });
       }
     });
@@ -289,6 +293,42 @@ module.exports = {
             }
           );
         }
+
+        // Find the biggest (best) score of the character
+        bestScore = await culvertSchema.aggregate([
+          {
+            $unwind: "$characters",
+          },
+          {
+            $match: {
+              "characters.name": {
+                $regex: `^${user?.characters[0]?.name}$`,
+                $options: "i",
+              },
+            },
+          },
+          {
+            $set: {
+              "characters.scores": {
+                $sortArray: {
+                  input: "$characters.scores",
+                  sortBy: {
+                    score: -1,
+                  },
+                },
+              },
+            },
+          },
+        ]);
+
+        // If the character scores less than 60% of their best, set a sandbag flag
+        if (
+          character.score !== 0 &&
+          !isNaN(character.score) &&
+          character.score < bestScore[0].characters.scores[0]?.score * 0.85
+        ) {
+          character.sandbag = true;
+        }
       } else {
         failureCount++;
         notFoundChars.push(character.name);
@@ -299,7 +339,7 @@ module.exports = {
     function getSuccessList() {
       let content = "";
 
-      for (const character of validScores) {
+      validScores.forEach((character) => {
         // If the character name is valid, include it in the list
         if (!notFoundChars.includes(character.name)) {
           content = content.concat(
@@ -307,10 +347,16 @@ module.exports = {
               !isNaN(character.score)
                 ? character.score.toLocaleString("en-US")
                 : "0 (NaN)"
-            }**\n`
+            }**`
           );
+
+          if (character.sandbag) {
+            content = content.concat(` <:sakuPeek:1134862404900106381>\n`);
+          } else {
+            content = content.concat("\n");
+          }
         }
-      }
+      });
 
       return content;
     }

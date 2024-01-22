@@ -271,7 +271,7 @@ module.exports = {
           scores[scores.length - 1]?.date,
           ": ",
           scores[scores.length - 1].score?.toLocaleString("en-US"),
-          "\n"
+          scores.length !== 1 ? "\n" : ""
         );
         notSubmitted = true;
       }
@@ -286,7 +286,7 @@ module.exports = {
             scores[i].date,
             ": ",
             scores[i].score.toLocaleString("en-US"),
-            "\n"
+            scores.length !== 1 ? "\n" : ""
           );
       }
 
