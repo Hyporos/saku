@@ -33,7 +33,7 @@ module.exports = {
       "ping",
     ];
 
-    isBee && choices.push("link", "unlink", "rename", "correct", "scan", "checkscores", "wos");
+    isBee && choices.push("link", "unlink", "rename", "correct", "scan", "checkscores", "wos", "export");
 
     const filtered = choices
       .filter((choice) => choice.toLowerCase().includes(value))
@@ -167,7 +167,7 @@ module.exports = {
     let response = "";
 
     if (!getCommandInfo("description") && selectedCommand !== null) {
-      response = `Error ⎯ The command **${selectedCommand}** could not be found`;
+      response = `Error - The command **${selectedCommand}** could not be found`;
     } else {
       response = { embeds: [selectedCommand ? specificHelp : help] };
     }

@@ -43,13 +43,13 @@ module.exports = {
 
     if (!isFormatted) {
       return interaction.reply(
-        `Error ⎯ The date **${dateOption}** is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
+        `Error - The date **${dateOption}** is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
       );
     }
 
     if (!isSunday) {
       return interaction.reply(
-        `Error ⎯ The date **${dateOption}** is not valid. Make sure that the day lands on a sunday`
+        `Error - The date **${dateOption}** is not valid. Make sure that the day lands on a sunday`
       );
     }
 
@@ -60,7 +60,7 @@ module.exports = {
 
     if (!user) {
       return interaction.reply(
-        `Error ⎯ The character **${characterOption}** has not yet been linked`
+        `Error - The character **${characterOption}** has not yet been linked`
       );
     }
     

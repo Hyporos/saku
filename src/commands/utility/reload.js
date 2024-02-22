@@ -32,7 +32,7 @@ module.exports = {
 
     if (!command) {
       return interaction.reply(
-        `Error ⎯ Could not find the command \`/${commandName}\``
+        `Error - Could not find the command \`/${commandName}\``
       );
     }
 
@@ -51,7 +51,7 @@ module.exports = {
     } catch (error) {
       console.error(error);
       await interaction.reply(
-        `Error ⎯ Could not reload the command \`/${command.data.name}\`:\n\`${error.message}\``
+        `Error - Could not reload the command \`/${command.data.name}\`:\n\`${error.message}\``
       );
     }
   },

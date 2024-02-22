@@ -62,7 +62,7 @@ module.exports = {
     const omitOption = interaction.options.getBoolean("omit_unsubmitted");
 
     if (weeksOption <= 1) {
-      return interaction.reply("Error ⎯ The number of weeks to display must be greater than 1");
+      return interaction.reply("Error - The number of weeks to display must be greater than 1");
     }
 
     // Find the user with the specified character
@@ -74,11 +74,11 @@ module.exports = {
     );
 
     if (!user) {
-      return interaction.reply(`Error ⎯ The character **${characterOption}** is not linked to any user`);
+      return interaction.reply(`Error - The character **${characterOption}** is not linked to any user`);
     }
 
     if (user.characters[0].scores.length < 2) {
-      return interaction.reply(`Error ⎯ The character **${characterOption}** must have at least two scores submitted`);
+      return interaction.reply(`Error - The character **${characterOption}** must have at least two scores submitted`);
     } 
 
     // Fetch the x and y axis labels for the graph

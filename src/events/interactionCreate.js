@@ -11,7 +11,7 @@ module.exports = {
 
       if (!command) {
         console.error(
-          `Error ⎯ No command matching /${interaction.commandName} was found`
+          `Error - No command matching /${interaction.commandName} was found`
         );
         return;
       }
@@ -31,7 +31,7 @@ module.exports = {
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "checkscores", "wos"];
+      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "checkscores", "wos", "say", "export"];
       const ownerCommands = ["import", "reload"];
 
       if (
@@ -39,7 +39,7 @@ module.exports = {
         culvertCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
-          `Error ⎯ Guests do not have permission to use this command`
+          `Error - Guests do not have permission to use this command`
         );
         return;
       }
@@ -50,7 +50,7 @@ module.exports = {
         beeCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
-          `Error ⎯ Members do not have permission to use this command`
+          `Error - Members do not have permission to use this command`
         );
         return;
       }
@@ -60,7 +60,7 @@ module.exports = {
         ownerCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
-          `Error ⎯ You do not have permission to use this command`
+          `Error - You do not have permission to use this command`
         );
         return;
       }
@@ -69,7 +69,7 @@ module.exports = {
         await command.execute(interaction);
       } catch (error) {
         console.error(
-          `Error ⎯ Could not execute the /${interaction.commandName} command`
+          `Error - Could not execute the /${interaction.commandName} command`
         );
         console.error(error);
       }

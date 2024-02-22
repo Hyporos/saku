@@ -54,7 +54,7 @@ module.exports = {
     let content;
 
     if (user.graphColor === getGraphColor(colorOption)) {
-      content = `Error ⎯ Your graph color is already set to ${colorOption}`;
+      content = `Error - Your graph color is already set to ${colorOption}`;
     } else {
       content = `Your graph color has been changed to ${colorOption}`;
     }

@@ -205,9 +205,9 @@ module.exports = {
     let response = "";
 
     if (!characterLinked && characterExists && !isBee) {
-      response = `Error ⎯ The character **${selectedCharacter}** is not linked to you`;
+      response = `Error - The character **${selectedCharacter}** is not linked to you`;
     } else if (!characterExists) {
-      response = `Error ⎯ The character **${selectedCharacter}** has not yet been linked`;
+      response = `Error - The character **${selectedCharacter}** has not yet been linked`;
     } else if (weekLogged.length > 0) {
       response = `${selectedCharacter}'s score has been updated to **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
     } else {

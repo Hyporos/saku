@@ -27,7 +27,7 @@ module.exports = {
 
     if (!characterLinked) {
       return interaction.reply(
-        `Error ⎯ The character **${characterOption}** is not linked to any user`
+        `Error - The character **${characterOption}** is not linked to any user`
       );
     }
 

@@ -96,6 +96,7 @@ module.exports = {
       if (name === "Nåro") return "Nàro";
       if (name === "Sasåri" || name === "Sasóri") return "Sasôri";
       if (name === "Druú") return "Drùú";
+      if (name === "Minári") return "Minãri";
       return name;
     }
 

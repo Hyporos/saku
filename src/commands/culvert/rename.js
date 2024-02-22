@@ -35,7 +35,7 @@ module.exports = {
 
     if (!user) {
       return interaction.reply(
-        `Error ⎯ The character **${oldNameOption}** has not yet been linked`
+        `Error - The character **${oldNameOption}** has not yet been linked`
       );
     }
 
@@ -46,7 +46,7 @@ module.exports = {
 
     if (characterLinked) {
       return interaction.reply(
-        `Error ⎯ The character **${newNameOption}** is already linked to a user`
+        `Error - The character **${newNameOption}** is already linked to a user`
       );
     }
 
@@ -72,7 +72,7 @@ module.exports = {
       })
       .catch(function (error) {
         interaction.reply(
-          `Error ⎯ The character **${newNameOption}** could not be found on the rankings`
+          `Error - The character **${newNameOption}** could not be found on the rankings`
         );
 
         console.error(error);

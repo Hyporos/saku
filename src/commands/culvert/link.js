@@ -38,7 +38,7 @@ module.exports = {
 
     if (!dayjs(memberSinceOption).isValid()) {
       return interaction.reply(
-        `Error ⎯ The date **${memberSinceOption}** is not valid. Make sure that it is properly formatted (ex: April 28, 2023 or 04-28-2023)`
+        `Error - The date **${memberSinceOption}** is not valid. Make sure that it is properly formatted (ex: April 28, 2023 or 04-28-2023)`
       );
     }
 
@@ -49,7 +49,7 @@ module.exports = {
 
     if (characterLinked) {
       return interaction.reply(
-        `Error ⎯ The character **${characterOption}** is already linked to a user`
+        `Error - The character **${characterOption}** is already linked to a user`
       );
     }
 
@@ -122,7 +122,7 @@ module.exports = {
       })
       .catch(function (error) {
         interaction.reply(
-          `Error ⎯ The character **${characterOption}** could not be found on the rankings`
+          `Error - The character **${characterOption}** could not be found on the rankings`
         );
 
         console.error(error);

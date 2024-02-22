@@ -78,7 +78,7 @@ module.exports = {
 
     if (!user?.characters[0]) {
       return interaction.reply(
-        `Error ⎯ The character **${selectedCharacter}** is not linked to any user`
+        `Error - The character **${selectedCharacter}** is not linked to any user`
       );
     }
 
@@ -400,7 +400,7 @@ module.exports = {
       });
     } catch (error) {
       interaction.reply(
-        `Error ⎯ The character **${selectedCharacter}** could not be fetched from the API`
+        `Error - The character **${selectedCharacter}** could not be fetched from the API`
       );
       console.error(error);
     }
