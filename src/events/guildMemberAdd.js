@@ -59,7 +59,7 @@ module.exports = {
       });
 
     // Display event responses
-    //welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
+    welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
     logChannel.send({ embeds: [log] });
   },
 };
