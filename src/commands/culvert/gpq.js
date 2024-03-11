@@ -61,7 +61,9 @@ module.exports = {
     const culvertScore = interaction.options.getInteger("score");
 
     // Check if the sender is a Bee
-    const isBee = interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725";
+    const isBee =
+      interaction.member.roles.cache.has("720001044746076181") ||
+      interaction.user.id === "631337640754675725";
 
     // Day of the week the culvert score gets reset (Monday 12:00 AM UTC)
     dayjs.updateLocale("en", {
@@ -74,7 +76,7 @@ module.exports = {
       .subtract(1, "day")
       .format("YYYY-MM-DD");
 
-    // Check if character exists
+    // Fetch the character
     const characterExists = await culvertSchema.exists({
       "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
     });
@@ -84,7 +86,15 @@ module.exports = {
       _id: interaction.user.id,
       "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
     });
-    
+
+    // Find the character with the given name
+    const user = await culvertSchema.findOne(
+      {
+        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+      },
+      { "characters.$": 1 }
+    );
+
     // Find the biggest (best) score of the character
     const bestScore = await culvertSchema.aggregate([
       {
@@ -123,7 +133,7 @@ module.exports = {
       {
         $match: {
           "characters.name": {
-            $regex: `^${selectedCharacter}$`,  // might not be needed
+            $regex: `^${selectedCharacter}$`, // might not be needed
             $options: "i",
           },
           "characters.scores.date": reset,
@@ -143,7 +153,7 @@ module.exports = {
         },
         {
           $addToSet: {
-            "characters.$[nameElem].scores": { 
+            "characters.$[nameElem].scores": {
               score: culvertScore,
               date: reset,
             },
@@ -209,9 +219,13 @@ module.exports = {
     } else if (!characterExists) {
       response = `Error - The character **${selectedCharacter}** has not yet been linked`;
     } else if (weekLogged.length > 0) {
-      response = `${selectedCharacter}'s score has been updated to **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
+      response = `${
+        user.characters[0].name
+      }'s score has been updated to **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
     } else {
-      response = `${selectedCharacter} has scored **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
+      response = `${
+        user.characters[0].name
+      } has scored **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
     }
 
     interaction.reply(response);
