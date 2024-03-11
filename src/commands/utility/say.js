@@ -27,12 +27,20 @@ module.exports = {
   async execute(interaction, client) {
     // Parse the command arguments
     const message = interaction.options.getString("message");
-    const channel = interaction.options.get("channel");
+    const channel = interaction.options.getChannel("channel");
 
-    interaction.channel.send("test 1");
-
-    // interaction.reply({
-    //   content: `${channel}`,
-    // });
+    // Send the message in the provided channel
+    try {
+      await channel.send(message);
+      await interaction.reply({
+        content: `Message has been successfully sent in ${channel.toString()}`,
+        ephemeral: true,
+      });
+    } catch (error) {
+      await interaction.reply({
+        content: "Error - Message could not be sent",
+        ephemeral: true,
+      });
+    }
   },
 };
