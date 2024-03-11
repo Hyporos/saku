@@ -1,5 +1,7 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const dayjs = require("dayjs");
+var relativeTime = require('dayjs/plugin/relativeTime')
+dayjs.extend(relativeTime)
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -38,7 +40,8 @@ module.exports = {
       });
 
     // Create the log embed
-    const createdAt = dayjs(member.user.createdAt).format("MMM D YYYY");
+    const createdAt = dayjs().from(dayjs(member.user.createdAt), true);
+    const memberCount = member.guild.members.cache.filter(member => !member.user.bot).size;
 
     const log = new EmbedBuilder()
       .setColor(0x85ff89)
@@ -48,7 +51,7 @@ module.exports = {
       })
       .setTitle("Member joined")
       .setDescription(
-        `${member.user}\nDiscord member since ${createdAt}`
+        `${member.user}\nDiscord member for ${createdAt}\n**Member Count:** ${memberCount}`
       )
       .setTimestamp()
       .setFooter({
@@ -56,7 +59,7 @@ module.exports = {
       });
 
     // Display event responses
-    welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
+    //welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
     logChannel.send({ embeds: [log] });
   },
 };

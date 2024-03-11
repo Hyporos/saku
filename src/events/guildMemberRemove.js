@@ -1,5 +1,7 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const dayjs = require("dayjs");
+var relativeTime = require('dayjs/plugin/relativeTime')
+dayjs.extend(relativeTime)
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -28,7 +30,7 @@ module.exports = {
     }
 
     // Create the log embed
-    const joinedAt = dayjs(member.joinedAt).format("MMM D YYYY");
+    const joinedAt = dayjs().from(dayjs(member.joinedAt), true);
 
     const log = new EmbedBuilder()
       .setColor(0xff8585)
@@ -40,7 +42,7 @@ module.exports = {
       .setDescription(
         `${
           member.user
-        }\nSaku member since ${joinedAt}\n**Role:** ${getMemberRoles()}`
+        }\nSaku member for ${joinedAt}\n**Role:** ${getMemberRoles()}`
       )
       .setTimestamp()
       .setFooter({

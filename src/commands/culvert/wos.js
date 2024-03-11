@@ -53,7 +53,7 @@ module.exports = {
         }
       }
 
-      if (((totalScores - missedScores) / totalScores) * 100 <= 60) {
+      if (((totalScores - missedScores) / totalScores) * 100 <= 80) {
         shameList.push({
           name: user.characters.name,
           totalScores: totalScores,
