@@ -12,6 +12,7 @@
   "dependencies": {
     "@jimp/plugin-threshold": "^0.22.10",
     "axios": "^1.5.0",
+    "cron": "^3.1.6",
     "csv": "^6.3.3",
     "dayjs": "^1.11.9",
     "discord.js": "^14.13.0",
@@ -22,6 +23,7 @@
     "jimp": "^0.22.10",
     "mongodb": "^6.0.0",
     "mongoose": "^7.5.0",
+    "node-cron": "^3.0.3",
     "sharp": "^0.32.5",
     "tesseract.js": "^4.1.2"
   }

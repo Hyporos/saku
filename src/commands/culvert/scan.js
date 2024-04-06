@@ -409,6 +409,6 @@ module.exports = {
       await interaction.followUp(chunk);
     }
 
-    console.log("Scan complete");
+    ////console.log("Scan complete");
   },
 };

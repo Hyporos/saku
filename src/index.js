@@ -6,6 +6,9 @@ const {
 } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
+const cron = require("cron");
+const dayjs = require("dayjs");
+const User = require('./userSchema'); // Assuming you have a User model defined in user.js
 require("dotenv").config();
 
 // Create a new client instance
@@ -17,6 +20,70 @@ const client = new Client({
     [GatewayIntentBits.GuildMessages],
   partials: [Partials.GuildMember],
 });
+
+const createScheduledEvent = (schedule, message) => {
+  return new cron.CronJob(schedule, () => {
+    const channel = client.channels.cache.get("761406523950891059");
+    if (channel) {
+      channel.send(message);
+    } else {
+      console.log(`Error - Channel ${channel} not found`);
+    }
+  });
+};
+
+const ursusAfternoonEvent = createScheduledEvent(
+  "0 14 * * *",
+  "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710439231:t> to <t:1710453631:t> your local time)"
+);
+
+const ursusNightEvent = createScheduledEvent(
+  "0 21 * * *",
+  "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
+);
+
+const setBirthdays = async () => {
+  try {
+    const users = await User.find({});
+    for (const user of users) {
+      const birthdayDate = user.birthdayDate;
+      if (!birthdayDate) continue; // Skip users without a birthday date
+      // Parse the birthday date using dayjs
+      const birthday = dayjs(birthdayDate, "MMM DD, YYYY");
+      // Extract day and month
+      const month = birthday.month() + 1; // dayjs month is zero-based, so we add 1
+      const day = birthday.date();
+      // Create a cron schedule for the user's birthday at midnight
+      const cronSchedule = `0 0 ${day} ${month} *`;
+      // Create a birthday event for the user
+      const birthdayEvent = new cron.CronJob(
+        cronSchedule,
+        () => {
+          const channel = client.channels.cache.get("761406523950891059");
+          if (!channel) {
+            console.log("Error - Ursus reminder channel not found");
+            return;
+          }
+          channel.send(`Happy birthday`);
+        },
+        null,
+        true, // Start the job right away
+        'UTC' // Timezone
+      );
+      // Start the birthday event
+      birthdayEvent.start();
+    }
+    console.log("Birthday events set up successfully");
+  } catch (error) {
+    console.error("Error setting up birthday events:", error);
+  }
+}
+
+setBirthdays();
+
+// Start cron jobs
+ursusAfternoonEvent.start();
+ursusNightEvent.start();
 
 // Grab all of the slash command files
 client.commands = new Collection();

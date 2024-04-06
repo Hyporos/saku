@@ -38,7 +38,7 @@ module.exports = {
 
     if (!dayjs(memberSinceOption).isValid()) {
       return interaction.reply(
-        `Error - The date **${memberSinceOption}** is not valid. Make sure that it is properly formatted (ex: April 28, 2023 or 04-28-2023)`
+        `Error - The date **${memberSinceOption}** is not valid. Make sure that it is properly formatted (ex: April 28 2023 or 04-28-2023)`
       );
     }
 
@@ -116,9 +116,18 @@ module.exports = {
           }
         );
 
+        // Send confirmation message
         interaction.reply(
           `Linked **${res.data[0].CharacterName}** to ${userOption}\nMember since: ${joinDate}`
         );
+
+        // Send an introduction to the newly linked user
+        const culvertChannel = interaction.client.channels.cache.get("1090002887410729090");
+        if (characterOption !== "druu") {
+          culvertChannel.send(
+            `Welcome to Saku, ${userOption}! Your character **${characterOption}** has just been linked to Saku's official discord bot.\n\nIn the ${culvertChannel} channel, you can view your culvert progression with various commands, such as \`/profile\` and \`/graph\`.\nSubmit your weekly scores with the \`/gpq\` command if you wish to view your stats early, otherwise they will be automatically submitted by the end of the week.\n\nTo learn more, use the \`/culvertinfo\` command.`
+          );
+        }
       })
       .catch(function (error) {
         interaction.reply(

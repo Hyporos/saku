@@ -25,7 +25,7 @@ module.exports = {
       .setAuthor({
         name: `Welcome to Saku, ${member.user.username}!`,
         iconURL:
-          "https://cdn.discordapp.com/icons/719788426022617138/a_2ed98f7952ca3456a52008c11a6b79cf.png",
+          "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
       })
       .setDescription(
         `Hey ${member.user}!\n\nTo gain access to our Discord, please write a little introduction about yourself and change your Discord nickname to your Preferred Name (IGN). For example: miche (superbbzzzzz)\n\n✦ • ────────────── · · · · · · · · ✦`

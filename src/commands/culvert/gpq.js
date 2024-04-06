@@ -203,7 +203,6 @@ module.exports = {
 
     // Check if the character has set a new personal best
     function hasNewBest() {
-      console.log(bestScore[0].characters.scores[0]?.score);
       if (culvertScore > bestScore[0].characters.scores[0]?.score) {
         return " :trophy:";
       } else {
