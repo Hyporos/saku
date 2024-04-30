@@ -36,7 +36,7 @@ module.exports = {
 
     await interaction.deferReply();
 
-    // Day of the week the culvert score gets reset (sunday)
+    // Set the day of the week that the culvert score gets reset (Sunday)
     dayjs.updateLocale("en", {
       weekStart: 1,
     });

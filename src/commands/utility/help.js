@@ -40,7 +40,7 @@ module.exports = {
         "rename",
         "correct",
         "scan",
-        "checkscores",
+        "finalize",
         "wos",
         "export"
       );
@@ -89,8 +89,8 @@ module.exports = {
             return "Edit or create a new score for a character. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format.";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert.";
-          case "checkscores":
-            return "View a list of characters that have unsubmitted scores for the given week. Use this to confirm whether or not /scan has missed any characters or if members have left the guild.";
+          case "finalize":
+            return "View a list of characters that have unsubmitted scores for the given week. Use this to confirm whether or not /scan has missed any characters or if members have left the guild. If successful, a JSON containing all user data will be returned.";
           case "wos":
             return "View the wall of shame. On the wall there will be a list of users sorted by their participation rate, from lowest to 60%.";
           case "export":
@@ -124,8 +124,8 @@ module.exports = {
             return `\u0060[character]\u0060 ⎯ The character to be corrected\n\u0060[date]\u0060 ⎯ The date of the score\n\u0060[score]\u0060 ⎯ The new score to submit`;
           case "scan":
             return `\u0060[week]\u0060 ⎯ Submit the scores for either the current or the last week`;
-          case "checkscores":
-            return `\u0060[week]\u0060 ⎯ Fetch the character list for either the current or the last week`;
+          case "finalize":
+            return `\u0060[week]\u0060 ⎯ Check the scores for either the current or the last week\n\u0060[override]\u0060 ⎯ Ignore unsubmitted scores and proceed with finalization`;
           case "wos":
             return `None`;
           case "export":
@@ -155,7 +155,7 @@ module.exports = {
         name: "Culvert",
         value: `\u0060gpq\u0060, \u0060profile\u0060, \u0060graph\u0060, \u0060graphcolor\u0060, \u0060rankings\u0060${
           isBee
-            ? ", \u0060link\u0060, \u0060unlink\u0060, \u0060rename\u0060, \u0060correct\u0060, \u0060scan\u0060, \u0060checkscores\u0060, \u0060wos\u0060, \u0060export\u0060"
+            ? ", \u0060link\u0060, \u0060unlink\u0060, \u0060rename\u0060, \u0060correct\u0060, \u0060scan\u0060, \u0060finalize\u0060, \u0060wos\u0060, \u0060export\u0060"
             : ""
         }`,
       })
