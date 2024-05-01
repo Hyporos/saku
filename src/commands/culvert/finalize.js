@@ -105,14 +105,13 @@ module.exports = {
 
       // Write the data to JSON file
       fs.writeFile(
-        `culvert-${dayjs().format("YYYY-MM-DD")}.json`,
+        `culvert-${weekOption}.json`,
         jsonData,
         (err) => {
           if (err) {
             console.error("Error saving JSON to file:", err);
             return;
           }
-          console.log("Collection exported to collection.json");
         }
       );
     } catch (error) {
@@ -121,7 +120,7 @@ module.exports = {
 
     // Create attachment builder with file path
     const attachment = new AttachmentBuilder(
-      `./culvert-${dayjs().format("YYYY-MM-DD")}.json`
+      `./culvert-${weekOption}.json`
     );
 
     // Display response
