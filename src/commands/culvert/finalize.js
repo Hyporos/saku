@@ -56,6 +56,12 @@ module.exports = {
 
     weekOption = weekOption === "this_week" ? reset : lastReset;
 
+    // Find the total count of characters
+    const characterCount = await culvertSchema.aggregate([
+      { $unwind: "$characters" },
+      { $group: { _id: null, count: { $sum: 1 } } },
+    ]);
+
     // Find the characters with no score submitted on the provided date
     const charactersWithoutScore = await culvertSchema.aggregate([
       { $unwind: "$characters" },
@@ -104,28 +110,28 @@ module.exports = {
       const jsonData = JSON.stringify(data, null, 2); // Add indentation for readability
 
       // Write the data to JSON file
-      fs.writeFile(
-        `culvert-${weekOption}.json`,
-        jsonData,
-        (err) => {
-          if (err) {
-            console.error("Error saving JSON to file:", err);
-            return;
-          }
+      fs.writeFile(`culvert-${weekOption}.json`, jsonData, (err) => {
+        if (err) {
+          console.error("Error saving JSON to file:", err);
+          return;
         }
-      );
+      });
     } catch (error) {
       console.error("Error exporting collection to JSON:", error);
     }
 
     // Create attachment builder with file path
-    const attachment = new AttachmentBuilder(
-      `./culvert-${weekOption}.json`
-    );
+    const attachment = new AttachmentBuilder(`./culvert-${weekOption}.json`);
 
     // Display response
     interaction.reply({
-      content: `${missedCharactersArray.length !== 0 ? `**${missedCharactersArray.length}** scores have been ignored` : "All scores have been submitted"} for the week of **${weekOption}**\n\nJSON backup data:`,
+      content: `${
+        missedCharactersArray.length !== 0
+          ? `**${characterCount[0].count - missedCharactersArray.length}/${
+              characterCount[0].count
+            }** scores`
+          : "All scores"
+      } have been submitted for the week of **${weekOption}**\n\nJSON backup data:`,
       files: [attachment],
     });
   },
