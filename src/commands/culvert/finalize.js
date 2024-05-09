@@ -112,12 +112,12 @@ module.exports = {
       // Write the data to JSON file
       fs.writeFile(`culvert-${weekOption}.json`, jsonData, (err) => {
         if (err) {
-          console.error("Error saving JSON to file:", err);
+          console.error("Error - Could not save JSON to file:", err);
           return;
         }
       });
     } catch (error) {
-      console.error("Error exporting collection to JSON:", error);
+      console.error("Error - Could not export collection to JSON:", error);
     }
 
     // Create attachment builder with file path

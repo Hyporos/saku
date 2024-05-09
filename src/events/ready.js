@@ -15,7 +15,7 @@ module.exports = {
 
     // Fetch all members for use on other events, instead of using the cache
     const guild = await client.guilds.fetch("719788426022617138");
-	  await guild.members.fetch();
+    await guild.members.fetch();
 
     // Display event responses
     console.log(`Ready! Logged in as ${client.user.tag}`);

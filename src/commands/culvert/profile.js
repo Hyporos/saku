@@ -308,13 +308,6 @@ module.exports = {
           .setColor(0xffc3c5)
           .setTitle(user.characters[0]?.name || "")
           .setAuthor({ name: "Culvert Profile" })
-          .setURL(
-            `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0]?.name}&search=true`
-          )
-          .setThumbnail(
-            "https://i.mapleranks.com/u/" +
-              res.data[0]?.CharacterImgUrl.slice(38) || "a.png"
-          )
           .addFields(
             {
               name: "Class",

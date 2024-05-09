@@ -32,7 +32,7 @@ module.exports = {
       ];
 
       const beeCommands = ["link", "unlink", "rename", "correct", "scan", "finalize", "wos", "say", "export"];
-      const ownerCommands = ["import", "reload"];
+      const ownerCommands = ["reload"];
 
       if (
         interaction.member.roles.cache.has("720006084252663868") &&
