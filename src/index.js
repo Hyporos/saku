@@ -38,7 +38,7 @@ const client = new Client({
 
 const createScheduledEvent = (schedule, message) => {
   return new cron.CronJob(schedule, () => {
-    const channel = client.channels.cache.get("761406523950891059");
+    const channel = client.channels.cache.get("719788426022617142");
     if (channel) {
       channel.send(message);
     } else {

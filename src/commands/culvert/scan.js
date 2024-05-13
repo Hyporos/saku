@@ -178,6 +178,7 @@ module.exports = {
       const halfMatched = [];
 
       for (const character of characterList) {
+        if (!character.characters.name) continue;
         const name = character.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
 
         // Find all names which match with the iterated nameBeginning or nameEnd

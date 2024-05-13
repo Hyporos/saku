@@ -299,7 +299,7 @@ module.exports = {
     }
 
       // Ranking API
-      const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${selectedCharacter}&page_index=1`;
+      const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${selectedCharacter}`;
 
     // Create and display a profile embed for the selected character (if they exist)
     try {
@@ -308,6 +308,13 @@ module.exports = {
           .setColor(0xffc3c5)
           .setTitle(user.characters[0]?.name || "")
           .setAuthor({ name: "Culvert Profile" })
+          .setURL(
+            `https://www.nexon.com/maplestory/rankings/north-america/overall-ranking/legendary?world_type=heroic&search_type=character-name&search=${user.characters[0]?.name}`
+          )
+          .setThumbnail(
+            "https://i.mapleranks.com/u/" +
+              res.data.ranks[0]?.characterImgURL.slice(38) || "a.png"
+          )
           .addFields(
             {
               name: "Class",
@@ -316,7 +323,7 @@ module.exports = {
             },
             {
               name: "Level",
-              value: `${res.data[0]?.Level || "?"}`,
+              value: `${res.data.ranks[0]?.level || "?"}`,
               inline: true,
             },
             {

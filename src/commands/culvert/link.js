@@ -81,14 +81,14 @@ module.exports = {
         },
       };
 
-      const jobName = res.data[0].JobName;
-      const jobDetail = res.data[0].JobDetail;
+      const jobID = res.data.ranks[0]?.jobID;
+      const jobDetail = res.data.ranks[0]?.jobDetail;
 
-      return (jobMap[jobName] && jobMap[jobName][jobDetail]) || jobName;
+      return (jobMap[jobID] && jobMap[jobID][jobDetail]) || jobID;
     }
 
     // Fetch Maplestory ranking data
-    const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${characterOption}&page_index=1`;
+    const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${characterOption}`;
 
     const joinDate = dayjs(memberSinceOption).format("MMM DD, YYYY");
 
@@ -105,7 +105,7 @@ module.exports = {
             graphColor: "255,189,213",
             $addToSet: {
               characters: {
-                name: res.data[0].CharacterName,
+                name: res.data.ranks[0]?.characterName,
                 class: getClassName(res),
                 memberSince: joinDate,
               },
@@ -118,14 +118,14 @@ module.exports = {
 
         // Send confirmation message
         interaction.reply(
-          `Linked **${res.data[0].CharacterName}** to ${userOption}\nMember since: ${joinDate}`
+          `Linked **${res.data.ranks[0]?.characterName}** to ${userOption}\nMember since: ${joinDate}`
         );
 
         // Send an introduction to the newly linked user
-        const culvertChannel = interaction.client.channels.cache.get("1090002887410729090");
+        const culvertChannel = interaction.client.channels.cache.get("1090037019557769256");
         if (characterOption !== "druu") {
           culvertChannel.send(
-            `Welcome to Saku, ${userOption}! Your character **${characterOption}** has just been linked to Saku's official discord bot.\n\nIn the ${culvertChannel} channel, you can view your culvert progression with various commands, such as \`/profile\` and \`/graph\`.\nSubmit your weekly scores with the \`/gpq\` command if you wish to view your stats early, otherwise they will be automatically submitted by the end of the week.\n\nTo learn more, use the \`/culvertinfo\` command.`
+            `Welcome to Saku, ${userOption}! Your character **${characterOption}** has just been linked to Saku's official discord bot.\n\nIn the ${culvertChannel} channel, you can view your culvert progression with various commands, such as \`/profile\` and \`/graph\`.\nSubmit your weekly scores with the \`/gpq\` command if you wish to view your stats early, otherwise they will be automatically submitted by the end of the week.\n\nTo learn more, use the \`/help\` command.`
           );
         }
       })

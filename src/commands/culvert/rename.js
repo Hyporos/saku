@@ -51,7 +51,7 @@ module.exports = {
     }
 
     // Fetch Maplestory ranking data
-    const url = `https://maplestory.nexon.net/api/ranking?id=overall&id2=legendary&rebootIndex=1&character_name=${newNameOption}&page_index=1`;
+    const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${newNameOption}`;
 
     axios
       .get(url)
@@ -62,12 +62,12 @@ module.exports = {
             "characters.name": { $regex: `^${oldNameOption}$`, $options: "i" },
           },
           {
-            $set: { "characters.$.name": res.data[0].CharacterName },
+            $set: { "characters.$.name": res.data.ranks[0]?.characterName },
           }
         );
 
         interaction.reply(
-          `${oldNameOption}'s name has been changed to **${res.data[0].CharacterName}**`
+          `${oldNameOption}'s name has been changed to **${res.data.ranks[0]?.characterName}**`
         );
       })
       .catch(function (error) {
