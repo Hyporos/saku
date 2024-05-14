@@ -49,12 +49,12 @@ const createScheduledEvent = (schedule, message) => {
 
 const ursusAfternoonEvent = createScheduledEvent(
   "0 14 * * *",
-  "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710439231:t> to <t:1710453631:t> your local time)"
+  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710439231:t> to <t:1710453631:t> your local time)"
 );
 
 const ursusNightEvent = createScheduledEvent(
   "0 21 * * *",
-  "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
+  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
 );
 
 const setBirthdays = async () => {
