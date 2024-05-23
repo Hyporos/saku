@@ -1,14 +1,10 @@
 const culvertSchema = require("../culvertSchema.js");
 const express = require("express");
+const axios = require("axios");
 
 const router = express.Router();
 
-//Post Method
-router.post("/post", (req, res) => {
-  res.send("Post API");
-});
-
-//Get all Method
+// Get all Method
 router.get("/getAll", async (req, res) => {
   try {
     const culverts = await culvertSchema.find();
@@ -35,14 +31,26 @@ router.get("/character/:name", async (req, res) => {
   }
 });
 
-//Update by ID Method
-router.patch("/update/:id", (req, res) => {
-  res.send("Update by ID API");
-});
+// Get character info from MapleStory rankings
+router.get("/rankings/:name", async (req, res) => {
+  try {
+    const response = await axios.get(
+      `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${req.params.name}`
+    );
 
-//Delete by ID Method
-router.delete("/delete/:id", (req, res) => {
-  res.send("Delete by ID API");
+    const characterImgURL = response.data.ranks[0].characterImgURL;
+    const level = response.data.ranks[0].level;
+
+    const characterData = {
+      characterImgURL,
+      level,
+    };
+
+    res.json(characterData);
+  } catch (error) {
+    console.error("Error fetching character:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 module.exports = router;

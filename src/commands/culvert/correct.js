@@ -71,6 +71,7 @@ module.exports = {
 
     // Create or update an existing score on the selected character
     if (scoreExists) {
+      console.log("Score exists, updating previous score");
       await culvertSchema.findOneAndUpdate(
         {
           "characters.name": {
@@ -97,6 +98,7 @@ module.exports = {
         }
       );
     } else {
+      console.log("No score found, creating a new one");
       await culvertSchema.findOneAndUpdate(
         {
           "characters.name": {
