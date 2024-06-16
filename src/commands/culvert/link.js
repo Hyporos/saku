@@ -84,7 +84,7 @@ module.exports = {
       const jobID = res.data.ranks[0]?.jobID;
       const jobDetail = res.data.ranks[0]?.jobDetail;
 
-      return (jobMap[jobID] && jobMap[jobID][jobDetail]) || jobID;
+      return (jobMap[jobID] && jobMap[jobID][jobDetail]) || res.data.ranks[0]?.jobName;
     }
 
     // Fetch Maplestory ranking data
