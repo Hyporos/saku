@@ -53,7 +53,7 @@ module.exports = {
       );
     }
 
-    // Determine class name based on JobDetail
+    // Determine explorer class name based on JobDetail
     function getClassName(res) {
       const jobMap = {
         Warrior: {

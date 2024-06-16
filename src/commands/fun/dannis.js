@@ -28,6 +28,12 @@ module.exports = {
           return "https://media.discordapp.net/attachments/1090002887410729090/1196657634003128451/OIG.png?ex=65b86d44&is=65a5f844&hm=de7145dccb6e16f2e0958e2fb32469d6fd0c4384d18975d7dbc6db03ca399be9&=&format=webp&quality=lossless";
         case 7:
           return "I'm just eating fried chicken";
+        case 8:
+          return "Saw a corgi at work today, pretty sure it was just Dannis there to bless me tho. Thank you Dannis.";
+        case 9:
+          return "please my goat dannis who should be in the hall of legends instead of faker please bless me with a pitched drop that i need on this blessed weekend";
+        case 10:
+          return "Dear king Dannis, Please bless me with atleast 1 pb this week I am just but a humble peasent who wishes to arise to your nobel status. From - Your most devoted follower";
       }
     }
 
