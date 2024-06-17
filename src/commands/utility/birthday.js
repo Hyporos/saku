@@ -24,7 +24,7 @@ module.exports = {
 
     if (!dayjs(birthdayDateOption).isValid()) {
       return interaction.reply({
-        content: `Error - The date **${birthdayDateOption}** is not valid. Make sure that it is properly formatted (ex: April 28 2023 or 04-28-2023)`,
+        content: `Error - The date **${birthdayDateOption}** is not valid. Make sure that it is properly formatted (ex: April 28)`,
         ephemeral: true,
       });
     }
@@ -38,7 +38,7 @@ module.exports = {
         _id: interaction.user.id,
         birthdayDate: dayjs(
             birthdayDateOption
-          ).format("MMM DD, YYYY"),
+          ).format("MMMM DD"),
       },
       {
         upsert: true,
@@ -48,7 +48,7 @@ module.exports = {
     interaction.reply({
       content: `Your birthday has been set to ${dayjs(
         birthdayDateOption
-      ).format("MMM DD, YYYY")}`,
+      ).format("MMMM DD")}`,
       ephemeral: true,
     });
   },

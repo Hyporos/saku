@@ -64,29 +64,26 @@ const setBirthdays = async () => {
       const birthdayDate = user.birthdayDate;
       if (!birthdayDate) continue; // Skip users without a birthday date
       // Parse the birthday date using dayjs
-      const birthday = dayjs(birthdayDate, "MMM DD, YYYY");
+      const birthday = dayjs(birthdayDate, "MMMM DD");
       // Extract day and month
       const month = birthday.month() + 1; // dayjs month is zero-based, so we add 1
-      const day = birthday.date();
+      const day = birthday.date() - 1;
       // Create a cron schedule for the user's birthday at midnight
-      const cronSchedule = `0 0 ${day} ${month} *`;
+      const cronSchedule = `0 20 ${day} ${month} *`;
       // Create a birthday event for the user
-      const birthdayEvent = new cron.CronJob(
+      new cron.CronJob(
         cronSchedule,
         () => {
-          const channel = client.channels.cache.get("761406523950891059");
+          const channel = client.channels.cache.get("1090002887410729090");
           if (!channel) {
-            console.log("Error - Ursus reminder channel not found");
+            console.log("Error - Birthday message channel not found");
             return;
           }
-          channel.send(`Happy birthday`);
+          channel.send(`It's a special day today!\nEverybody wish <@${user.id}> a happy birthday! <:sakuParty:1072880580187930735>`);
         },
         null,
-        true, // Start the job right away
-        'UTC' // Timezone
+        true // Start the job right away
       );
-      // Start the birthday event
-      birthdayEvent.start();
     }
     console.log("Birthday events set up successfully");
   } catch (error) {
