@@ -10,8 +10,14 @@
     </summary>
         <summary align="center">
         <h3 style="display: inline-block;">
-          A Discord Bot tailored towards Saku's community. It provides culvert score tracking, general character statistics, as well as fun commands!
+          A Discord Bot tailored for Saku's community.
         </h3>
+                 <h4 style="display: inline-block;">
+                    As a member, make use of commands such as /profile and /graph which provide you with detailed character and culvert score statistics. You can also view the overall scores with /rankings, or use fun commands such as /8ball to get some insight!
+        </h4>
+                            <h4 style="display: inline-block;">
+                    As an administrator, work comfortably behind the scenes. Manage users and characters (CRUD), scan and input weekly scores, view top secret data, and more. 
+        </h4>
     </summary>
     <hr></hr>
   </ul>
@@ -41,7 +47,7 @@
   <img src="src/assets/help.png" alt="Graph UI"/>
 </div>
 
-<h2 align="center">Scan</h2>
+<h2 align="center">Scan (and related commands)</h2>
 
 <div align="center">
   <img src="src/assets/scan.png" alt="Graph UI"/>
@@ -52,7 +58,7 @@
     <hr></hr>
     <summary align="center">
         <h2 style="display: inline-block;">
-          And many more!
+          Check the code to see more of the commands and how they work!
         </h1>
     </summary>
   </ul>
