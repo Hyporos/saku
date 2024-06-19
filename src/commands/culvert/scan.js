@@ -55,11 +55,12 @@ module.exports = {
       .format("YYYY-MM-DD");
 
     // Get the list of character name exceptions
-    const checkExceptions = async (entryName) => {
+    async function checkExceptions(entryName) {
       const exceptions = await botSchema.find({});
       // Find the exception. if no exception exists, keep the entry name
 
-      const returnedName = await exceptions.find((name) => entryName === name.exception).name || entryName
+      const exception = exceptions.find((entry) => entryName.toLowerCase() === entry.exception.toLowerCase());
+      const returnedName = exception ? exception.name : entryName;
 
       console.log(`Exception found for ${returnedName}`)
 
@@ -160,7 +161,7 @@ module.exports = {
     const notFoundChars = [];
 
     // Select name and score from each entry and push into a separate array
-    entryArray.forEach((entry) => {
+    for (const entry of entryArray) {
       // Log character names which have invalid scores
       if (isNaN(Number(entry.split(" ").pop()))) {
         NaNScores.push(entry.split(" ")[0]);
@@ -168,12 +169,12 @@ module.exports = {
       // Log character names which are valid
       if (entry.split(" ")[0] !== "") {
         validScores.push({
-          name: checkExceptions(entry.split(" ")[0]),
+          name: await checkExceptions(entry.split(" ")[0]),
           score: Number(entry.split(" ").pop()),
           sandbag: false,
         });
       }
-    });
+    };
 
     for (const character of validScores) {
       // Get the first and last 4 letters of the character name to use for better database matching
