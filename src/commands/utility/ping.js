@@ -20,9 +20,9 @@ module.exports = {
           "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
       })
       .setDescription(
-        `**Latency** ⎯ ${
+        `**Latency** - ${
           message.createdTimestamp - interaction.createdTimestamp
-        }ms\n**API** ⎯ ${interaction.client.ws.ping}ms`
+        }ms\n**API** - ${interaction.client.ws.ping}ms`
       );
 
     interaction.editReply({ embeds: [pong] });

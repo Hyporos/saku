@@ -108,27 +108,27 @@ module.exports = {
       } else if (type === "parameters") {
         switch (selectedCommand) {
           case "gpq":
-            return `\u0060[character]\u0060 ⎯ The character that the score will be logged to\n\u0060[score]\u0060 ⎯ The score to be logged`;
+            return `\u0060[character]\u0060 - The character that the score will be logged to\n\u0060[score]\u0060 - The score to be logged`;
           case "profile":
-            return `\u0060[character]\u0060 ⎯ The character's profile to be viewed`;
+            return `\u0060[character]\u0060 - The character's profile to be viewed`;
           case "graph":
-            return `\u0060[character]\u0060 ⎯ The character's graph to be rendered\n\u0060[number_of_weeks]\u0060 ⎯ The number of weeks to display (default: 8)\n\u0060[omit_unsubmitted]\u0060 ⎯ Prevent unsubmitted scores (missed weeks) from displaying`;
+            return `\u0060[character]\u0060 - The character's graph to be rendered\n\u0060[number_of_weeks]\u0060 - The number of weeks to display (default: 8)\n\u0060[omit_unsubmitted]\u0060 - Prevent unsubmitted scores (missed weeks) from displaying`;
           case "graphcolor":
-            return `\u0060[color]\u0060 ⎯ The new color of the graph area (default: pink)`;
+            return `\u0060[color]\u0060 - The new color of the graph area (default: pink)`;
           case "rankings":
-            return `\u0060[timeframe]\u0060 ⎯ The timeframe that the leaderboard will display`;
+            return `\u0060[timeframe]\u0060 - The timeframe that the leaderboard will display`;
           case "link":
-            return `\u0060[character]\u0060 ⎯ The character to be linked\n\u0060[discord_user]\u0060 ⎯ The Discord user to be paired with the character\n\u0060[member_since]\u0060 ⎯ The date that the character joined the guild`;
+            return `\u0060[character]\u0060 - The character to be linked\n\u0060[discord_user]\u0060 - The Discord user to be paired with the character\n\u0060[member_since]\u0060 - The date that the character joined the guild`;
           case "unlink":
-            return `\u0060[character]\u0060 ⎯ The character to be unlinked`;
+            return `\u0060[character]\u0060 - The character to be unlinked`;
           case "rename":
-            return `\u0060[old_name]\u0060 ⎯ The character to be renamed\n\u0060[new_name]\u0060 ⎯ The new name to set for this character`;
+            return `\u0060[old_name]\u0060 - The character to be renamed\n\u0060[new_name]\u0060 - The new name to set for this character`;
           case "correct":
-            return `\u0060[character]\u0060 ⎯ The character to be corrected\n\u0060[date]\u0060 ⎯ The date of the score\n\u0060[score]\u0060 ⎯ The new score to submit`;
+            return `\u0060[character]\u0060 - The character to be corrected\n\u0060[date]\u0060 - The date of the score\n\u0060[score]\u0060 - The new score to submit`;
           case "scan":
-            return `\u0060[week]\u0060 ⎯ Submit the scores for either the current or the last week`;
+            return `\u0060[week]\u0060 - Submit the scores for either the current or the last week`;
           case "finalize":
-            return `\u0060[week]\u0060 ⎯ Check the scores for either the current or the last week\n\u0060[override]\u0060 ⎯ Ignore unsubmitted scores and proceed with finalization`;
+            return `\u0060[week]\u0060 - Check the scores for either the current or the last week\n\u0060[override]\u0060 - Ignore unsubmitted scores and proceed with finalization`;
           case "wos":
             return `None`;
           case "export":
@@ -136,9 +136,9 @@ module.exports = {
           case "roll":
             return `None`;
             case "8ball":
-              return `\u0060[question]\u0060 ⎯ Your question, to be answered by the Magic 8 Ball`;
+              return `\u0060[question]\u0060 - Your question, to be answered by the Magic 8 Ball`;
           case "help":
-            return `\u0060[command]\u0060 ⎯ The command to view in depth`;
+            return `\u0060[command]\u0060 - The command to view in depth`;
           case "ping":
             return `None`;
         }

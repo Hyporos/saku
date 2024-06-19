@@ -391,7 +391,7 @@ module.exports = {
         "\n\nThe following characters could not be found:\n- "
       );
       for (const name of notFoundChars) {
-        response = response.concat(`**${name}** ⎯ `);
+        response = response.concat(`**${name}** - `);
       }
       response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
     }
@@ -401,7 +401,7 @@ module.exports = {
         "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
       );
       for (const name of NaNScores) {
-        response = response.concat(`**${name}** ⎯ `);
+        response = response.concat(`**${name}** - `);
       }
       response = response.slice(0, -3);
     }

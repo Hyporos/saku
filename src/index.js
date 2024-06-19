@@ -117,7 +117,7 @@ for (const folder of commandFolders) {
       client.commands.set(command.data.name, command);
     } else {
       console.log(
-        `Warning ⎯ The command at ${filePath} is missing a required "data" or "execute" property`
+        `Warning - The command at ${filePath} is missing a required "data" or "execute" property`
       );
     }
   }
