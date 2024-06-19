@@ -29,6 +29,7 @@ module.exports = {
       "graphcolor",
       "rankings",
       "roll",
+      "8ball",
       "help",
       "ping",
     ];
@@ -97,6 +98,8 @@ module.exports = {
             return "Export a .csv containing all members scores along with their dates. This file can be imported into Excel or Sheets for viewing.";
           case "roll":
             return "Roll a number between 1 and 100";
+            case "8ball":
+              return "Seek advice from the Magic 8 Ball";
           case "help":
             return "Display a list of all commands. You can choose to use /help followed by a command name to view more details about that particular command. Did you really just do /help help?";
           case "ping":
@@ -132,6 +135,8 @@ module.exports = {
             return `None`;
           case "roll":
             return `None`;
+            case "8ball":
+              return `\u0060[question]\u0060 ⎯ Your question, to be answered by the Magic 8 Ball`;
           case "help":
             return `\u0060[command]\u0060 ⎯ The command to view in depth`;
           case "ping":
@@ -159,7 +164,7 @@ module.exports = {
             : ""
         }`,
       })
-      .addFields({ name: "Fun", value: "`roll`" })
+      .addFields({ name: "Fun", value: "`roll`, `8ball`" })
       .addFields({ name: "Utility", value: "`help`, `ping`" });
 
     // Create the specific help embed

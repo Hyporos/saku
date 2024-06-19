@@ -15,30 +15,30 @@ module.exports = {
     const questionOption = interaction.options.getString("question");
 
     const positive = [
-      "Definitely",
-      "It is certain",
-      "Outlook good",
-      "Without a doubt",
-      "Felix says YA YA YAAAAAAAAAAA",
-      "Arik says bet",
-      "Ayub says fine I'll let you eat",
+      "Definitely.",
+      "It is certain.",
+      "Outlook good.",
+      "Without a doubt.",
+      `Felix says, "YA YA YAAAAAAAAAAA."`,
+      `Arik says, "Bet."`,
+      `Ayub says, "Fine, I'll let you eat."`,
     ];
 
     const vague = [
-      "Ask again later",
-      "Lock in and ask again",
-      "Ayub says I might have some food left, we shall see",
-      "Mike says let me check... ask again later",
-      "Vape says don't ask me",
+      "Ask again later.",
+      "Lock in and ask again.",
+      `Ayub says, "I might have some food left, we shall see. Ask again later."`,
+      `Mike says, "Let me check... ask again later."`,
+      `Vape says, "Don't ask me. Ask again."`,
     ];
 
     const negative = [
-      "Doubt",
-      "My sources say no",
-      "Angelo says OH NAHHH",
-      "Matt says oh hell nah",
-      "William uses f3, no",
-      "Miche says no",
+      "Doubt.",
+      "My sources say no.",
+      `Angelo says, "OH NAHHH."`,
+      `Matt says, "Oh hell nah."`,
+      `William uses f3... "No."`,
+      `Miche says, "No."`,
     ];
 
     function getRandomElement(arr) {
@@ -71,9 +71,11 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(embedColor)
-      .setTitle(":8ball: | " + response)
-      .setDescription(questionOption);
+      .setTitle(questionOption)
+      .setDescription(":8ball: " + response);
 
-    interaction.reply({ embeds: [embed] });
+    interaction.reply({
+      embeds: [embed],
+    });
   },
 };

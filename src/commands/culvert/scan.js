@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const botSchema = require("../../exceptionSchema.js");
 const { createWorker } = require("tesseract.js");
 const Jimp = require("jimp");
 const dayjs = require("dayjs");
@@ -53,52 +54,64 @@ module.exports = {
       .subtract(8, "day")
       .format("YYYY-MM-DD");
 
-    // Create individual exceptions for recurring un-scannable names
-    function exceptions(name) {
-      if (
-        name === "dissatisfiedThunder" ||
-        name === "dissatisfiedhunder" ||
-        name === "dissatisfiedrhunder"
-      )
-        return "dìssatisfied";
-      if (name === "lgniteChee") return "IgniteCheese";
-      if (name === "Idiot") return "ldìot";
-      if (name === "Takina") return "Takìna";
-      if (name === "YapeOnurG") return "VapeOnurGirl";
-      if (name === "WhylCry") return "WhyICry";
-      if (name === "miche") return "míche";
-      if (name === "Náro" || name === "Naro") return "Nàro";
-      if (name === "Migs") return "Mïgs";
-      if (name === "Cehba") return "Cebba";
-      if (name === "Kyéra") return "Kyêra";
-      if (name === "Jdéy" || name === "Jèéy") return "Jòéy";
-      if (name === "yuhing") return "yubin8";
-      if (name === "Méllgw" || name === "Méllaw") return "Mëlløw";
-      if (name === "¡AmPunny") return "iAmPunny";
-      if (name === "eGirl") return "egirI";
-      if (name === "Kürea") return "Kùrea";
-      if (name === "Aski") return "Aøki";
-      if (name === "Laved") return "Løved";
-      if (name === "Aina" || name === "Ainå") return "Ainà";
-      if (name === "Hikåri" || name === "Hikéri" || name === "Hikari")
-        return "Hikárì";
-      if (name === "Cukeu") return "Cukcu";
-      if (name === "téee" || name === "tåee") return "táee";
-      if (name === "Kaküja" || name === "Kakdja") return "kakúja";
-      if (name === "Kogå") return "Kogâ";
-      if (name === "ponzi" || name === "pånzi" || name === "pènzi")
-        return "pònzi";
-      if (name === "CaptainWaThunder" || name === "CaptainvaThunder")
-        return "CaptainWater";
-      if (name === "Hakgs") return "Hakøs";
-      if (name === "JaylTB") return "JayITB";
-      if (name === "Mipd" || name === "Mipû") return "Mipú";
-      if (name === "Nåro") return "Nàro";
-      if (name === "Sasåri" || name === "Sasóri") return "Sasôri";
-      if (name === "Druú") return "Drùú";
-      if (name === "Minári" || name === "minári") return "Minãri";
-      return name;
+    // Get the list of character name exceptions
+    const checkExceptions = async (entryName) => {
+      const exceptions = await botSchema.find({});
+      // Find the exception. if no exception exists, keep the entry name
+
+      const returnedName = await exceptions.find((name) => entryName === name.exception).name || entryName
+
+      console.log(`Exception found for ${returnedName}`)
+
+      return returnedName;
     }
+
+    // Create individual exceptions for recurring un-scannable names
+    // function exceptions(name) {
+    //   if (
+    //     name === "dissatisfiedThunder" ||
+    //     name === "dissatisfiedhunder" ||
+    //     name === "dissatisfiedrhunder"
+    //   )
+    //     return "dìssatisfied";
+    //   if (name === "lgniteChee") return "IgniteCheese";
+    //   if (name === "Idiot") return "ldìot";
+    //   if (name === "Takina") return "Takìna";
+    //   if (name === "YapeOnurG") return "VapeOnurGirl";
+    //   if (name === "WhylCry") return "WhyICry";
+    //   if (name === "miche") return "míche";
+    //   if (name === "Náro" || name === "Naro") return "Nàro";
+    //   if (name === "Migs") return "Mïgs";
+    //   if (name === "Cehba") return "Cebba";
+    //   if (name === "Kyéra") return "Kyêra";
+    //   if (name === "Jdéy" || name === "Jèéy") return "Jòéy";
+    //   if (name === "yuhing") return "yubin8";
+    //   if (name === "Méllgw" || name === "Méllaw") return "Mëlløw";
+    //   if (name === "¡AmPunny") return "iAmPunny";
+    //   if (name === "eGirl") return "egirI";
+    //   if (name === "Kürea") return "Kùrea";
+    //   if (name === "Aski") return "Aøki";
+    //   if (name === "Laved") return "Løved";
+    //   if (name === "Aina" || name === "Ainå") return "Ainà";
+    //   if (name === "Hikåri" || name === "Hikéri" || name === "Hikari")
+    //     return "Hikárì";
+    //   if (name === "Cukeu") return "Cukcu";
+    //   if (name === "téee" || name === "tåee") return "táee";
+    //   if (name === "Kaküja" || name === "Kakdja") return "kakúja";
+    //   if (name === "Kogå") return "Kogâ";
+    //   if (name === "ponzi" || name === "pånzi" || name === "pènzi")
+    //     return "pònzi";
+    //   if (name === "CaptainWaThunder" || name === "CaptainvaThunder")
+    //     return "CaptainWater";
+    //   if (name === "Hakgs") return "Hakøs";
+    //   if (name === "JaylTB") return "JayITB";
+    //   if (name === "Mipd" || name === "Mipû") return "Mipú";
+    //   if (name === "Nåro") return "Nàro";
+    //   if (name === "Sasåri" || name === "Sasóri") return "Sasôri";
+    //   if (name === "Druú") return "Drùú";
+    //   if (name === "Minári" || name === "minári") return "Minãri";
+    //   return name;
+    // }
 
     // Process the image
     Jimp.read(image.proxyURL).then(function (image) {
@@ -152,10 +165,10 @@ module.exports = {
       if (isNaN(Number(entry.split(" ").pop()))) {
         NaNScores.push(entry.split(" ")[0]);
       }
-      // If the character name is valid, store the entry
-      if (entry.split(" ")[0] != "") {
+      // Log character names which are valid
+      if (entry.split(" ")[0] !== "") {
         validScores.push({
-          name: exceptions(entry.split(" ")[0]),
+          name: checkExceptions(entry.split(" ")[0]),
           score: Number(entry.split(" ").pop()),
           sandbag: false,
         });
@@ -164,6 +177,7 @@ module.exports = {
 
     for (const character of validScores) {
       // Get the first and last 4 letters of the character name to use for better database matching
+      console.log(character);
       const nameBeginning = character.name.substring(0, 4);
       const nameEnd = character.name.substring(character.name.length - 4);
 
