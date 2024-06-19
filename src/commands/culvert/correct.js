@@ -63,9 +63,13 @@ module.exports = {
         `Error - The character **${characterOption}** has not yet been linked`
       );
     }
-    
+
     // Check if the character has a score on the given date
-    const scoreExists = user.characters[0].scores.find(
+    const character = user.characters.find(
+      (char) => char.name.toLowerCase() === characterOption.toLowerCase()
+    );
+
+    const scoreExists = character.scores.find(
       (score) => score.date === dateOption
     );
 
@@ -128,6 +132,8 @@ module.exports = {
     }
 
     // Display user responses
-    interaction.reply(`${characterOption}'s score has been set to **${scoreOption}** for the week of ${dateOption}`);
+    interaction.reply(
+      `${characterOption}'s score has been set to **${scoreOption}** for the week of ${dateOption}`
+    );
   },
 };
