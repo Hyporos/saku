@@ -67,53 +67,6 @@ module.exports = {
       return returnedName;
     }
 
-    // Create individual exceptions for recurring un-scannable names
-    // function exceptions(name) {
-    //   if (
-    //     name === "dissatisfiedThunder" ||
-    //     name === "dissatisfiedhunder" ||
-    //     name === "dissatisfiedrhunder"
-    //   )
-    //     return "dìssatisfied";
-    //   if (name === "lgniteChee") return "IgniteCheese";
-    //   if (name === "Idiot") return "ldìot";
-    //   if (name === "Takina") return "Takìna";
-    //   if (name === "YapeOnurG") return "VapeOnurGirl";
-    //   if (name === "WhylCry") return "WhyICry";
-    //   if (name === "miche") return "míche";
-    //   if (name === "Náro" || name === "Naro") return "Nàro";
-    //   if (name === "Migs") return "Mïgs";
-    //   if (name === "Cehba") return "Cebba";
-    //   if (name === "Kyéra") return "Kyêra";
-    //   if (name === "Jdéy" || name === "Jèéy") return "Jòéy";
-    //   if (name === "yuhing") return "yubin8";
-    //   if (name === "Méllgw" || name === "Méllaw") return "Mëlløw";
-    //   if (name === "¡AmPunny") return "iAmPunny";
-    //   if (name === "eGirl") return "egirI";
-    //   if (name === "Kürea") return "Kùrea";
-    //   if (name === "Aski") return "Aøki";
-    //   if (name === "Laved") return "Løved";
-    //   if (name === "Aina" || name === "Ainå") return "Ainà";
-    //   if (name === "Hikåri" || name === "Hikéri" || name === "Hikari")
-    //     return "Hikárì";
-    //   if (name === "Cukeu") return "Cukcu";
-    //   if (name === "téee" || name === "tåee") return "táee";
-    //   if (name === "Kaküja" || name === "Kakdja") return "kakúja";
-    //   if (name === "Kogå") return "Kogâ";
-    //   if (name === "ponzi" || name === "pånzi" || name === "pènzi")
-    //     return "pònzi";
-    //   if (name === "CaptainWaThunder" || name === "CaptainvaThunder")
-    //     return "CaptainWater";
-    //   if (name === "Hakgs") return "Hakøs";
-    //   if (name === "JaylTB") return "JayITB";
-    //   if (name === "Mipd" || name === "Mipû") return "Mipú";
-    //   if (name === "Nåro") return "Nàro";
-    //   if (name === "Sasåri" || name === "Sasóri") return "Sasôri";
-    //   if (name === "Druú") return "Drùú";
-    //   if (name === "Minári" || name === "minári") return "Minãri";
-    //   return name;
-    // }
-
     // Process the image
     Jimp.read(image.proxyURL).then(function (image) {
       image

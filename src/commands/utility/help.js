@@ -40,6 +40,7 @@ module.exports = {
         "unlink",
         "rename",
         "correct",
+        "exception",
         "scan",
         "finalize",
         "wos",
@@ -88,6 +89,8 @@ module.exports = {
             return "Rename a character. All stats and character info will remain.";
           case "correct":
             return "Edit or create a new score for a character. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format.";
+            case "exception":
+              return "Add a character exception to /scan. If a name is being incorrectly read by the bot, you can add an exception (alternative name) for the bot to recognize.";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert.";
           case "finalize":
@@ -125,6 +128,8 @@ module.exports = {
             return `\u0060[old_name]\u0060 - The character to be renamed\n\u0060[new_name]\u0060 - The new name to set for this character`;
           case "correct":
             return `\u0060[character]\u0060 - The character to be corrected\n\u0060[date]\u0060 - The date of the score\n\u0060[score]\u0060 - The new score to submit`;
+            case "exception":
+            return `\u0060[name]\u0060 - The name of the character\n\u0060[exception]\u0060 - The alternative name, which is being incorrectly scanned`;
           case "scan":
             return `\u0060[week]\u0060 - Submit the scores for either the current or the last week`;
           case "finalize":
@@ -160,7 +165,7 @@ module.exports = {
         name: "Culvert",
         value: `\u0060gpq\u0060, \u0060profile\u0060, \u0060graph\u0060, \u0060graphcolor\u0060, \u0060rankings\u0060${
           isBee
-            ? ", \u0060link\u0060, \u0060unlink\u0060, \u0060rename\u0060, \u0060correct\u0060, \u0060scan\u0060, \u0060finalize\u0060, \u0060wos\u0060, \u0060export\u0060"
+            ? ", \u0060link\u0060, \u0060unlink\u0060, \u0060rename\u0060, \u0060correct\u0060, \u0060exception\u0060, \u0060scan\u0060, \u0060finalize\u0060, \u0060wos\u0060, \u0060export\u0060"
             : ""
         }`,
       })

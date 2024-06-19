@@ -26,12 +26,13 @@ module.exports = {
         "unlink",
         "rename",
         "correct",
+        "exception",
         "scan",
         "finalize",
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "rename", "correct", "scan", "finalize", "wos", "say", "export"];
+      const beeCommands = ["link", "unlink", "rename", "correct", "exception", "scan", "finalize", "wos", "say", "export"];
       const ownerCommands = ["reload"];
 
       if (

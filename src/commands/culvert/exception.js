@@ -10,13 +10,13 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName("name")
-        .setDescription("The real name of the character")
+        .setDescription("The name of the character")
         .setRequired(true)
     )
     .addStringOption((option) =>
       option
         .setName("exception")
-        .setDescription("The name which is being incorrectly scanned")
+        .setDescription("The alternative name, which is being incorrectly scanned")
         .setRequired(true)
     ),
 
@@ -29,10 +29,10 @@ module.exports = {
 
     // Check if the exception has already been made
     const exceptionExists = await botSchema.exists({
-      exceptionField: {
+      exception: {
         $regex: `^${exceptionOption}$`,
         $options: "i",
-      }
+      },
     });
 
     if (exceptionExists) {
