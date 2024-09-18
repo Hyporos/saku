@@ -20,8 +20,10 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
+    // Parse the command arguments
     const birthdayDateOption = interaction.options.getString("date");
 
+    // Check if the date is valid (real or not)
     if (!dayjs(birthdayDateOption).isValid()) {
       return interaction.reply({
         content: `Error - The date **${birthdayDateOption}** is not valid. Make sure that it is properly formatted (ex: April 28)`,
@@ -45,6 +47,7 @@ module.exports = {
       }
     );
 
+    // Handle responses
     interaction.reply({
       content: `Your birthday has been set to ${dayjs(
         birthdayDateOption
