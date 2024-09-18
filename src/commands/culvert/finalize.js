@@ -1,11 +1,11 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const fs = require("fs");
 const culvertSchema = require("../../culvertSchema.js");
+const {
+  getResetDates,
+  handleResponse,
+} = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const updateLocale = require("dayjs/plugin/updateLocale");
-dayjs.extend(utc);
-dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -38,64 +38,31 @@ module.exports = {
     let weekOption = interaction.options.getString("week");
     const overrideOption = interaction.options.getBoolean("override") || false;
 
-    // Set the day of the week that the culvert score gets reset (Wednesday)
-    dayjs.updateLocale("en", {
-      weekStart: 4,
-    });
-
-    const reset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(1, "day")
-      .format("YYYY-MM-DD");
-
-    const lastReset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(8, "day")
-      .format("YYYY-MM-DD");
-
+    // Get the current reset and last reset dates
+    const { reset, lastReset } = getResetDates();
     weekOption = weekOption === "this_week" ? reset : lastReset;
 
-    // Find the total count of characters
-    const characterCount = await culvertSchema.aggregate([
-      { $unwind: "$characters" },
-      { $group: { _id: null, count: { $sum: 1 } } },
-    ]);
+    // Fetch a list of all characters
+    const charactersData = await culvertSchema.find({}, "characters");
+    const allCharacters = charactersData.flatMap((list) => list.characters);
 
-    // Find the characters with no score submitted on the provided date
-    const charactersWithoutScore = await culvertSchema.aggregate([
-      { $unwind: "$characters" },
-      {
-        $match: {
-          "characters.scores.date": {
-            $ne: weekOption,
-          },
-        },
-      },
-    ]);
+    // Extract the names of characters without scores submitted if they joined after the weekly reset
+    const missedCharactersArray = allCharacters
+      .filter((character) => {
+        const hasNoScore = character.scores.every(
+          (score) => score.date !== weekOption
+        );
+        const wasInGuild = !(
+          weekOption === lastReset &&
+          dayjs(character.memberSince).isAfter(lastReset)
+        );
 
-    // Push the character names into an array to create a list
-    const missedCharactersArray = [];
-
-    for (character of charactersWithoutScore) {
-      // Check if the character was in the guild at the time of reset
-      if (
-        weekOption === lastReset &&
-        dayjs(character.characters.memberSince).isAfter(lastReset)
-      )
-        continue;
-      missedCharactersArray.push(character.characters.name);
-    }
+        return hasNoScore && wasInGuild;
+      })
+      .map((character) => character.name);
 
     // Convert the character names array into a structured string
-    let missedCharacters = "";
-
-    for (name of missedCharactersArray) {
-      missedCharacters = missedCharacters.concat(name + ", ");
-    }
-
-    missedCharacters = missedCharacters.slice(0, -2); // Remove the unnecessary comma at the end
+    let missedCharacters = missedCharactersArray.join(", ");
 
     if (missedCharactersArray.length !== 0 && overrideOption === false) {
       return interaction.reply(
@@ -103,14 +70,12 @@ module.exports = {
       );
     }
 
+    // Extract the collection data and write it to a JSON file
     try {
-      // Extract entire collection data
       const data = await culvertSchema.find({});
 
-      // Convert data to JSON
-      const jsonData = JSON.stringify(data, null, 2); // Add indentation for readability
+      const jsonData = JSON.stringify(data, null, 2);
 
-      // Write the data to JSON file
       fs.writeFile(`culvert-${weekOption}.json`, jsonData, (err) => {
         if (err) {
           console.error("Error - Could not save JSON to file:", err);
@@ -121,15 +86,14 @@ module.exports = {
       console.error("Error - Could not export collection to JSON:", error);
     }
 
-    // Create attachment builder with file path
     const attachment = new AttachmentBuilder(`./culvert-${weekOption}.json`);
 
-    // Display response
+    // Handle responses
     interaction.reply({
       content: `${
         missedCharactersArray.length !== 0
-          ? `**${characterCount[0].count - missedCharactersArray.length}/${
-              characterCount[0].count
+          ? `**${allCharacters.length - missedCharactersArray.length}/${
+              allCharacters.length
             }** scores`
           : "All scores"
       } have been submitted for the week of **${weekOption}**\n\nJSON backup data:`,

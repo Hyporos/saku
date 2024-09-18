@@ -1,5 +1,9 @@
 const culvertSchema = require("../culvertSchema.js");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const updateLocale = require("dayjs/plugin/updateLocale");
+dayjs.extend(utc);
+dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -26,24 +30,54 @@ async function findUserByCharacter(interaction, characterOption) {
 }
 
 /**
+ * Gets the current reset and last reset dates based on the day of Wednesday.
+ *
+ * @returns {Object} An object containing the current reset, last reset and next reset dates.
+ */
+
+function getResetDates() {
+  dayjs.updateLocale("en", {
+    weekStart: 4, // Week starts on Thursday 12:00 AM UTC
+  });
+
+  const reset = dayjs()
+    .utc()
+    .startOf("week")
+    .subtract(1, "day")
+    .format("YYYY-MM-DD");
+
+  const lastReset = dayjs()
+    .utc()
+    .startOf("week")
+    .subtract(8, "day")
+    .format("YYYY-MM-DD");
+
+  const nextReset = dayjs().utc().startOf("week").add(7, "day");
+
+  return { reset, lastReset, nextReset };
+}
+
+/**
  * Logs a message to the console and sends a reply to the Discord channel.
  *
  * @param {Object} interaction - The interaction object from Discord.js.
  * @param {string|Object} message - The message or object to be sent and logged.
  */
 
-function handleResponse(interaction, message) {
+function handleResponse(interaction, message, customLogMessage) {
   // Determine if `message` is an object
-  if (typeof message === 'object') {
+  if (typeof message === "object") {
     // Extract relevant properties, if present
     const { content, files, embeds, components, ephemeral } = message;
 
-    // Construct log message from content if available
-    const logMessage = `/${interaction.commandName}: ${content ? content.replace(/\*/g, '') : ''}`;
+    // Use the custom log message if provided, otherwise use the content
+    const logMessage = `/${interaction.commandName}: ${
+      customLogMessage || (content ? content.replace(/\*/g, "") : "")
+    }`;
 
     console.log(logMessage);
     interaction.reply({
-      content: content || '',
+      content: content || "",
       files: files || [],
       embeds: embeds || [],
       components: components || [],
@@ -51,11 +85,13 @@ function handleResponse(interaction, message) {
     });
   } else {
     // Handle the case where `message` is a string
-    const logMessage = `/${interaction.commandName}: ${message.replace(/\*/g, '')}`;
+    const logMessage = `/${interaction.commandName}: ${
+      customLogMessage || message.replace(/\*/g, "")
+    }`;
 
     console.log(logMessage);
     interaction.reply(message);
   }
 }
 
-module.exports = { findUserByCharacter, handleResponse };
+module.exports = { findUserByCharacter, getResetDates, handleResponse };
