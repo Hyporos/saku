@@ -51,6 +51,7 @@ module.exports = {
       exception: exceptionOption,
     });
 
+    // Handle responses
     return handleResponse(
       interaction,
       `**${exceptionOption}** has been set as an exception for **${nameOption}**`

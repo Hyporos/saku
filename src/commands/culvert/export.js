@@ -1,21 +1,24 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const fs = require("fs");
 const culvertSchema = require("../../culvertSchema.js");
+const { handleResponse } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("export")
-    .setDescription("Export a .csv of characters' scores for their respective dates"),
+    .setDescription(
+      "Export a .csv of characters' scores for their respective dates"
+    ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
     try {
-      const data = await culvertSchema.find({}); // Fetch all data from the schema
+      const data = await culvertSchema.find({});
 
-      const ws = fs.createWriteStream(`culvert.csv`); // Create a write stream for CSV file
+      const ws = fs.createWriteStream(`culvert.csv`);
 
       // Flatten the characters array from all users
       let allCharacters = [];
@@ -60,19 +63,25 @@ module.exports = {
       // Write character scores to CSV file
       allCharacters.forEach(({ name, memberSince }) => {
         const scores = dates.map((date) => scoresByDate[date][name] || "");
-        const characterRow = [name, `"${memberSince}"`, ...scores]; // Wrap memberSince in double quotes
+        const characterRow = [name, `"${memberSince}"`, ...scores];
         ws.write(characterRow.join(",") + "\r\n");
       });
 
-      ws.end(); // Close the write stream
+      ws.end();
 
-      const attachment = new AttachmentBuilder("./culvert.csv"); // Create attachment builder with file path
-      interaction.reply({
+      const attachment = new AttachmentBuilder("./culvert.csv");
+
+      // Handle responses
+      handleResponse(interaction, {
         content: "Data has been successfully exported",
         files: [attachment],
       });
     } catch (error) {
-      interaction.reply("Error - Data could not be successfully exported");
+      handleResponse(
+        interaction,
+        "Error - Data could not be successfully exported"
+      );
+      console.log(error);
     }
   },
 };

@@ -23,17 +23,36 @@ async function findUserByCharacter(interaction, characterOption) {
 }
 
 /**
- * Logs a message to the console and sends a reply to the discord channel.
+ * Logs a message to the console and sends a reply to the Discord channel.
  *
  * @param {Object} interaction - The interaction object from Discord.js.
- * @param {string} message - The success or error message to be sent and logged.
+ * @param {string|Object} message - The message or object to be sent and logged.
  */
 
 function handleResponse(interaction, message) {
-  logMessage = `/${interaction.commandName}: ${message.replace(/\*/g, "")}`;
+  // Determine if `message` is an object
+  if (typeof message === 'object') {
+    // Extract relevant properties, if present
+    const { content, files, embeds, components, ephemeral } = message;
 
-  console.log(logMessage);
-  interaction.reply(message);
+    // Construct log message from content if available
+    const logMessage = `/${interaction.commandName}: ${content ? content.replace(/\*/g, '') : ''}`;
+
+    console.log(logMessage);
+    interaction.reply({
+      content: content || '',
+      files: files || [],
+      embeds: embeds || [],
+      components: components || [],
+      ephemeral: ephemeral || false,
+    });
+  } else {
+    // Handle the case where `message` is a string
+    const logMessage = `/${interaction.commandName}: ${message.replace(/\*/g, '')}`;
+
+    console.log(logMessage);
+    interaction.reply(message);
+  }
 }
 
 module.exports = { findUserByCharacter, handleResponse };
