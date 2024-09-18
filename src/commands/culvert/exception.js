@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const botSchema = require("../../exceptionSchema.js");
+const { handleResponse } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -16,7 +17,9 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName("exception")
-        .setDescription("The alternative name, which is being incorrectly scanned")
+        .setDescription(
+          "The alternative name, which is being incorrectly scanned"
+        )
         .setRequired(true)
     ),
 
@@ -36,7 +39,8 @@ module.exports = {
     });
 
     if (exceptionExists) {
-      return interaction.reply(
+      return handleResponse(
+        interaction,
         `Error - The exception **${exceptionOption}** has already been made`
       );
     }
@@ -47,7 +51,8 @@ module.exports = {
       exception: exceptionOption,
     });
 
-    interaction.reply(
+    return handleResponse(
+      interaction,
       `**${exceptionOption}** has been set as an exception for **${nameOption}**`
     );
   },

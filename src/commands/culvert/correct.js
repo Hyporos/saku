@@ -1,7 +1,10 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
-const { findUserByCharacter } = require("../../utility/culvertUtils.js");
+const {
+  findUserByCharacter,
+  handleResponse,
+} = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -40,26 +43,22 @@ module.exports = {
     const isFormatted = /^\d{4}-\d{2}-\d{2}$/.test(dateOption);
 
     if (!isFormatted) {
-      console.log(
-        `/correct: Error - The date ${dateOption} is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
-      );
-      return interaction.reply(
+      return handleResponse(
+        interaction,
         `Error - The date **${dateOption}** is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
       );
     }
 
     // Check if the date is valid (lands on a Wednesday)
     if (dayjs(dateOption).day() !== 3) {
-      console.log(
-        `/correct: Error - The date ${dateOption} is not valid. Make sure that the day lands on a Wednesday`
-      );
-      return interaction.reply(
+      return handleResponse(
+        interaction,
         `Error - The date **${dateOption}** is not valid. Make sure that the day lands on a Wednesday`
-      );
+      )
     }
 
     // Find the user with the specified character
-    const user = await findUserByCharacter(characterOption, interaction);
+    const user = await findUserByCharacter(interaction, characterOption);
     if (!user) return;
 
     // Check if the character has a score on the given date
@@ -128,19 +127,15 @@ module.exports = {
 
     // Handle responses
     if (scoreExists) {
-      console.log(
-        `/correct: ${characterOption}'s score has been updated to ${scoreOption} for the week of ${dateOption}`
-      );
-      interaction.reply(
+      return handleResponse(
+        interaction,
         `${characterOption}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`
-      );
+      )
     } else {
-      console.log(
-        `/correct: ${characterOption}'s score of ${scoreOption} has been created for the week of ${dateOption}`
-      );
-      interaction.reply(
-        `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
-      );
+      return handleResponse(
+        interaction,
+         `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
+      )
     }
   },
 };
