@@ -1,10 +1,7 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const fs = require("fs");
 const culvertSchema = require("../../culvertSchema.js");
-const {
-  getResetDates,
-  handleResponse,
-} = require("../../utility/culvertUtils.js");
+const { getResetDates } = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -89,7 +86,7 @@ module.exports = {
     const attachment = new AttachmentBuilder(`./culvert-${weekOption}.json`);
 
     // Handle responses
-    interaction.reply({
+    return interaction.reply({
       content: `${
         missedCharactersArray.length !== 0
           ? `**${allCharacters.length - missedCharactersArray.length}/${

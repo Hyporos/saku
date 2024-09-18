@@ -1,10 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
-const {
-  findUserByCharacter,
-  handleResponse,
-} = require("../../utility/culvertUtils.js");
+const { findUserByCharacter } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -43,16 +40,14 @@ module.exports = {
     const isFormatted = /^\d{4}-\d{2}-\d{2}$/.test(dateOption);
 
     if (!isFormatted) {
-      return handleResponse(
-        interaction,
+      return interaction.reply(
         `Error - The date **${dateOption}** is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
       );
     }
 
     // Check if the date is valid (lands on a Wednesday)
     if (dayjs(dateOption).day() !== 3) {
-      return handleResponse(
-        interaction,
+      return interaction.reply(
         `Error - The date **${dateOption}** is not valid. Make sure that the day lands on a Wednesday`
       );
     }
@@ -127,13 +122,11 @@ module.exports = {
 
     // Handle responses
     if (scoreExists) {
-      return handleResponse(
-        interaction,
+      return interaction.reply(
         `${characterOption}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`
       );
     } else {
-      return handleResponse(
-        interaction,
+      return interaction.reply(
         `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
       );
     }

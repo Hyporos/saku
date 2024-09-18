@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const fs = require("fs");
 const culvertSchema = require("../../culvertSchema.js");
-const { handleResponse } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -72,14 +71,13 @@ module.exports = {
       const attachment = new AttachmentBuilder("./culvert.csv");
 
       // Handle responses
-      handleResponse(interaction, {
+      return interaction.reply({
         content: "Data has been successfully exported",
         files: [attachment],
       });
     } catch (error) {
       console.log(error);
-      handleResponse(
-        interaction,
+      return interaction.reply(
         "Error - Data could not be successfully exported"
       );
     }

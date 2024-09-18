@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
 const exceptionSchema = require("../../exceptionSchema.js");
-const { handleResponse } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -39,8 +38,7 @@ module.exports = {
     });
 
     if (exceptionExists) {
-      return handleResponse(
-        interaction,
+      return interaction.reply(
         `Error - The exception **${exceptionOption}** has already been made`
       );
     }
@@ -52,8 +50,7 @@ module.exports = {
     });
 
     // Handle responses
-    return handleResponse(
-      interaction,
+    return interaction.reply(
       `**${exceptionOption}** has been set as an exception for **${nameOption}**`
     );
   },

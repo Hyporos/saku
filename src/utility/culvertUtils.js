@@ -57,41 +57,4 @@ function getResetDates() {
   return { reset, lastReset, nextReset };
 }
 
-/**
- * Logs a message to the console and sends a reply to the Discord channel.
- *
- * @param {Object} interaction - The interaction object from Discord.js.
- * @param {string|Object} message - The message or object to be sent and logged.
- */
-
-function handleResponse(interaction, message, customLogMessage) {
-  // Determine if `message` is an object
-  if (typeof message === "object") {
-    // Extract relevant properties, if present
-    const { content, files, embeds, components, ephemeral } = message;
-
-    // Use the custom log message if provided, otherwise use the content
-    const logMessage = `/${interaction.commandName}: ${
-      customLogMessage || (content ? content.replace(/\*/g, "") : "")
-    }`;
-
-    console.log(logMessage);
-    interaction.reply({
-      content: content || "",
-      files: files || [],
-      embeds: embeds || [],
-      components: components || [],
-      ephemeral: ephemeral || false,
-    });
-  } else {
-    // Handle the case where `message` is a string
-    const logMessage = `/${interaction.commandName}: ${
-      customLogMessage || message.replace(/\*/g, "")
-    }`;
-
-    console.log(logMessage);
-    interaction.reply(message);
-  }
-}
-
-module.exports = { findUserByCharacter, getResetDates, handleResponse };
+module.exports = { findUserByCharacter, getResetDates };
