@@ -77,11 +77,11 @@ module.exports = {
         files: [attachment],
       });
     } catch (error) {
+      console.log(error);
       handleResponse(
         interaction,
         "Error - Data could not be successfully exported"
       );
-      console.log(error);
     }
   },
 };

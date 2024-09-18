@@ -21,30 +21,35 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    const categoryName = interaction.options
+    // Parse the command arguments
+    const categoryOption = interaction.options
       .getString("category", true)
       .toLowerCase();
-    const commandName = interaction.options
+    const commandOption = interaction.options
       .getString("command", true)
       .toLowerCase();
 
-    const command = interaction.client.commands.get(commandName);
+    // Fetch the command name, return if nonexistent 
+    const command = interaction.client.commands.get(commandOption);
 
     if (!command) {
       return interaction.reply(
-        `Error - Could not find the command \`/${commandName}\``
+        `Error - Could not find the command \`/${commandOption}\``
       );
     }
 
+    // Clear the command cache
     delete require.cache[
-      require.resolve(`../${categoryName}/${command.data.name}.js`)
+      require.resolve(`../${categoryOption}/${command.data.name}.js`)
     ];
 
+    // Reload the specified command via deletion / reloading
     try {
       interaction.client.commands.delete(command.data.name);
-      const newCommand = require(`../${categoryName}/${command.data.name}.js`);
+      const newCommand = require(`../${categoryOption}/${command.data.name}.js`);
       interaction.client.commands.set(newCommand.data.name, newCommand);
       
+      // Handle responses
       await interaction.reply(
         `The \`/${newCommand.data.name}\` command was reloaded`
       );
