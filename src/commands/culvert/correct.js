@@ -54,7 +54,7 @@ module.exports = {
       return handleResponse(
         interaction,
         `Error - The date **${dateOption}** is not valid. Make sure that the day lands on a Wednesday`
-      )
+      );
     }
 
     // Find the user with the specified character
@@ -130,12 +130,12 @@ module.exports = {
       return handleResponse(
         interaction,
         `${characterOption}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`
-      )
+      );
     } else {
       return handleResponse(
         interaction,
-         `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
-      )
+        `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
+      );
     }
   },
 };

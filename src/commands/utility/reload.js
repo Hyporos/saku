@@ -29,7 +29,7 @@ module.exports = {
       .getString("command", true)
       .toLowerCase();
 
-    // Fetch the command name, return if nonexistent 
+    // Fetch the command name, return if nonexistent
     const command = interaction.client.commands.get(commandOption);
 
     if (!command) {
@@ -48,7 +48,7 @@ module.exports = {
       interaction.client.commands.delete(command.data.name);
       const newCommand = require(`../${categoryOption}/${command.data.name}.js`);
       interaction.client.commands.set(newCommand.data.name, newCommand);
-      
+
       // Handle responses
       await interaction.reply(
         `The \`/${newCommand.data.name}\` command was reloaded`
