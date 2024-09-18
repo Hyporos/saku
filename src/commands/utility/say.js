@@ -29,7 +29,7 @@ module.exports = {
     const message = interaction.options.getString("message");
     const channel = interaction.options.getChannel("channel");
 
-    // Send the message in the provided channel
+    // Handle responses, in the specified channel
     try {
       await channel.send(message);
       await interaction.reply({
