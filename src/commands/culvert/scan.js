@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const botSchema = require("../../exceptionSchema.js");
+const exceptionSchema = require("../../exceptionSchema.js");
 const { createWorker } = require("tesseract.js");
 const Jimp = require("jimp");
 const dayjs = require("dayjs");
@@ -56,7 +56,7 @@ module.exports = {
 
     // Get the list of character name exceptions
     async function checkExceptions(entryName) {
-      const exceptions = await botSchema.find({});
+      const exceptions = await exceptionSchema.find({});
       // Find the exception. if no exception exists, keep the entry name
 
       const exception = exceptions.find((entry) => entryName.toLowerCase() === entry.exception.toLowerCase());

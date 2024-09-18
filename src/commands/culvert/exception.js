@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const botSchema = require("../../exceptionSchema.js");
+const exceptionSchema = require("../../exceptionSchema.js");
 const { handleResponse } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -31,7 +31,7 @@ module.exports = {
     const exceptionOption = interaction.options.getString("exception");
 
     // Check if the exception has already been made
-    const exceptionExists = await botSchema.exists({
+    const exceptionExists = await exceptionSchema.exists({
       exception: {
         $regex: `^${exceptionOption}$`,
         $options: "i",
@@ -46,7 +46,7 @@ module.exports = {
     }
 
     // Create an exception for the character
-    await botSchema.create({
+    await exceptionSchema.create({
       name: nameOption,
       exception: exceptionOption,
     });
