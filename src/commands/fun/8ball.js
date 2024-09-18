@@ -12,8 +12,10 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    // Parse the command arguments
     const questionOption = interaction.options.getString("question");
 
+    // Create lists of possible responses
     const positive = [
       "Definitely.",
       "It is certain.",
@@ -41,6 +43,7 @@ module.exports = {
       `Miche says, "No."`,
     ];
 
+    // Pick a random response from the lists
     function getRandomElement(arr) {
       return arr[Math.floor(Math.random() * arr.length)];
     }
@@ -56,7 +59,7 @@ module.exports = {
         response = getRandomElement(positive);
       } else if (rand < 2 / 3) {
         // Vague (1/3 chance)
-        embedColor = 0xFFCB80;
+        embedColor = 0xffcb80;
         response = getRandomElement(vague);
       } else {
         // Negative (1/3 chance)
@@ -74,6 +77,7 @@ module.exports = {
       .setTitle(questionOption)
       .setDescription(":8ball: " + response);
 
+    // Handle responses
     interaction.reply({
       embeds: [embed],
     });
