@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
-const { findUserByCharacter } = require("../../utility/culvertUtils.js");
+const { findUserByCharacter, getCasedName } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -55,6 +55,8 @@ module.exports = {
     // Find the user with the specified character
     const user = await findUserByCharacter(interaction, characterOption);
     if (!user) return;
+
+    const characterNameCased = await getCasedName(characterOption);
 
     // Check if the character has a score on the given date
     const scoreExists = user.characters
@@ -121,14 +123,14 @@ module.exports = {
     }
 
     // Handle responses
+    let content;
+
     if (scoreExists) {
-      return interaction.reply(
-        `${characterOption}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`
-      );
+      content = `${characterNameCased}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`;
     } else {
-      return interaction.reply(
-        `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
-      );
+      content = `${characterNameCased}'s score of **${scoreOption}** has been created for the week of ${dateOption}`;
     }
+
+    return interaction.reply(content);
   },
 };

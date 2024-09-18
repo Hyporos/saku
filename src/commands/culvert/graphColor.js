@@ -13,9 +13,9 @@ module.exports = {
         .setDescription("The new color of the graph area (default: pink)")
         .setRequired(true)
         .addChoices(
-          { name: "Blue", value: "blue" },
-          { name: "Purple", value: "purple" },
           { name: "Pink", value: "pink" },
+          { name: "Purple", value: "purple" },
+          { name: "Blue", value: "blue" },
           { name: "Red", value: "red" },
           { name: "Orange", value: "orange" },
           { name: "Yellow", value: "yellow" },
@@ -32,9 +32,9 @@ module.exports = {
     // Get the RGB values for the selected color
     function getGraphColor(color) {
       const colorMap = {
-        blue: "31,119,180",
-        purple: "145,68,207",
         pink: "255,189,213",
+        purple: "145,68,207",
+        blue: "31,119,180",
         red: "189,36,36",
         orange: "214,110,45",
         yellow: "180,170,31",
@@ -50,7 +50,7 @@ module.exports = {
       { $set: { graphColor: getGraphColor(colorOption) } }
     );
 
-    // Display user responses
+    // Handle responses
     let content;
 
     if (user.graphColor === getGraphColor(colorOption)) {
@@ -59,6 +59,6 @@ module.exports = {
       content = `Your graph color has been changed to ${colorOption}`;
     }
 
-    interaction.reply({ content, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   },
 };
