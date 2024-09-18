@@ -23,6 +23,10 @@ module.exports = {
         "Saw a corgi at work today, pretty sure it was just Dannis there to bless me tho. Thank you Dannis.",
         "please my goat dannis who should be in the hall of legends instead of faker please bless me with a pitched drop that i need on this blessed weekend",
         "Dear king Dannis, Please bless me with atleast 1 pb this week I am just but a humble peasent who wishes to arise to your nobel status. From - Your most devoted follower",
+        "I am here to acquire Lord Dannis Corgithy Charles the 1st's blessing for my pitched drop tonight :prayge:",
+        "I saw dannis in game last night. This must be a sign",
+        "please lord dannis grant me some pitched i need some help to catch up with saku culvert requirement increase :PepeHands:",
+        "Dannis I've been a good boy this week please bless me"
       ];
 
       return phrases[Math.floor(Math.random() * phrases.length)];

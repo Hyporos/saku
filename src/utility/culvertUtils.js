@@ -11,23 +11,61 @@ dayjs.extend(updateLocale);
  * Finds a user object based on the given character name
  *
  * @param {Object} interaction - The interaction object from Discord.js.
- * @param {string} characterOption - The character name to be used for the query.
+ * @param {string} characterName - The character name to be used for the query.
  */
 
-async function findUserByCharacter(interaction, characterOption) {
+async function findUserByCharacter(interaction, characterName) {
   const user = await culvertSchema.findOne({
-    "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
+    "characters.name": { $regex: `^${characterName}$`, $options: "i" },
   });
 
   if (!user) {
     await interaction.reply(
-      `Error - The character **${characterOption}** has not yet been linked`
+      `Error - The character **${characterName}** is not linked to any user`
     );
     return null;
   }
 
   return user;
 }
+
+/**
+ * Check if a character already exists in the database (is linked to a user)
+ *
+ * @param {Object} interaction - The interaction object from Discord.js.
+ * @param {string} characterName - The character name to be used for the query.
+ */
+
+async function isCharacterLinked(interaction, characterName) {
+  const characterLinked = await culvertSchema.exists({
+    "characters.name": { $regex: `^${characterName}$`, $options: "i" },
+  })
+
+  if (!characterLinked) {
+    await interaction.reply(
+      `Error - The character **${characterName}** is not linked to any user`
+    );
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Return the properly cased name of a character
+ *
+ * @param {string} characterName - The character name to be used for the query.
+ */
+
+async function getCasedName(characterName) {
+  const casedName = await culvertSchema.findOne(
+    { "characters.name": { $regex: `^${characterName}$`, $options: "i" } },
+    { "characters.$": 1 }
+  );
+
+  return casedName.characters[0].name;
+}
+
 
 /**
  * Gets the current reset and last reset dates based on the day of Wednesday.
@@ -57,4 +95,4 @@ function getResetDates() {
   return { reset, lastReset, nextReset };
 }
 
-module.exports = { findUserByCharacter, getResetDates };
+module.exports = { findUserByCharacter, isCharacterLinked, getCasedName, getResetDates };

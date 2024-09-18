@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const { isCharacterLinked, getCasedName } = require("../../utility/culvertUtils.js")
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -21,15 +22,10 @@ module.exports = {
     const characterOption = interaction.options.getString("character");
 
     // Check if the character is already linked to a user
-    const characterLinked = await culvertSchema.exists({
-      "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
-    });
+    const characterLinked = await isCharacterLinked(interaction, characterOption);
+    if (!characterLinked) return;
 
-    if (!characterLinked) {
-      return interaction.reply(
-        `Error - The character **${characterOption}** is not linked to any user`
-      );
-    }
+    const characterNameCased = await getCasedName(characterOption);
 
     // Remove the character from the database
     await culvertSchema.findOneAndUpdate(
@@ -46,8 +42,9 @@ module.exports = {
       }
     );
 
+    // Handle responses
     interaction.reply(
-      `Unlinked and removed all of **${characterOption}**'s scores from the database` //TODO: Make this display the real name
+      `Unlinked and removed all of **${characterNameCased}**'s scores from the database` //TODO: Make this display the real name
     );
   },
 };
