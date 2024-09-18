@@ -13,29 +13,26 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-
-    try {
-      const result = await culvertSchema.updateMany(
-        { 'characters.scores.date': '2024-09-08' },
-        {
-          $set: {
-            'characters.$[char].scores.$[score].date': '2024-09-11',
+      try {
+        const result = await culvertSchema.updateMany(
+          { 'characters.scores.date': '2024-09-15' },
+          {
+            $pull: {
+              'characters.$[char].scores': { date: '2024-09-15' }
+            }
           },
-        },
-        {
-          arrayFilters: [
-            { 'char.scores.date': '2024-09-08' },
-            { 'score.date': '2024-09-08' }
-          ],
-          multi: true // Apply update to all matching documents
-        }
-      );
-      
-      console.log('Update Result:', result);
-    } catch (error) {
-      console.error('Error updating scores:', error);
-    }
-
-      interaction.reply("command executed. idk if succesful or not");
+          {
+            arrayFilters: [
+              { 'char.scores.date': '2024-09-15' }
+            ]
+          }
+        );
+        
+        console.log('Update Result:', result);
+        interaction.reply("Scores with the date of 2024-09-15 have been deleted.");
+      } catch (error) {
+        console.error('Error updating scores:', error);
+        interaction.reply("An error occurred while processing the command.");
+      }
   },
 };
