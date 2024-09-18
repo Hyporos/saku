@@ -59,7 +59,7 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    // Get parameter options
+    // Parse the command arguments
     const selectedCommand = interaction.options.getString("command");
 
     // Check if the sender is a Bee
@@ -70,6 +70,7 @@ module.exports = {
     // Get command info
     function getCommandInfo(type) {
       if (type === "description") {
+        // Get the description for the command
         switch (selectedCommand) {
           case "gpq":
             return "Log a culvert score for one of your characters. The score will be set to the Wednesday of this week (weekly reset)";
@@ -89,8 +90,8 @@ module.exports = {
             return "Rename a character. All stats and character info will remain.";
           case "correct":
             return "Edit or create a new score for a character. If the date does not exist, a new one will be created. The score must be in the 'YYYY-MM-DD' format.";
-            case "exception":
-              return "Add a character exception to /scan. If a name is being incorrectly read by the bot, you can add an exception (alternative name) for the bot to recognize.";
+          case "exception":
+            return "Add a character exception to /scan. If a name is being incorrectly read by the bot, you can add an exception (alternative name) for the bot to recognize.";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert.";
           case "finalize":
@@ -101,14 +102,15 @@ module.exports = {
             return "Export a .csv containing all members scores along with their dates. This file can be imported into Excel or Sheets for viewing.";
           case "roll":
             return "Roll a number between 1 and 100";
-            case "8ball":
-              return "Seek advice from the Magic 8 Ball";
+          case "8ball":
+            return "Seek advice from the Magic 8 Ball";
           case "help":
             return "Display a list of all commands. You can choose to use /help followed by a command name to view more details about that particular command. Did you really just do /help help?";
           case "ping":
             return "Check Saku's response time. It will display both the latency and API ping.";
         }
       } else if (type === "parameters") {
+        // Get the argument information for the command
         switch (selectedCommand) {
           case "gpq":
             return `\u0060[character]\u0060 - The character that the score will be logged to\n\u0060[score]\u0060 - The score to be logged`;
@@ -128,7 +130,7 @@ module.exports = {
             return `\u0060[old_name]\u0060 - The character to be renamed\n\u0060[new_name]\u0060 - The new name to set for this character`;
           case "correct":
             return `\u0060[character]\u0060 - The character to be corrected\n\u0060[date]\u0060 - The date of the score\n\u0060[score]\u0060 - The new score to submit`;
-            case "exception":
+          case "exception":
             return `\u0060[name]\u0060 - The name of the character\n\u0060[exception]\u0060 - The alternative name, which is being incorrectly scanned`;
           case "scan":
             return `\u0060[week]\u0060 - Submit the scores for either the current or the last week`;
@@ -140,8 +142,8 @@ module.exports = {
             return `None`;
           case "roll":
             return `None`;
-            case "8ball":
-              return `\u0060[question]\u0060 - Your question, to be answered by the Magic 8 Ball`;
+          case "8ball":
+            return `\u0060[question]\u0060 - Your question, to be answered by the Magic 8 Ball`;
           case "help":
             return `\u0060[command]\u0060 - The command to view in depth`;
           case "ping":
@@ -150,7 +152,7 @@ module.exports = {
       }
     }
 
-    // Create the general help embed
+    // Create an embed for general /help commands
     const help = new EmbedBuilder()
       .setColor(0xffc3c5)
       .setAuthor({
@@ -172,7 +174,7 @@ module.exports = {
       .addFields({ name: "Fun", value: "`roll`, `8ball`" })
       .addFields({ name: "Utility", value: "`help`, `ping`" });
 
-    // Create the specific help embed
+    // Create a /help embed for the specified command
     const specificHelp = new EmbedBuilder()
       .setColor(0xffc3c5)
       .setAuthor({
@@ -187,7 +189,7 @@ module.exports = {
         value: `${getCommandInfo("parameters")}`,
       });
 
-    // Display responses
+    // Handle responses
     let response = "";
 
     if (!getCommandInfo("description") && selectedCommand !== null) {
