@@ -30,10 +30,10 @@ module.exports = {
       "44.234.162.100", "44.234.161.69", "44.234.162.145", "44.234.162.130",
     ];
 
-    const port = 8585; // Port to connect to
+    const port = 8585;
     const pingResults = [];
     
-    // Function to process the TCP connection
+    // Process the TCP connection and display latency statistics
     function processConnection(index, startTime, error) {
       const latency = Date.now() - startTime;
 
@@ -58,10 +58,10 @@ module.exports = {
       const startTime = Date.now();
       const socket = new net.Socket();
 
-      socket.setTimeout(3000); // 3 seconds timeout
+      socket.setTimeout(3000);
 
       socket.on("connect", () => {
-        processConnection(index + 1, startTime, null); // Use index + 1 for 1-based indexing
+        processConnection(index + 1, startTime, null); 
         socket.destroy();
       });
 

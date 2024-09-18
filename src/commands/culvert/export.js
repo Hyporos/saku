@@ -76,7 +76,7 @@ module.exports = {
         files: [attachment],
       });
     } catch (error) {
-      console.log(error);
+      console.error("Error - Data could not be successfully exported", error);
       return interaction.reply(
         "Error - Data could not be successfully exported"
       );
