@@ -30,7 +30,7 @@ module.exports = {
 
     // Handle responses
     interaction.reply({
-      content: randomPhrase(number),
+      content: randomPhrase(),
     });
   },
 };
