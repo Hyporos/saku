@@ -14,7 +14,7 @@ module.exports = {
   async execute(interaction) {
     // Last reset
     dayjs.updateLocale("en", {
-      weekStart: 1,
+      weekStart: 4,
     });
 
     // Define the date for which to check scores
@@ -43,7 +43,7 @@ module.exports = {
     // Track user IDs to ensure only the first valid character is included
     const userSeen = new Set();
 
-    // Filter characters that have a score on the last Sunday and exclude those with the Bee role
+    // Filter characters that have a score on the last Wednesday and exclude those with the Bee role
     users.forEach((user) => {
       const { characters } = user;
       const userId = user._id.toString(); // Assuming _id is their Discord ID
@@ -74,7 +74,7 @@ module.exports = {
     // Pick the first 7 random characters (no need to check for duplicate IDs)
     const selectedCharacters = shuffled.slice(0, 7);
 
-    // Prepare reply message displaying the character's score from last Sunday
+    // Prepare reply message displaying the character's score from last Wednesday
     const replyMessage = selectedCharacters
       .map((user, index) => {
         const { characters, lastSundayScore } = user;

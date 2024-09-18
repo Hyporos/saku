@@ -65,9 +65,9 @@ module.exports = {
       interaction.member.roles.cache.has("720001044746076181") ||
       interaction.user.id === "631337640754675725";
 
-    // Day of the week the culvert score gets reset (Monday 12:00 AM UTC)
+    // Day of the week the culvert score gets reset (Thursday 12:00 AM UTC)
     dayjs.updateLocale("en", {
-      weekStart: 1,
+      weekStart: 4,
     });
 
     const reset = dayjs()

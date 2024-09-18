@@ -67,7 +67,7 @@ module.exports = {
 
     // Last reset
     dayjs.updateLocale("en", {
-      weekStart: 1,
+      weekStart: 4,
     });
 
     const lastReset = dayjs()

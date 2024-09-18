@@ -37,9 +37,9 @@ module.exports = {
     let weekOption = interaction.options.getString("week");
     const overrideOption = interaction.options.getBoolean("override") || false;
 
-    // Set the day of the week that the culvert score gets reset (Sunday)
+    // Set the day of the week that the culvert score gets reset (Wednesday)
     dayjs.updateLocale("en", {
-      weekStart: 1,
+      weekStart: 4,
     });
 
     const reset = dayjs()
