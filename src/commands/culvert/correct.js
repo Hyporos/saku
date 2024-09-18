@@ -126,7 +126,7 @@ module.exports = {
       );
     }
 
-    // Display user responses
+    // Handle responses
     if (scoreExists) {
       console.log(
         `/correct: ${characterOption}'s score has been updated to ${scoreOption} for the week of ${dateOption}`
