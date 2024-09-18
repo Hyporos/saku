@@ -28,11 +28,12 @@ module.exports = {
         "correct",
         "exception",
         "scan",
+        "giveaway",
         "finalize",
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "rename", "correct", "exception", "scan", "finalize", "wos", "say", "export"];
+      const beeCommands = ["link", "unlink", "rename", "correct", "exception", "scan", "giveaway", "finalize", "wos", "say", "export"];
       const ownerCommands = ["reload"];
 
       if (

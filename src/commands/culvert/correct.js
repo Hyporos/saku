@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const dayjs = require ("dayjs");
+const dayjs = require("dayjs");
+const { findUserByCharacter } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -35,47 +36,42 @@ module.exports = {
     const dateOption = interaction.options.getString("date");
     const scoreOption = interaction.options.getInteger("score");
 
-    // Check if the date is valid (formatted properly, falls on a sunday)
-    const dateFormat = /^\d{4}-\d{2}-\d{2}$/;
-    const isFormatted = dateFormat.test(dateOption);
-
-    const isSunday = dayjs(dateOption).day() === 0;
+    // Check if the date is valid (formatted properly)
+    const isFormatted = /^\d{4}-\d{2}-\d{2}$/.test(dateOption);
 
     if (!isFormatted) {
+      console.log(
+        `/correct: Error - The date ${dateOption} is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
+      );
       return interaction.reply(
         `Error - The date **${dateOption}** is not valid. Make sure that it follows the 'YYYY-MM-DD' format`
       );
     }
 
-    if (!isSunday) {
+    // Check if the date is valid (lands on a Wednesday)
+    if (dayjs(dateOption).day() !== 3) {
+      console.log(
+        `/correct: Error - The date ${dateOption} is not valid. Make sure that the day lands on a Wednesday`
+      );
       return interaction.reply(
-        `Error - The date **${dateOption}** is not valid. Make sure that the day lands on a sunday`
+        `Error - The date **${dateOption}** is not valid. Make sure that the day lands on a Wednesday`
       );
     }
 
     // Find the user with the specified character
-    const user = await culvertSchema.findOne({
-      "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
-    });
-
-    if (!user) {
-      return interaction.reply(
-        `Error - The character **${characterOption}** has not yet been linked`
-      );
-    }
+    const user = await findUserByCharacter(characterOption, interaction);
+    if (!user) return;
 
     // Check if the character has a score on the given date
-    const character = user.characters.find(
-      (char) => char.name.toLowerCase() === characterOption.toLowerCase()
-    );
-
-    const scoreExists = character.scores.find(
-      (score) => score.date === dateOption
-    );
+    const scoreExists = user.characters
+      .find(
+        (character) =>
+          character.name.toLowerCase() === characterOption.toLowerCase()
+      )
+      ?.scores.find((score) => score.date === dateOption);
 
     // Create or update an existing score on the selected character
     if (scoreExists) {
-      console.log("Score exists, updating previous score");
       await culvertSchema.findOneAndUpdate(
         {
           "characters.name": {
@@ -102,7 +98,6 @@ module.exports = {
         }
       );
     } else {
-      console.log("No score found, creating a new one");
       await culvertSchema.findOneAndUpdate(
         {
           "characters.name": {
@@ -132,8 +127,20 @@ module.exports = {
     }
 
     // Display user responses
-    interaction.reply(
-      `${characterOption}'s score has been set to **${scoreOption}** for the week of ${dateOption}`
-    );
+    if (scoreExists) {
+      console.log(
+        `/correct: ${characterOption}'s score has been updated to ${scoreOption} for the week of ${dateOption}`
+      );
+      interaction.reply(
+        `${characterOption}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`
+      );
+    } else {
+      console.log(
+        `/correct: ${characterOption}'s score of ${scoreOption} has been created for the week of ${dateOption}`
+      );
+      interaction.reply(
+        `${characterOption}'s score of **${scoreOption}** has been created for the week of ${dateOption}`
+      );
+    }
   },
 };
