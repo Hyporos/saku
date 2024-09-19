@@ -6,7 +6,10 @@ const {
   ActionRowBuilder,
   ComponentType,
 } = require("discord.js");
-const culvertSchema = require("../../culvertSchema.js");
+const {
+  getAllCharacters,
+  getResetDates,
+} = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const updateLocale = require("dayjs/plugin/updateLocale");
@@ -26,27 +29,28 @@ module.exports = {
         .setRequired(true)
         .addChoices(
           { name: "Weekly", value: "weekly" },
-          { name: "Lifetime", value: "lifetime" }
+          { name: "Yearly", value: "yearly" }
         )
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
+    // Parse the command arguments
     const category = interaction.options.getString("timeframe");
 
     // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
 
-    // Create buttons & row
+    // Create pagination buttons and action row
     const previous = new ButtonBuilder()
       .setCustomId("previous")
-      .setEmoji("<:singleleftchevron:1193783932366372907>")
+      .setEmoji("<:singleleftchevron:1286237594707038220>")
       .setStyle(ButtonStyle.Primary);
 
     const next = new ButtonBuilder()
       .setCustomId("next")
-      .setEmoji("<:singlerightchevron:1193783934052470835>")
+      .setEmoji("<:singlerightchevron:1286237595629649970>")
       .setStyle(ButtonStyle.Primary);
 
     const first = new ButtonBuilder()
@@ -66,95 +70,74 @@ module.exports = {
       last
     );
 
-    // Last reset
-    dayjs.updateLocale("en", {
-      weekStart: 4,
-    });
+    // Get the last reset and next reset dates (Thursday 12:00 AM UTC)
+    const { lastReset, nextReset } = getResetDates();
 
-    const lastReset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(8, "day")
-      .format("YYYY-MM-DD");
-
-    const nextReset = dayjs().utc().startOf("week").add(7, "day");
-
-    // Find the name of all characters
-    const users = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-    ]);
-
-    // Calculate the sum of lifetime character scores
-    let lifetimeList = [];
-
-    for (const user of users) {
-      let totalScore = 0;
-
-      for (const scoreObject of user.characters?.scores) {
-        totalScore += scoreObject.score;
-      }
-
-      lifetimeList.push({
-        name: user.characters.name,
-        score: totalScore,
-      });
-    }
-
-    // Sort the array of lifetime scores
-    lifetimeList.sort((a, b) => {
-      if (a.score === undefined) {
-        return 1;
-      }
-      if (b.score === undefined) {
-        // make this return (b.score ?? 0) - (a.score ?? 0)
-        return -1;
-      }
-      return b.score - a.score;
-    });
+    // Get a list of all currently linked characters
+    const characterList = await getAllCharacters();
 
     // Calculate the sum of weekly character scores
-    let weeklyList = [];
-
-    for (const user of users) {
-      const scoreObject = user.characters.scores.find(
+    const weeklyScoresList = characterList.reduce((list, character) => {
+      const scoreInput = character.scores.find(
         (score) => score.date === lastReset
       );
 
-      if (scoreObject) {
-        weeklyList.push({
-          name: user.characters.name,
-          score: scoreObject.score,
+      if (scoreInput) {
+        list.push({
+          name: character.name,
+          score: scoreInput.score, // TODO: make this score ?? 0
         });
       } else {
-        weeklyList.push({
-          name: user.characters.name,
+        list.push({
+          name: character.name,
           score: 0,
         });
       }
-    }
 
-    // Sort the array of weekly scores
-    weeklyList.sort((a, b) => {
-      if (a.score === undefined) {
-        return 1;
-      }
-      if (b.score === undefined) {
-        return -1;
-      }
+      return list;
+    }, []);
+
+    // Sort the list of characters in ascending order (weekly score)
+    weeklyScoresList.sort((a, b) => {
+      if (a.score === undefined) return 1;
+      if (b.score === undefined) return -1;
+
       return b.score - a.score;
     });
 
-    // Initialize embed variables
-    let firstRank = 0;
-    let lastRank = 8;
-    let page = 1;
-    let placement = 1;
-    const maxPage = Math.ceil(lifetimeList.length / 8);
+    // Set placements for each character, based on weekly scores
+    weeklyScoresList.forEach((character, index) => {
+      character.placement = index + 1;
+    });
 
-    // Handle update time
-    function getUpdateTime() {
+    // Create the weekly rankings list embed field
+    let firstPlacement = 0;
+    let lastPlacement = 8;
+
+    function getWeeklyRankings() {
+      let content = "\u0060\u0060\u0060";
+
+      for (let i = firstPlacement; i < lastPlacement; i++) {
+        const character = weeklyScoresList[i];
+        if (!character?.name) break;
+
+        // Adjust text padding based on placement length
+        let padding = 20;
+        if (character.placement > 99) padding = 18;
+        if (character.placement > 9) padding = 19;
+
+        const characterInfo = `${character.placement}. ${weeklyScoresList[
+          i
+        ].name.padEnd(padding, " ")}${
+          weeklyScoresList[i].score?.toLocaleString() || 0
+        }\n`;
+        content += characterInfo;
+      }
+      return content.concat("\u0060\u0060\u0060");
+    }
+
+    // Get the time remaining until the next weekly update
+    function getWeeklyUpdateTime() {
       const nextUpdateDays = dayjs(nextReset).diff(dayjs().utc(), "day");
       const nextUpdateHours = dayjs(nextReset).diff(dayjs().utc(), "hour");
       const nextUpdateMinutes = dayjs(nextReset).diff(dayjs().utc(), "minute");
@@ -168,119 +151,134 @@ module.exports = {
       }
     }
 
-    // Create the lifetime rankings list embed field
-    function getLifetimeRank() {
+    // Create a list of characters with their yearly scores
+    const yearlyScoresList = characterList.reduce((list, character) => {
+      // Sort the character scores, most recent first
+      const sortedScores = character.scores.sort((a, b) => b.date - a.date);
+    
+      // Get the last 52 scores (one year)
+      const recentScores = sortedScores.slice(0, 52);
+    
+      const totalScore = recentScores.reduce(
+        (sum, scoreInput) => sum + scoreInput.score,
+        0
+      );
+    
+      list.push({
+        name: character.name,
+        score: totalScore,
+      });
+    
+      return list;
+    }, []);
+
+    // Sort the list of characters in ascending order (yearly score)
+    yearlyScoresList.sort((a, b) => {
+      if (a.score === undefined) return 1;
+      if (b.score === undefined) return -1;
+
+      return b.score - a.score;
+    });
+
+    // Set placements for each character, based on yearly scores
+    yearlyScoresList.forEach((character, index) => {
+      character.placement = index + 1;
+    });
+
+    // Create the placement fields for the yearly ranking list
+    function getYearlyRankings() {
       let content = "\u0060\u0060\u0060";
 
-      let padding = 20;
+      for (let i = firstPlacement; i < lastPlacement; i++) {
+        const character = yearlyScoresList[i];
+        if (!character?.name) break;
 
-      for (let i = firstRank; i < lastRank; i++) {
-        if (placement > 9) padding = 19; // Adjust padding based on placement length
-        if (placement > 99) padding = 18;
-        if (lifetimeList[i]?.name) {
-          content = content.concat(
-            `${placement}. ${lifetimeList[i].name.padEnd(padding, " ")}${
-              lifetimeList[i].score?.toLocaleString("en-US") || 0
-            }\n`
-          );
-        }
+        // Adjust text padding based on placement length
+        let padding = 20;
+        if (character.placement > 99) padding = 18;
+        if (character.placement > 9) padding = 19;
 
-        placement++;
+        const characterInfo = `${character.placement}. ${yearlyScoresList[
+          i
+        ].name.padEnd(padding, " ")}${
+          yearlyScoresList[i].score?.toLocaleString() || 0
+        }\n`;
+        content += characterInfo;
       }
       return content.concat("\u0060\u0060\u0060");
     }
 
-    // Create the weekly rankings list embed field
-    function getWeeklyRank() {
-      let content = "\u0060\u0060\u0060";
+    // Original embed
+    let page = 1;
+    const maxPage = Math.ceil(yearlyScoresList.length / 8);
 
-      let padding = 20;
-
-      for (let i = firstRank; i < lastRank; i++) {
-        if (placement > 9) padding = 19; // Adjust padding based on placement length
-        if (placement > 99) padding = 18;
-        if (weeklyList[i]?.name) {
-          content = content.concat(
-            `${placement}. ${weeklyList[i].name.padEnd(padding, " ")}${
-              weeklyList[i].score?.toLocaleString("en-US") || 0
-            }\n`
-          );
-        }
-
-        placement++;
-      }
-      return content.concat("\u0060\u0060\u0060");
+    function createRankingsEmbed(page, maxPage) {
+      return new EmbedBuilder()
+        .setColor(0xffc3c5)
+        .setAuthor({ name: "Culvert Rankings" })
+        .addFields({
+          name: `${
+            category === "weekly"
+              ? `Weekly Score (${lastReset})`
+              : "Yearly Score (Last 52 weeks)"
+          }`,
+          value: `${
+            category === "weekly" ? getWeeklyRankings() : getYearlyRankings()
+          }`,
+          inline: false,
+        })
+        .setFooter({
+          text: `Page ${page}/${maxPage} ${
+            category === "weekly" ? `• Updates in ${getWeeklyUpdateTime()}` : ""
+          }`,
+        });
     }
 
+    // Disable the first/previous buttons on initial render
     if (page === 1) {
       first.setDisabled(true);
       previous.setDisabled(true);
     }
 
-    // Original embed
-    const rankings = new EmbedBuilder()
-      .setColor(0xffc3c5)
-      .setAuthor({ name: "Culvert Rankings" })
-      .addFields({
-        name: `${
-          category === "weekly"
-            ? `Weekly Score (${lastReset})`
-            : "Lifetime Score"
-        }`,
-        value: `${category === "weekly" ? getWeeklyRank() : getLifetimeRank()}`,
-        inline: false,
-      })
-      .setFooter({
-        text: `Page ${page}/${maxPage} ${
-          category === "weekly" ? `• Updates in ${getUpdateTime()}` : ""
-        }`,
-      });
-
-    // Display responses via button collector
+    // Display the initial ranking embed
     const response = await interaction.editReply({
-      embeds: [rankings],
+      embeds: [createRankingsEmbed(page, maxPage)],
       components: [pagination],
     });
 
-    const filter = (i) => i.user.id === interaction.user.id;
-
+    // Create a collector to handle the pagination buttons
     const collector = response.createMessageComponentCollector({
       componentType: ComponentType.Button,
-      filter,
-      idle: 120000,
+      filter: (i) => i.user.id === interaction.user.id, // Only allow the initiator of the command to use the buttons
+      idle: 120000, // After 2 minutes, turn off the buttons
     });
 
+    // Handle button presses via the collector
     collector.on("collect", async (interaction) => {
-      // Handle button presses
+      // Handle pagination, placement accuracy
       if (interaction.customId === "previous") {
-        if (page <= 1) {
-          placement -= 8; // prevent placement from changing
-        } else {
+        if (page > 1) {
           page--;
-          firstRank -= 8;
-          lastRank -= 8;
-          placement -= 16;
+          firstPlacement -= 8;
+          lastPlacement -= 8;
         }
       } else if (interaction.customId === "next") {
-        if (page >= maxPage) {
-          placement -= 8;
-        } else {
+        if (page < maxPage) {
           page++;
-          firstRank += 8;
-          lastRank += 8;
+          firstPlacement += 8;
+          lastPlacement += 8;
         }
       } else if (interaction.customId === "first") {
-        placement = 1;
-        firstRank = 0;
-        lastRank = 8;
         page = 1;
+        firstPlacement = 0;
+        lastPlacement = 8;
       } else if (interaction.customId === "last") {
-        placement += 8 * (maxPage - page - 1);
-        firstRank += 8 * (maxPage - page);
-        lastRank += 8 * (maxPage - page);
         page = maxPage;
+        firstPlacement = maxPage * 8 - 8;
+        lastPlacement = maxPage * 8;
       }
 
+      // Disable buttons if they do not serve any purpose (already at first or last page)
       if (page === 1) {
         first.setDisabled(true);
         previous.setDisabled(true);
@@ -297,70 +295,24 @@ module.exports = {
         next.setDisabled(false);
       }
 
-      // New updated embed object // ! This should not be duplicated
-      const rankingsUpdate = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setAuthor({ name: "Culvert Rankings" })
-        .addFields({
-          name: `${
-            category === "weekly"
-              ? `Weekly Score (${lastReset})`
-              : "Lifetime Score"
-          }`,
-          value: `${
-            category === "weekly" ? getWeeklyRank() : getLifetimeRank()
-          }`,
-          inline: false,
-        })
-        .setFooter({
-          text: `Page ${page}/${maxPage} ${
-            category === "weekly" ? `• Updates in ${getUpdateTime()}` : ""
-          }`,
-        });
-
-      // Display new page
+      // Display the previous/next page
       await interaction.deferUpdate();
 
       await interaction.editReply({
-        embeds: [rankingsUpdate],
+        embeds: [createRankingsEmbed(page, maxPage)],
         components: [pagination],
       });
-
-      return;
     });
 
-    // Disable the buttons after 2 minutes of idling
+    // Handle the end of the collector (after 2 minutes of idle)
     collector.on("end", () => {
       previous.setDisabled(true);
       next.setDisabled(true);
       first.setDisabled(true);
       last.setDisabled(true);
 
-      placement -= 8; // TODO: Figure out why this even goes up +8 when it disables
-
-      // New updated embed object // ! This should not be duplicated
-      const rankingsUpdate = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setAuthor({ name: "Culvert Rankings" })
-        .addFields({
-          name: `${
-            category === "weekly"
-              ? `Weekly Score (${lastReset})`
-              : "Lifetime Score"
-          }`,
-          value: `${
-            category === "weekly" ? getWeeklyRank() : getLifetimeRank()
-          }`,
-          inline: false,
-        })
-        .setFooter({
-          text: `Page ${page}/${maxPage} ${
-            category === "weekly" ? `• Updates in ${getUpdateTime()}` : ""
-          }`,
-        });
-
       interaction.editReply({
-        embeds: [rankingsUpdate],
+        embeds: [createRankingsEmbed(page, maxPage)],
         components: [pagination],
       });
     });

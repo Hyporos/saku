@@ -62,7 +62,7 @@ module.exports = {
     // Get a list of all currently linked characters
     const characterList = await getAllCharacters();
 
-    // Calculate the sum of lifetime character scores
+    // Create a list of characters that have a participation rate the same or lower as the specified rate
     const shameList = characterList.reduce((list, character) => {
       const totalScores = character.scores.length;
       const missedScores = character.scores.filter(
@@ -71,7 +71,6 @@ module.exports = {
 
       const submissionRate = ((totalScores - missedScores) / totalScores) * 100;
 
-      // If submission rate is the same or lower than the specified rate, add character to the wall of shame
       if (submissionRate <= participationRateOption) {
         list.push({
           name: character.name,
@@ -102,7 +101,7 @@ module.exports = {
     let firstPlacement = 0;
     let lastPlacement = 8;
 
-    function getLifetimeRank(duplicate) {
+    function getParticipationRankings() {
       let content = "\u0060\u0060\u0060";
 
       for (let i = firstPlacement; i < lastPlacement; i++) {
@@ -130,17 +129,12 @@ module.exports = {
     let page = 1;
     const maxPage = Math.ceil(shameList.length / 8);
 
-    function createRankingsEmbed(
-      page,
-      maxPage,
-      participationRateOption,
-      duplicate
-    ) {
+    function createWosEmbed(page, maxPage, participationRateOption) {
       return new EmbedBuilder()
         .setColor(0xa30d0e)
         .addFields({
           name: "Wall of Shame",
-          value: `${getLifetimeRank(duplicate)}`,
+          value: `${getParticipationRankings()}`,
           inline: false,
         })
         .setFooter({
@@ -148,11 +142,15 @@ module.exports = {
         });
     }
 
-    // Display the initial ranked embed
+    // Disable the first/previous buttons on initial render
+    if (page === 1) {
+      first.setDisabled(true);
+      previous.setDisabled(true);
+    }
+
+    // Display the initial wos embed
     const response = await interaction.editReply({
-      embeds: [
-        createRankingsEmbed(page, maxPage, participationRateOption, false),
-      ],
+      embeds: [createWosEmbed(page, maxPage, participationRateOption)],
       components: [pagination],
     });
 
@@ -188,26 +186,41 @@ module.exports = {
         lastPlacement = maxPage * 8;
       }
 
+      // Disable buttons if they do not serve any purpose (already at first or last page)
+      if (page === 1) {
+        first.setDisabled(true);
+        previous.setDisabled(true);
+      } else {
+        first.setDisabled(false);
+        previous.setDisabled(false);
+      }
+
+      if (page === maxPage) {
+        last.setDisabled(true);
+        next.setDisabled(true);
+      } else {
+        last.setDisabled(false);
+        next.setDisabled(false);
+      }
+
       // Display the previous/next page
       await interaction.deferUpdate();
 
       await interaction.editReply({
-        embeds: [
-          createRankingsEmbed(page, maxPage, participationRateOption, true),
-        ],
+        embeds: [createWosEmbed(page, maxPage, participationRateOption)],
         components: [pagination],
       });
     });
 
-    // Handle the end of the collector (after 2 minutes)
+    // Handle the end of the collector (after 2 minutes of idle)
     collector.on("end", () => {
       previous.setDisabled(true);
       next.setDisabled(true);
+      first.setDisabled(true);
+      last.setDisabled(true);
 
       interaction.editReply({
-        embeds: [
-          createRankingsEmbed(page, maxPage, participationRateOption, true),
-        ],
+        embeds: [createWosEmbed(page, maxPage, participationRateOption)],
         components: [pagination],
       });
     });
