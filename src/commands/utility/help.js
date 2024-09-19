@@ -97,7 +97,7 @@ module.exports = {
           case "finalize":
             return "View a list of characters that have unsubmitted scores for the given week. Use this to confirm whether or not /scan has missed any characters or if members have left the guild. If successful, a JSON containing all user data will be returned.";
           case "wos":
-            return "View the wall of shame. On the wall there will be a list of users sorted by their participation rate, from lowest to 60%.";
+            return "View the wall of shame. On the wall there will be a list of users sorted by their participation rate, based on the minimum rate provided.";
           case "export":
             return "Export a .csv containing all members scores along with their dates. This file can be imported into Excel or Sheets for viewing.";
           case "roll":
@@ -137,7 +137,7 @@ module.exports = {
           case "finalize":
             return `\u0060[week]\u0060 - Check the scores for either the current or the last week\n\u0060[override]\u0060 - Ignore unsubmitted scores and proceed with finalization`;
           case "wos":
-            return `None`;
+            return `\u0060[participation_rate]\u0060 - The minimum participation rate percentage to filter by`;
           case "export":
             return `None`;
           case "roll":

@@ -35,6 +35,7 @@ module.exports = {
   async execute(interaction) {
     const category = interaction.options.getString("timeframe");
 
+    // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
 
     // Create buttons & row
@@ -264,9 +265,9 @@ module.exports = {
         if (page >= maxPage) {
           placement -= 8;
         } else {
+          page++;
           firstRank += 8;
           lastRank += 8;
-          page++;
         }
       } else if (interaction.customId === "first") {
         placement = 1;

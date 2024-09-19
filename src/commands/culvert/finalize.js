@@ -35,7 +35,7 @@ module.exports = {
     let weekOption = interaction.options.getString("week");
     const overrideOption = interaction.options.getBoolean("override") || false;
 
-    // Get the current reset and last reset dates
+    // Get the current reset and last reset dates (Thursday 12:00 AM UTC)
     const { reset, lastReset } = getResetDates();
     weekOption = weekOption === "this_week" ? reset : lastReset;
 
@@ -86,7 +86,7 @@ module.exports = {
     const attachment = new AttachmentBuilder(`./culvert-${weekOption}.json`);
 
     // Handle responses
-    return interaction.reply({
+    interaction.reply({
       content: `${
         missedCharactersArray.length !== 0
           ? `**${allCharacters.length - missedCharactersArray.length}/${

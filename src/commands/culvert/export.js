@@ -71,7 +71,7 @@ module.exports = {
       const attachment = new AttachmentBuilder("./culvert.csv");
 
       // Handle responses
-      return interaction.reply({
+      interaction.reply({
         content: "Data has been successfully exported",
         files: [attachment],
       });
@@ -79,7 +79,7 @@ module.exports = {
     } catch (error) {
       console.error("Error - Data could not be successfully exported", error);
 
-      return interaction.reply(
+      interaction.reply(
         "Error - Data could not be successfully exported"
       );
     }

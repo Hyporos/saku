@@ -6,187 +6,208 @@ const {
   ActionRowBuilder,
   ComponentType,
 } = require("discord.js");
-const culvertSchema = require("../../culvertSchema.js");
+const { getAllCharacters } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("wos")
-    .setDescription("View the wall of shame..."),
+    .setDescription("View the wall of shame")
+    .addIntegerOption((option) =>
+      option
+        .setName("participation_rate")
+        .setDescription("The minimum participation rate percentage")
+        .setRequired(true)
+    ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
+    // Parse the command arguments
+    const participationRateOption =
+      interaction.options.getInteger("participation_rate") || 0;
+
+    // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
 
-    // Create buttons & row
+    // Create pagination buttons and action row
     const previous = new ButtonBuilder()
       .setCustomId("previous")
-      .setLabel("Prev")
-      .setStyle(ButtonStyle.Secondary);
+      .setEmoji("<:singleleftchevron:1286237594707038220>")
+      .setStyle(ButtonStyle.Primary);
 
     const next = new ButtonBuilder()
       .setCustomId("next")
-      .setLabel("Next")
+      .setEmoji("<:singlerightchevron:1286237595629649970>")
+      .setStyle(ButtonStyle.Primary);
+
+    const first = new ButtonBuilder()
+      .setCustomId("first")
+      .setEmoji("<:doubleleftchevron:1193783344996024350>")
       .setStyle(ButtonStyle.Secondary);
 
-    const pagination = new ActionRowBuilder().addComponents(previous, next);
+    const last = new ButtonBuilder()
+      .setCustomId("last")
+      .setEmoji("<:doublerightchevron:1193783935071682591>")
+      .setStyle(ButtonStyle.Secondary);
 
-    // Find the character with the given name
-    const users = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-    ]);
+    const pagination = new ActionRowBuilder().addComponents(
+      first,
+      previous,
+      next,
+      last
+    );
+
+    // Get a list of all currently linked characters
+    const characterList = await getAllCharacters();
 
     // Calculate the sum of lifetime character scores
-    let shameList = [];
+    const shameList = characterList.reduce((list, character) => {
+      const totalScores = character.scores.length;
+      const missedScores = character.scores.filter(
+        (scoreInput) => scoreInput.score === 0
+      ).length;
 
-    for (const user of users) {
-      const totalScores = user.characters.scores.length;
-      let missedScores = 0;
+      const submissionRate = ((totalScores - missedScores) / totalScores) * 100;
 
-      for (const score of user.characters.scores) {
-        if (score.score === 0) {
-          missedScores++;
-        }
-      }
-
-      if (((totalScores - missedScores) / totalScores) * 100 <= 80) {
-        shameList.push({
-          name: user.characters.name,
-          totalScores: totalScores,
+      // If submission rate is the same or lower than the specified rate, add character to the wall of shame
+      if (submissionRate <= participationRateOption) {
+        list.push({
+          name: character.name,
+          totalScores,
           submittedScores: totalScores - missedScores,
-          rate: Math.round(((totalScores - missedScores) / totalScores) * 100),
+          rate: Math.round(submissionRate),
         });
       }
-    }
 
-    // Sort the array of lifetime scores
+      return list;
+    }, []);
+
+    // Sort the list of characters in ascending order (rate first, then by totalScores)
     shameList.sort((a, b) => {
-      // If the rate is NaN, move it to the back of the list
-      if (isNaN(a.rate)) {
-        return 1;
-      } else if (isNaN(b.rate)) {
-        return -1;
-      }
+      // Place NaN rates at the back of the list
+      if (isNaN(a.rate)) return 1;
+      if (isNaN(b.rate)) return -1;
 
       return a.rate - b.rate || a.totalScores - b.totalScores;
     });
 
-    // Create the wos list embed field
-    let firstRank = 0;
-    let lastRank = 8;
-    let page = 1;
-    let placement = 1;
-    const maxPage = Math.ceil(shameList.length / 8);
+    // Set placements for each character, based on participation rate
+    shameList.forEach((character, index) => {
+      character.placement = index + 1;
+    });
 
-    function getLifetimeRank() {
+    // Create the placement fields for the wall of shame list
+    let firstPlacement = 0;
+    let lastPlacement = 8;
+
+    function getLifetimeRank(duplicate) {
       let content = "\u0060\u0060\u0060";
 
-      let padding = 20;
+      for (let i = firstPlacement; i < lastPlacement; i++) {
+        const character = shameList[i];
+        if (!character?.name) break;
 
-      for (let i = firstRank; i < lastRank; i++) {
-        if (placement > 9) padding = 19; // Adjust padding based on placement length
-        if (placement > 99) padding = 18;
-        if (shameList[i]?.name) {
-          content = content.concat(
-            `${placement}. ${shameList[i].name.padEnd(padding, " ")}${
-              shameList[i].submittedScores
-            }/${shameList[i].totalScores} (${shameList[i].rate}%)\n`
-          );
-        }
-        placement++;
+        // Adjust text padding based on placement length
+        let padding = 20;
+        if (character.placement > 99) padding = 18;
+        if (character.placement > 9) padding = 19;
+
+        const characterInfo = `${character.placement}. ${character.name.padEnd(
+          padding,
+          " "
+        )}${character.submittedScores}/${character.totalScores} (${
+          character.rate
+        }%)\n`;
+
+        content += characterInfo;
       }
       return content.concat("\u0060\u0060\u0060");
     }
 
-    // Original embed
-    const rankings = new EmbedBuilder()
-      .setColor(0xa30d0e)
-      .addFields({
-        name: "Wall of Shame",
-        value: `${getLifetimeRank()}`,
-        inline: false,
-      })
-      .setFooter({ text: `Page ${page}/${maxPage}` });
+    // A function to create the an updated embed for the wall of shame list
+    let page = 1;
+    const maxPage = Math.ceil(shameList.length / 8);
 
-    // Display responses via button collector
-    const response = await interaction.editReply({
-      embeds: [rankings],
-      components: [pagination],
-    });
-
-    const filter = (i) => i.user.id === interaction.user.id;
-
-    const collector = response.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      filter,
-      idle: 120000,
-    });
-
-    collector.on("collect", async (interaction) => {
-      // Handle button presses
-      if (interaction.customId === "previous") {
-        if (page <= 1) {
-          placement -= 8; // prevent placement from changing
-        } else {
-          page--;
-          firstRank -= 8;
-          lastRank -= 8;
-          placement -= 16;
-        }
-      } else if (interaction.customId === "next") {
-        if (page >= maxPage) {
-          placement -= 8;
-        } else {
-          firstRank += 8;
-          lastRank += 8;
-          page++;
-        }
-      }
-
-      // New updated embed object // ! This should not be duplicated
-      const rankingsUpdate = new EmbedBuilder()
+    function createRankingsEmbed(
+      page,
+      maxPage,
+      participationRateOption,
+      duplicate
+    ) {
+      return new EmbedBuilder()
         .setColor(0xa30d0e)
         .addFields({
           name: "Wall of Shame",
-          value: `${getLifetimeRank()}`,
+          value: `${getLifetimeRank(duplicate)}`,
           inline: false,
         })
-        .setFooter({ text: `Page ${page}/${maxPage}` });
+        .setFooter({
+          text: `Page ${page}/${maxPage} • Minimum rate of ${participationRateOption}%`,
+        });
+    }
 
-      // Display new page
+    // Display the initial ranked embed
+    const response = await interaction.editReply({
+      embeds: [
+        createRankingsEmbed(page, maxPage, participationRateOption, false),
+      ],
+      components: [pagination],
+    });
+
+    // Create a collector to handle the pagination buttons
+    const collector = response.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      filter: (i) => i.user.id === interaction.user.id, // Only allow the initiator of the command to use the buttons
+      idle: 120000, // After 2 minutes, turn off the buttons
+    });
+
+    // Handle button presses via the collector
+    collector.on("collect", async (interaction) => {
+      // Handle pagination, placement accuracy
+      if (interaction.customId === "previous") {
+        if (page > 1) {
+          page--;
+          firstPlacement -= 8;
+          lastPlacement -= 8;
+        }
+      } else if (interaction.customId === "next") {
+        if (page < maxPage) {
+          page++;
+          firstPlacement += 8;
+          lastPlacement += 8;
+        }
+      } else if (interaction.customId === "first") {
+        page = 1;
+        firstPlacement = 0;
+        lastPlacement = 8;
+      } else if (interaction.customId === "last") {
+        page = maxPage;
+        firstPlacement = maxPage * 8 - 8;
+        lastPlacement = maxPage * 8;
+      }
+
+      // Display the previous/next page
       await interaction.deferUpdate();
 
       await interaction.editReply({
-        embeds: [rankingsUpdate],
+        embeds: [
+          createRankingsEmbed(page, maxPage, participationRateOption, true),
+        ],
         components: [pagination],
       });
-
-      return;
     });
 
-    // Disable the buttons after 2 minutes of idling
+    // Handle the end of the collector (after 2 minutes)
     collector.on("end", () => {
       previous.setDisabled(true);
       next.setDisabled(true);
 
-      placement -= 8; // TODO: Figure out why this even goes up +8 when it disables
-
-      // New updated embed object // ! This should not be duplicated
-      const rankingsUpdate = new EmbedBuilder()
-        .setColor(0xa30d0e)
-        .addFields({
-          name: "Wall of Shame",
-          value: `${getLifetimeRank()}`,
-          inline: false,
-        })
-        .setFooter({ text: `Page ${page}/${maxPage}` });
-
       interaction.editReply({
-        embeds: [rankingsUpdate],
+        embeds: [
+          createRankingsEmbed(page, maxPage, participationRateOption, true),
+        ],
         components: [pagination],
       });
     });

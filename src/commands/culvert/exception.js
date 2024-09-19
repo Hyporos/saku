@@ -50,7 +50,7 @@ module.exports = {
     });
 
     // Handle responses
-    return interaction.reply(
+    interaction.reply(
       `**${exceptionOption}** has been set as an exception for **${nameOption}**`
     );
   },

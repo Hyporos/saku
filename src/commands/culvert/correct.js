@@ -56,6 +56,7 @@ module.exports = {
     const user = await findUserByCharacter(interaction, characterOption);
     if (!user) return;
 
+    // Get the properly cased name of the character
     const characterNameCased = await getCasedName(characterOption);
 
     // Check if the character has a score on the given date
@@ -131,6 +132,6 @@ module.exports = {
       content = `${characterNameCased}'s score of **${scoreOption}** has been created for the week of ${dateOption}`;
     }
 
-    return interaction.reply(content);
+    interaction.reply(content);
   },
 };

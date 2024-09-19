@@ -76,6 +76,7 @@ module.exports = {
 
     const { response, embedColor } = get8BallResponse();
 
+    // Create an embed for the 8ball response
     const embed = new EmbedBuilder()
       .setColor(embedColor)
       .setTitle(questionOption)

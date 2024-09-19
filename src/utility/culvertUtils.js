@@ -52,6 +52,21 @@ async function isCharacterLinked(interaction, characterName) {
 }
 
 /**
+ * Gets a list of all currently linked characters
+ */
+
+async function getAllCharacters() {
+  return await culvertSchema.aggregate([
+    {
+      $unwind: "$characters",
+    },
+    {
+      $replaceRoot: { newRoot: "$characters" },
+    },
+  ]);
+}
+
+/**
  * Return the properly cased name of a character
  *
  * @param {string} characterName - The character name to be used for the query.
@@ -66,9 +81,8 @@ async function getCasedName(characterName) {
   return casedName.characters[0].name;
 }
 
-
 /**
- * Gets the current reset and last reset dates based on the day of Wednesday.
+ * Gets the current reset and last reset dates based on Thursday 12:00 AM UTC.
  *
  * @returns {Object} An object containing the current reset, last reset and next reset dates.
  */
@@ -95,4 +109,4 @@ function getResetDates() {
   return { reset, lastReset, nextReset };
 }
 
-module.exports = { findUserByCharacter, isCharacterLinked, getCasedName, getResetDates };
+module.exports = { findUserByCharacter, isCharacterLinked, getAllCharacters, getCasedName, getResetDates };

@@ -25,6 +25,7 @@ module.exports = {
     const characterLinked = await isCharacterLinked(interaction, characterOption);
     if (!characterLinked) return;
 
+    // Get the properly cased name of the character
     const characterNameCased = await getCasedName(characterOption);
 
     // Remove the character from the database
@@ -43,7 +44,7 @@ module.exports = {
     );
 
     // Handle responses
-    return interaction.reply(
+    interaction.reply(
       `Unlinked and removed all of **${characterNameCased}**'s scores from the database` //TODO: Make this display the real name
     );
   },

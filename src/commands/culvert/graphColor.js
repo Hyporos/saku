@@ -59,6 +59,6 @@ module.exports = {
       content = `Your graph color has been changed to ${colorOption}`;
     }
 
-    return interaction.reply({ content, ephemeral: true });
+    interaction.reply({ content, ephemeral: true });
   },
 };

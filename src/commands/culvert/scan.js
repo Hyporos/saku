@@ -35,6 +35,7 @@ module.exports = {
     const image = interaction.options.getAttachment("attach");
     const selectedWeek = interaction.options.getString("week");
 
+    // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
 
     // Set the day of the week that the culvert score gets reset (Wednesday)
