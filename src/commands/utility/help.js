@@ -81,7 +81,7 @@ module.exports = {
           case "graphcolor":
             return "Change the color of your progression graph area. Your graph will also be displayed to other users in the color you choose";
           case "rankings":
-            return "View the culvert leaderboard. You can choose between displaying weekly or lifetime scores";
+            return "View the culvert leaderboard. You can choose between displaying weekly or yearly scores";
           case "link":
             return "Link a character to a Discord ID. You must include the join date as well in a proper, common form (ex: YYYY-MM-DD)";
           case "unlink":
