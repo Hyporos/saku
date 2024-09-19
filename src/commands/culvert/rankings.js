@@ -155,19 +155,19 @@ module.exports = {
     const yearlyScoresList = characterList.reduce((list, character) => {
       // Sort the character scores, most recent first
       const sortedScores = character.scores.sort((a, b) => b.date - a.date);
-    
+
       // Get the last 52 scores (one year)
       const recentScores = sortedScores.slice(0, 52);
       const totalScore = recentScores.reduce(
         (sum, scoreInput) => sum + scoreInput.score,
         0
       );
-    
+
       list.push({
         name: character.name,
         score: totalScore,
       });
-    
+
       return list;
     }, []);
 
