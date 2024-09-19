@@ -158,7 +158,6 @@ module.exports = {
     
       // Get the last 52 scores (one year)
       const recentScores = sortedScores.slice(0, 52);
-    
       const totalScore = recentScores.reduce(
         (sum, scoreInput) => sum + scoreInput.score,
         0
