@@ -37,7 +37,7 @@ module.exports = {
 
   async execute(interaction) {
     // Parse the command arguments
-    const category = interaction.options.getString("timeframe");
+    const categoryOption = interaction.options.getString("timeframe");
 
     // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
@@ -154,14 +154,19 @@ module.exports = {
     // Create a list of characters with their yearly scores
     const yearlyScoresList = characterList.reduce((list, character) => {
       // Sort the character scores, most recent first
-      const sortedScores = character.scores.sort((a, b) => b.date - a.date);
+      const sortedScores = character.scores.sort((a, b) => a.date - b.date);
 
       // Get the last 52 scores (one year)
-      const recentScores = sortedScores.slice(0, 52);
+      const recentScores = sortedScores.slice(-52);
       const totalScore = recentScores.reduce(
         (sum, scoreInput) => sum + scoreInput.score,
         0
       );
+
+      if (character.name === "Shane") {
+        console.log(character.name, recentScores);
+      }
+
 
       list.push({
         name: character.name,
@@ -217,18 +222,18 @@ module.exports = {
         .setAuthor({ name: "Culvert Rankings" })
         .addFields({
           name: `${
-            category === "weekly"
+            categoryOption === "weekly"
               ? `Weekly Score (${lastReset})`
               : "Yearly Score (Last 52 weeks)"
           }`,
           value: `${
-            category === "weekly" ? getWeeklyRankings() : getYearlyRankings()
+            categoryOption === "weekly" ? getWeeklyRankings() : getYearlyRankings()
           }`,
           inline: false,
         })
         .setFooter({
           text: `Page ${page}/${maxPage} ${
-            category === "weekly" ? `• Updates in ${getWeeklyUpdateTime()}` : ""
+            categoryOption === "weekly" ? `• Updates in ${getWeeklyUpdateTime()}` : ""
           }`,
         });
     }

@@ -216,7 +216,7 @@ module.exports = {
     if (!characterLinked && characterExists && !isBee) {
       response = `Error - The character **${selectedCharacter}** is not linked to you`;
     } else if (!characterExists) {
-      response = `Error - The character **${selectedCharacter}** has not yet been linked`;
+      response = `Error - The character **${selectedCharacter}** is not linked to any user`;
     } else if (weekLogged.length > 0) {
       response = `${
         user.characters[0].name

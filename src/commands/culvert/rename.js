@@ -35,7 +35,7 @@ module.exports = {
 
     if (!user) {
       return interaction.reply(
-        `Error - The character **${oldNameOption}** has not yet been linked`
+        `Error - The character **${oldNameOption}** is not linked to any user`
       );
     }
 
