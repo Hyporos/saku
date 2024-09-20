@@ -123,7 +123,7 @@ module.exports = {
           case "rankings":
             return `\u0060[timeframe]\u0060 - The timeframe that the leaderboard will display`;
           case "link":
-            return `\u0060[character]\u0060 - The character to be linked\n\u0060[discord_user]\u0060 - The Discord user to be paired with the character\n\u0060[member_since]\u0060 - The date that the character joined the guild`;
+            return `\u0060[character]\u0060 - The character to be linked\n\u0060[discord_user]\u0060 - The Discord user to be paired with the character\n\u0060[member_since]\u0060 - The date that the character joined the guild\n\u0060[override]\u0060 - Force link the character, even if not present on rankings`;
           case "unlink":
             return `\u0060[character]\u0060 - The character to be unlinked`;
           case "rename":
