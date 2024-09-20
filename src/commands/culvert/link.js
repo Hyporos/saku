@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const { isCharacterLinked } = require("../../utility/culvertUtils.js");
 const axios = require("axios");
 const dayjs = require("dayjs");
 
@@ -26,6 +27,13 @@ module.exports = {
         .setName("member_since")
         .setDescription("The date that the character joined the guild")
         .setRequired(true)
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName("override")
+        .setDescription(
+          "Force link the character, even if not present on rankings"
+        )
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -35,12 +43,16 @@ module.exports = {
     const characterOption = interaction.options.getString("character");
     const userOption = interaction.options.getUser("discord_user");
     const memberSinceOption = interaction.options.getString("member_since");
+    const overrideOption = interaction.options.getBoolean("override");
 
+    // Check if the Member Since date is a valid date
     if (!dayjs(memberSinceOption).isValid()) {
       return interaction.reply(
         `Error - The date **${memberSinceOption}** is not valid. Make sure that it is properly formatted (ex: April 28 2023 or 04-28-2023)`
       );
     }
+
+    const joinDate = dayjs(memberSinceOption).format("MMM DD, YYYY");
 
     // Check if the character is already linked to a user
     const characterLinked = await culvertSchema.exists({
@@ -84,13 +96,14 @@ module.exports = {
       const jobID = res.data.ranks[0]?.jobID;
       const jobDetail = res.data.ranks[0]?.jobDetail;
 
-      return (jobMap[jobID] && jobMap[jobID][jobDetail]) || res.data.ranks[0]?.jobName;
+      return (
+        (jobMap[jobID] && jobMap[jobID][jobDetail]) ||
+        res.data.ranks[0]?.jobName
+      );
     }
 
     // Fetch Maplestory ranking data
     const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${characterOption}`;
-
-    const joinDate = dayjs(memberSinceOption).format("MMM DD, YYYY");
 
     axios
       .get(url)
@@ -105,8 +118,10 @@ module.exports = {
             graphColor: "255,189,213",
             $addToSet: {
               characters: {
-                name: res.data.ranks[0]?.characterName,
-                class: getClassName(res),
+                name: overrideOption
+                  ? characterOption
+                  : res.data.ranks[0]?.characterName,
+                class: overrideOption ? "?" : getClassName(res),
                 memberSince: joinDate,
               },
             },
@@ -116,25 +131,32 @@ module.exports = {
           }
         );
 
-        // Send confirmation message
         interaction.reply(
-          `Linked **${res.data.ranks[0]?.characterName}** to ${userOption}\nMember since: ${joinDate}`
+          `Linked **${
+            overrideOption ? characterOption : res.data.ranks[0]?.characterName
+          }** to ${userOption} ${
+            overrideOption ? "(override)" : ""
+          }\nMember since: ${joinDate}`
         );
 
         // Send an introduction to the newly linked user
-        const culvertChannel = interaction.client.channels.cache.get("1090037019557769256");
-        if (characterOption !== "druu") {
+        const culvertChannel = interaction.client.channels.cache.get(
+          "1090037019557769256"
+        );
+
+        // Let the lab rat be tested on secretly...
+        if (characterOption.toLowerCase() !== "druu") {
           culvertChannel.send(
             `Welcome to Saku, ${userOption}! Your character **${characterOption}** has just been linked to Saku's official discord bot.\n\nIn the ${culvertChannel} channel, you can view your culvert progression with various commands, such as \`/profile\` and \`/graph\`.\nSubmit your weekly scores with the \`/gpq\` command if you wish to view your stats early, otherwise they will be automatically submitted by the end of the week.\n\nTo learn more, use the \`/help\` command.`
           );
         }
       })
       .catch(function (error) {
+        console.error(error);
+
         interaction.reply(
           `Error - The character **${characterOption}** could not be found on the rankings`
         );
-
-        console.error(error);
       });
   },
 };
