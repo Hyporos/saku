@@ -3,7 +3,11 @@
 
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const { findCharacter, isCharacterLinked, getResetDates } = require("../../utility/culvertUtils.js")
+const {
+  findCharacter,
+  isCharacterLinked,
+  getResetDates,
+} = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -61,7 +65,10 @@ module.exports = {
     const { reset } = getResetDates();
 
     // Check if the character is already linked to a user
-    const characterLinked = await isCharacterLinked(interaction, characterOption);
+    const characterLinked = await isCharacterLinked(
+      interaction,
+      characterOption
+    );
     if (!characterLinked) return;
 
     // Check if the character belongs to the user
@@ -107,7 +114,7 @@ module.exports = {
       },
     ]);
 
-    const bestScore = bestScoreResult[0]?.characters?.scores?.[0]?.score
+    const bestScore = bestScoreResult[0]?.characters?.scores?.[0]?.score;
 
     // Check if a score has already been set for this week
     const scoreExistsResult = await culvertSchema.aggregate([
@@ -190,28 +197,13 @@ module.exports = {
       );
     }
 
-    // Check if the character has set a new personal best
-    function hasNewBest() {
-      if (scoreOption > bestScore) {
-        return " :trophy:";
-      } else {
-        return "";
-      }
-    }
-
-    // Display responses
-    let response = "";
-
-    if (scoreExists) {
-      response = `${
-        character.name
-      }'s score has been updated to **${scoreOption}**${hasNewBest()} for this week! (${reset})`;
-    } else {
-      response = `${
-        character.name
-      } has scored **${scoreOption}**${hasNewBest()} for this week! (${reset})`;
-    }
-
-    interaction.reply(response);
+    // Handle Responses
+    interaction.reply(
+      `${character.name} has ${
+        scoreExists ? "been updated" : "scored"
+      } **${scoreOption}**${
+        scoreOption > bestScore ? " :trophy:" : ""
+      } for this week! (${reset})`
+    );
   },
 };
