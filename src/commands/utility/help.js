@@ -127,7 +127,7 @@ module.exports = {
           case "unlink":
             return `\u0060[character]\u0060 - The character to be unlinked`;
           case "rename":
-            return `\u0060[old_name]\u0060 - The character to be renamed\n\u0060[new_name]\u0060 - The new name to set for this character`;
+            return `\u0060[old_name]\u0060 - The character to be renamed\n\u0060[new_name]\u0060 - The new name to set for this character\n\u0060[override]\u0060 - Force rename the character, even if not present on rankings`;
           case "correct":
             return `\u0060[character]\u0060 - The character to be corrected\n\u0060[date]\u0060 - The date of the score\n\u0060[score]\u0060 - The new score to submit`;
           case "exception":

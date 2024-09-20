@@ -45,7 +45,7 @@ module.exports = {
 
     // Handle responses
     interaction.reply(
-      `Unlinked and removed all of **${characterNameCased}**'s scores from the database` //TODO: Make this display the real name
+      `Unlinked and removed all of **${characterNameCased}**'s scores from the database`
     );
   },
 };

@@ -313,7 +313,7 @@ module.exports = {
           )
           .setThumbnail(
             "https://i.mapleranks.com/u/" +
-              res.data.ranks[0]?.characterImgURL.slice(38) || "a.png"
+              (res.data.ranks && res.data.ranks[0]?.characterImgURL.slice(38)) || "a.png"
           )
           .addFields(
             {
@@ -323,7 +323,7 @@ module.exports = {
             },
             {
               name: "Level",
-              value: `${res.data.ranks[0]?.level || "?"}`,
+              value: `${(res.data.ranks && res.data.ranks[0]?.level) || "?"}`,
               inline: true,
             },
             {

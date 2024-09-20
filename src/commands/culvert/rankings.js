@@ -163,11 +163,6 @@ module.exports = {
         0
       );
 
-      if (character.name === "Shane") {
-        console.log(character.name, recentScores);
-      }
-
-
       list.push({
         name: character.name,
         score: totalScore,
