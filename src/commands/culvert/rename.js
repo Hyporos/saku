@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { findUserByCharacter } = require("../../utility/culvertUtils.js");
+const { findCharacter } = require("../../utility/culvertUtils.js");
 const culvertSchema = require("../../culvertSchema.js");
 const axios = require("axios");
 
@@ -37,9 +37,9 @@ module.exports = {
     const newNameOption = interaction.options.getString("new_name");
     const overrideOption = interaction.options.getBoolean("override");
 
-    // Find the user with the specified character
-    const user = await findUserByCharacter(interaction, oldNameOption);
-    if (!user) return;
+    // Find the specified character
+    const character = await findCharacter(interaction, oldNameOption);
+    if (!character) return;
 
     // Check if the new character name is already linked to a user
     const characterLinked = await culvertSchema.exists({

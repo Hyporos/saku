@@ -73,7 +73,7 @@ module.exports = {
         // Get the description for the command
         switch (selectedCommand) {
           case "gpq":
-            return "Log a culvert score for one of your characters. The score will be set to the Wednesday of this week (weekly reset)";
+            return "Log a culvert score for one of your characters. The score will be set to the current weekly reset (Thursday 12:00 AM UTC)";
           case "profile":
             return "View the culvert profile of a user. It will show a variety of stats such as rankings, past scores, and character info (level, class)";
           case "graph":

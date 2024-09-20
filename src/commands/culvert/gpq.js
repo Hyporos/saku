@@ -3,11 +3,7 @@
 
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const updateLocale = require("dayjs/plugin/updateLocale");
-dayjs.extend(utc);
-dayjs.extend(updateLocale);
+const { findCharacter, isCharacterLinked, getResetDates } = require("../../utility/culvertUtils.js")
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -57,53 +53,42 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    const selectedCharacter = interaction.options.getString("character");
-    const culvertScore = interaction.options.getInteger("score");
+    // Parse the command arguments
+    const characterOption = interaction.options.getString("character");
+    const scoreOption = interaction.options.getInteger("score");
 
-    // Check if the sender is a Bee
-    const isBee =
-      interaction.member.roles.cache.has("720001044746076181") ||
-      interaction.user.id === "631337640754675725";
+    // Get the current reset date (Thursday 12:00 AM UTC)
+    const { reset } = getResetDates();
 
-    // Day of the week the culvert score gets reset (Thursday 12:00 AM UTC)
-    dayjs.updateLocale("en", {
-      weekStart: 4,
-    });
+    // Check if the character is already linked to a user
+    const characterLinked = await isCharacterLinked(interaction, characterOption);
+    if (!characterLinked) return;
 
-    const reset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(1, "day")
-      .format("YYYY-MM-DD");
-
-    // Fetch the character
-    const characterExists = await culvertSchema.exists({
-      "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-    });
-
-    // Check if character is linked to user // ! MAKE THIS NORMAL JS BRO
-    const characterLinked = await culvertSchema.exists({
+    // Check if the character belongs to the user
+    const characterBelongsToUser = await culvertSchema.exists({
       _id: interaction.user.id,
-      "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
+      "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
     });
 
-    // Find the character with the given name
-    const user = await culvertSchema.findOne(
-      {
-        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      },
-      { "characters.$": 1 }
-    );
+    if (!characterBelongsToUser) {
+      return interaction.reply(
+        `Error - The character **${characterOption}** is not linked to you`
+      );
+    }
 
-    // Find the biggest (best) score of the character
-    const bestScore = await culvertSchema.aggregate([
+    // Find the specified character
+    const character = await findCharacter(interaction, characterOption);
+    if (!character) return;
+
+    // Get the character's highest score
+    const bestScoreResult = await culvertSchema.aggregate([
       {
         $unwind: "$characters",
       },
       {
         $match: {
           "characters.name": {
-            $regex: `^${selectedCharacter}$`,
+            $regex: `^${characterOption}$`,
             $options: "i",
           },
         },
@@ -122,8 +107,10 @@ module.exports = {
       },
     ]);
 
+    const bestScore = bestScoreResult[0]?.characters?.scores?.[0]?.score
+
     // Check if a score has already been set for this week
-    const weekLogged = await culvertSchema.aggregate([
+    const scoreExistsResult = await culvertSchema.aggregate([
       {
         $unwind: "$characters",
       },
@@ -133,7 +120,7 @@ module.exports = {
       {
         $match: {
           "characters.name": {
-            $regex: `^${selectedCharacter}$`, // might not be needed
+            $regex: `^${characterOption}$`,
             $options: "i",
           },
           "characters.scores.date": reset,
@@ -141,20 +128,22 @@ module.exports = {
       },
     ]);
 
+    const scoreExists = scoreExistsResult.length >= 1;
+
     // Create or update an existing score on the selected character
-    if (weekLogged.length < 1) {
+    if (!scoreExists) {
       await culvertSchema.findOneAndUpdate(
         {
-          _id: !isBee ? interaction.user.id : { $regex: /.*/ },
+          _id: interaction.user.id,
           "characters.name": {
-            $regex: `^${selectedCharacter}$`,
+            $regex: `^${characterOption}$`,
             $options: "i",
           },
         },
         {
           $addToSet: {
             "characters.$[nameElem].scores": {
-              score: culvertScore,
+              score: scoreOption,
               date: reset,
             },
           },
@@ -163,7 +152,7 @@ module.exports = {
           arrayFilters: [
             {
               "nameElem.name": {
-                $regex: `^${selectedCharacter}$`,
+                $regex: `^${characterOption}$`,
                 $options: "i",
               },
             },
@@ -174,23 +163,23 @@ module.exports = {
     } else {
       await culvertSchema.findOneAndUpdate(
         {
-          _id: !isBee ? interaction.user.id : { $regex: /.*/ },
+          _id: interaction.user.id,
           "characters.name": {
-            $regex: `^${selectedCharacter}$`,
+            $regex: `^${characterOption}$`,
             $options: "i",
           },
           "characters.scores.date": reset,
         },
         {
           $set: {
-            "characters.$[nameElem].scores.$[dateElem].score": culvertScore,
+            "characters.$[nameElem].scores.$[dateElem].score": scoreOption,
           },
         },
         {
           arrayFilters: [
             {
               "nameElem.name": {
-                $regex: `^${selectedCharacter}$`, // might not be needed
+                $regex: `^${characterOption}$`,
                 $options: "i",
               },
             },
@@ -203,7 +192,7 @@ module.exports = {
 
     // Check if the character has set a new personal best
     function hasNewBest() {
-      if (culvertScore > bestScore[0].characters.scores[0]?.score) {
+      if (scoreOption > bestScore) {
         return " :trophy:";
       } else {
         return "";
@@ -213,18 +202,14 @@ module.exports = {
     // Display responses
     let response = "";
 
-    if (!characterLinked && characterExists && !isBee) {
-      response = `Error - The character **${selectedCharacter}** is not linked to you`;
-    } else if (!characterExists) {
-      response = `Error - The character **${selectedCharacter}** is not linked to any user`;
-    } else if (weekLogged.length > 0) {
+    if (scoreExists) {
       response = `${
-        user.characters[0].name
-      }'s score has been updated to **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
+        character.name
+      }'s score has been updated to **${scoreOption}**${hasNewBest()} for this week! (${reset})`;
     } else {
       response = `${
-        user.characters[0].name
-      } has scored **${culvertScore}**${hasNewBest()} for this week! (${reset})`;
+        character.name
+      } has scored **${scoreOption}**${hasNewBest()} for this week! (${reset})`;
     }
 
     interaction.reply(response);

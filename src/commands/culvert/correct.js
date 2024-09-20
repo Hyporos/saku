@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
 const dayjs = require("dayjs");
-const { findUserByCharacter, getCasedName } = require("../../utility/culvertUtils.js");
+const { findCharacter, getCasedName } = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -52,20 +52,17 @@ module.exports = {
       );
     }
 
-    // Find the user with the specified character
-    const user = await findUserByCharacter(interaction, characterOption);
-    if (!user) return;
+    // Find the specified character
+    const character = await findCharacter(interaction, characterOption);
+    if (!character) return;
 
     // Get the properly cased name of the character
     const characterNameCased = await getCasedName(characterOption);
 
     // Check if the character has a score on the given date
-    const scoreExists = user.characters
-      .find(
-        (character) =>
-          character.name.toLowerCase() === characterOption.toLowerCase()
-      )
-      ?.scores.find((score) => score.date === dateOption);
+    const scoreExists = character?.scores.find(
+      (score) => score.date === dateOption
+    );
 
     // Create or update an existing score on the selected character
     if (scoreExists) {

@@ -8,16 +8,19 @@ dayjs.extend(updateLocale);
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 /**
- * Finds a user object based on the given character name
+ * Finds a character based on the given name
  *
  * @param {Object} interaction - The interaction object from Discord.js.
  * @param {string} characterName - The character name to be used for the query.
  */
 
-async function findUserByCharacter(interaction, characterName) {
-  const user = await culvertSchema.findOne({
-    "characters.name": { $regex: `^${characterName}$`, $options: "i" },
-  });
+async function findCharacter(interaction, characterName) {
+  const user = await culvertSchema.findOne(
+    {
+      "characters.name": { $regex: `^${characterName}$`, $options: "i" },
+    },
+    { "characters.$": 1 }
+  );
 
   if (!user) {
     await interaction.reply(
@@ -26,7 +29,7 @@ async function findUserByCharacter(interaction, characterName) {
     return null;
   }
 
-  return user;
+  return user.characters[0];
 }
 
 /**
@@ -39,7 +42,7 @@ async function findUserByCharacter(interaction, characterName) {
 async function isCharacterLinked(interaction, characterName) {
   const characterLinked = await culvertSchema.exists({
     "characters.name": { $regex: `^${characterName}$`, $options: "i" },
-  })
+  });
 
   if (!characterLinked) {
     await interaction.reply(
@@ -109,4 +112,10 @@ function getResetDates() {
   return { reset, lastReset, nextReset };
 }
 
-module.exports = { findUserByCharacter, isCharacterLinked, getAllCharacters, getCasedName, getResetDates };
+module.exports = {
+  findCharacter,
+  isCharacterLinked,
+  getAllCharacters,
+  getCasedName,
+  getResetDates,
+};
