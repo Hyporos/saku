@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const { findCharacter } = require("../../utility/culvertUtils.js")
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -61,31 +62,34 @@ module.exports = {
     const weeksOption = interaction.options.getInteger("number_of_weeks") ?? 8;
     const omitOption = interaction.options.getBoolean("omit_unsubmitted");
 
+    // Check if the user entered an invalid amount of weeks
     if (weeksOption <= 1) {
       return interaction.reply("Error - The number of weeks to display must be greater than 1");
     }
 
-    // Find the user with the specified character
+    // Find the specified character
+    const character = await findCharacter(interaction, characterOption);
+    if (!character) return;
+
+    // Check if the character has at least two scores submitted
+    if (character.scores.length < 2) {
+      return interaction.reply(`Error - The character **${characterOption}** must have at least two scores submitted`);
+    } 
+    
+    // Get the user's selected graph color
     const user = await culvertSchema.findOne(
       {
         "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
       },
-      { "characters.$": 1, graphColor: 1 }
+      { graphColor: 1 }
     );
-
-    if (!user) {
-      return interaction.reply(`Error - The character **${characterOption}** is not linked to any user`);
-    }
-
-    if (user.characters[0].scores.length < 2) {
-      return interaction.reply(`Error - The character **${characterOption}** must have at least two scores submitted`);
-    } 
 
     // Fetch the x and y axis labels for the graph
     function getLabels(axis) {
-      const scores = user.characters[0].scores || [];
+      const scores = character.scores || [];
 
-      scores.sort(function(a,b){ // Sort just in case the /scan has submitted a score in the wrong place
+      // Sort all scores by date, from oldest to newest
+      scores.sort(function(a,b){ 
         return new Date(a.date) - new Date(b.date);
       });
 
@@ -96,12 +100,12 @@ module.exports = {
         if (!scores[i]) continue;
 
         if (omitOption && scores[i].score === 0) {
-          weekCount++; // Run one more iteration if no score is found
+          weekCount++; // Get the exact amount of scores requested, when omitting unsubmitted scores 
         } else {
           content = content.concat(
             axis === "x"
-              ? dayjs(scores[i].date).format("MM/DD")
-              : scores[i].score,
+              ? dayjs(scores[i].date).format("MM/DD") // For the x axis, grab the date
+              : scores[i].score, // For the y axis, grab the score
             ","
           );
         }
@@ -110,13 +114,13 @@ module.exports = {
       return content.slice(0, -1); // Remove the unnecessary comma at the end
     }
 
-    // Total number of weeks rendered
+    // Get the total number of weeks rendered (to display as information)
     const renderedWeeks = Math.min(
       weeksOption,
-      user.characters[0].scores.length
+      character.scores.length
     );
 
-    // QuickChart Template Link
+    // QuickChart Template Values & Link
     const xLabels = getLabels("x");
     const yLabels = getLabels("y");
     const graphColor = user.graphColor || "255,189,213";
@@ -131,9 +135,9 @@ module.exports = {
     .setColor(0x202222)
     .setAuthor({ name: "Culvert Graph" })
     .setImage(url)
-    .setTitle(user.characters[0].name)
+    .setTitle(character.name)
     .setURL(
-      `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${user.characters[0].name}&search=true`
+      `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${character.name}&search=true`
     )
     .setFooter({
       text: `Rendering the last ${renderedWeeks} weeks • ${
@@ -141,7 +145,7 @@ module.exports = {
       } unsubmitted scores`,
     });
 
-    // Display user responses
+    // Handle responses
     interaction.reply({embeds: [graph]});
   },
 };
