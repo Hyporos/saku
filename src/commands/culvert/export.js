@@ -75,13 +75,10 @@ module.exports = {
         content: "Data has been successfully exported",
         files: [attachment],
       });
-      
     } catch (error) {
       console.error("Error - Data could not be successfully exported", error);
 
-      interaction.reply(
-        "Error - Data could not be successfully exported"
-      );
+      interaction.reply("Error - Data could not be successfully exported");
     }
   },
 };

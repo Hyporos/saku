@@ -60,10 +60,12 @@ module.exports = {
       const exceptions = await exceptionSchema.find({});
       // Find the exception. if no exception exists, keep the entry name
 
-      const exception = exceptions.find((entry) => entryName.toLowerCase() === entry.exception.toLowerCase());
+      const exception = exceptions.find(
+        (entry) => entryName.toLowerCase() === entry.exception.toLowerCase()
+      );
       const returnedName = exception ? exception.name : entryName;
 
-      console.log(`Exception found for ${returnedName}`)
+      console.log(`Exception found for ${returnedName}`);
 
       return returnedName;
     }
@@ -128,7 +130,7 @@ module.exports = {
           sandbag: false,
         });
       }
-    };
+    }
 
     for (const character of validScores) {
       // Get the first and last 4 letters of the character name to use for better database matching

@@ -1,6 +1,9 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const { isCharacterLinked, getCasedName } = require("../../utility/culvertUtils.js")
+const {
+  isCharacterLinked,
+  getCasedName,
+} = require("../../utility/culvertUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -22,7 +25,10 @@ module.exports = {
     const characterOption = interaction.options.getString("character");
 
     // Check if the character is already linked to a user
-    const characterLinked = await isCharacterLinked(interaction, characterOption);
+    const characterLinked = await isCharacterLinked(
+      interaction,
+      characterOption
+    );
     if (!characterLinked) return;
 
     // Get the properly cased name of the character

@@ -38,9 +38,7 @@ module.exports = {
       },
       {
         _id: interaction.user.id,
-        birthdayDate: dayjs(
-            birthdayDateOption
-          ).format("MMMM DD"),
+        birthdayDate: dayjs(birthdayDateOption).format("MMMM DD"),
       },
       {
         upsert: true,

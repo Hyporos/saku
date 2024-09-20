@@ -222,13 +222,17 @@ module.exports = {
               : "Yearly Score (Last 52 weeks)"
           }`,
           value: `${
-            categoryOption === "weekly" ? getWeeklyRankings() : getYearlyRankings()
+            categoryOption === "weekly"
+              ? getWeeklyRankings()
+              : getYearlyRankings()
           }`,
           inline: false,
         })
         .setFooter({
           text: `Page ${page}/${maxPage} ${
-            categoryOption === "weekly" ? `• Updates in ${getWeeklyUpdateTime()}` : ""
+            categoryOption === "weekly"
+              ? `• Updates in ${getWeeklyUpdateTime()}`
+              : ""
           }`,
         });
     }

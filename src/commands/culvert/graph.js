@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
-const { findCharacter } = require("../../utility/culvertUtils.js")
+const { findCharacter } = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -64,7 +64,9 @@ module.exports = {
 
     // Check if the user entered an invalid amount of weeks
     if (weeksOption <= 1) {
-      return interaction.reply("Error - The number of weeks to display must be greater than 1");
+      return interaction.reply(
+        "Error - The number of weeks to display must be greater than 1"
+      );
     }
 
     // Find the specified character
@@ -73,9 +75,11 @@ module.exports = {
 
     // Check if the character has at least two scores submitted
     if (character.scores.length < 2) {
-      return interaction.reply(`Error - The character **${characterOption}** must have at least two scores submitted`);
-    } 
-    
+      return interaction.reply(
+        `Error - The character **${characterOption}** must have at least two scores submitted`
+      );
+    }
+
     // Get the user's selected graph color
     const user = await culvertSchema.findOne(
       {
@@ -89,7 +93,7 @@ module.exports = {
       const scores = character.scores || [];
 
       // Sort all scores by date, from oldest to newest
-      scores.sort(function(a,b){ 
+      scores.sort(function (a, b) {
         return new Date(a.date) - new Date(b.date);
       });
 
@@ -100,7 +104,7 @@ module.exports = {
         if (!scores[i]) continue;
 
         if (omitOption && scores[i].score === 0) {
-          weekCount++; // Get the exact amount of scores requested, when omitting unsubmitted scores 
+          weekCount++; // Get the exact amount of scores requested, when omitting unsubmitted scores
         } else {
           content = content.concat(
             axis === "x"
@@ -115,10 +119,7 @@ module.exports = {
     }
 
     // Get the total number of weeks rendered (to display as information)
-    const renderedWeeks = Math.min(
-      weeksOption,
-      character.scores.length
-    );
+    const renderedWeeks = Math.min(weeksOption, character.scores.length);
 
     // QuickChart Template Values & Link
     const xLabels = getLabels("x");
@@ -126,26 +127,27 @@ module.exports = {
     const graphColor = user.graphColor || "255,189,213";
     const borderColorAlpha = graphColor !== "255,189,213" ? 0.7 : 0.6;
 
-    const graphTemplate = "https://quickchart.io/chart/render/zm-b385873f-e32c-4e47-8dc8-6d360eea9464"
+    const graphTemplate =
+      "https://quickchart.io/chart/render/zm-b385873f-e32c-4e47-8dc8-6d360eea9464";
 
     const url = `${graphTemplate}?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
 
-    // Create the graph embed 
+    // Create the graph embed
     const graph = new EmbedBuilder()
-    .setColor(0x202222)
-    .setAuthor({ name: "Culvert Graph" })
-    .setImage(url)
-    .setTitle(character.name)
-    .setURL(
-      `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${character.name}&search=true`
-    )
-    .setFooter({
-      text: `Rendering the last ${renderedWeeks} weeks • ${
-        omitOption ? "Omitting" : "Displaying"
-      } unsubmitted scores`,
-    });
+      .setColor(0x202222)
+      .setAuthor({ name: "Culvert Graph" })
+      .setImage(url)
+      .setTitle(character.name)
+      .setURL(
+        `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${character.name}&search=true`
+      )
+      .setFooter({
+        text: `Rendering the last ${renderedWeeks} weeks • ${
+          omitOption ? "Omitting" : "Displaying"
+        } unsubmitted scores`,
+      });
 
     // Handle responses
-    interaction.reply({embeds: [graph]});
+    interaction.reply({ embeds: [graph] });
   },
 };
