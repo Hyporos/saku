@@ -2,7 +2,7 @@
 //TODO - Validate for negative and massive numbers
 
 const { SlashCommandBuilder } = require("discord.js");
-const culvertSchema = require("../../culvertSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
 const {
   findCharacter,
   isCharacterLinked,

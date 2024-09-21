@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
-const culvertSchema = require("../../culvertSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
 const { getResetDates } = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 

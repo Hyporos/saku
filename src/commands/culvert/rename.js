@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findCharacter } = require("../../utility/culvertUtils.js");
-const culvertSchema = require("../../culvertSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
 const axios = require("axios");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //

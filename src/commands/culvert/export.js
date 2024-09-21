@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const { Readable } = require("stream");
-const culvertSchema = require("../../culvertSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
 
 module.exports = {
   data: new SlashCommandBuilder()

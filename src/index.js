@@ -8,7 +8,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const cron = require("cron");
 const dayjs = require("dayjs");
-const User = require('./userSchema');
+const User = require('./schemas/userSchema');
 require("dotenv").config();
 const express = require("express");
 const routes = require("./routes/routes");

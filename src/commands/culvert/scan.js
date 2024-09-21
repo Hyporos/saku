@@ -1,13 +1,9 @@
 const { SlashCommandBuilder } = require("discord.js");
-const culvertSchema = require("../../culvertSchema.js");
-const exceptionSchema = require("../../exceptionSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
+const exceptionSchema = require("../../schemas/exceptionSchema.js");
+const { getResetDates } = require("../../utility/culvertUtils.js")
 const { createWorker } = require("tesseract.js");
 const Jimp = require("jimp");
-const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const updateLocale = require("dayjs/plugin/updateLocale");
-dayjs.extend(utc);
-dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 

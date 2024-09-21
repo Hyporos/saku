@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const culvertSchema = require("../../culvertSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
 const { findCharacter } = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 

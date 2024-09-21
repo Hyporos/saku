@@ -1,4 +1,4 @@
-const culvertSchema = require("../culvertSchema.js");
+const culvertSchema = require("../schemas/culvertSchema.js");
 const express = require("express");
 const axios = require("axios");
 

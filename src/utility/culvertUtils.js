@@ -1,4 +1,4 @@
-const culvertSchema = require("../culvertSchema.js");
+const culvertSchema = require("../schemas/culvertSchema.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const updateLocale = require("dayjs/plugin/updateLocale");
