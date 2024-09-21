@@ -1,10 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../culvertSchema.js");
+const {
+  findCharacter,
+  getResetDates,
+} = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const updateLocale = require("dayjs/plugin/updateLocale");
-dayjs.extend(utc); // ? needed in all files?
-dayjs.extend(updateLocale);
 const axios = require("axios");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -49,243 +49,120 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    const selectedCharacter = interaction.options.getString("character");
+    const characterOption = interaction.options.getString("character");
 
-    // Set the day of the week that the culvert score gets reset (Wednesday)
-    dayjs.updateLocale("en", {
-      weekStart: 4,
-    });
+    // Get the last reset current reset dates (Thursday 12:00 AM UTC)
+    const { lastReset, reset } = getResetDates();
 
-    const reset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(1, "day")
-      .format("YYYY-MM-DD");
+    // Find the specified character
+    const character = await findCharacter(interaction, characterOption);
+    if (!character) return;
 
-    const lastReset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(8, "day")
-      .format("YYYY-MM-DD");
+    // Get and sort all scores by date, from oldest to newest
+    const scores = character.scores;
 
-    // Find the character with the given name
-    const user = await culvertSchema.findOne(
-      {
-        "characters.name": { $regex: `^${selectedCharacter}$`, $options: "i" },
-      },
-      { "characters.$": 1 }
+    scores.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Calculate the characters total score for the past year (52 weeks)
+    const last52Scores = scores.slice(-52);
+    
+    const totalScore = last52Scores.reduce(
+      (sum, score) => sum + score.score,
+      0
     );
 
-    if (!user?.characters[0]) {
-      return interaction.reply(
-        `Error - The character **${selectedCharacter}** is not linked to any user`
-      );
-    }
+    // Find the character's best (highest) score
+    const sortedScores = [...scores].sort((a, b) => b.score - a.score);
+    const bestScore = sortedScores[0]?.score || 0;
 
-    // Find the name of all characters
+    // Get the participation ratio of the character
+    const submittedWeeks = scores.filter((score) => score.score > 0);
+    const participationRatio = Math.round(
+      (submittedWeeks.length / scores.length) * 100
+    );
+
+    // Get all character objects
     const users = await culvertSchema.aggregate([
       {
         $unwind: "$characters",
       },
     ]);
 
-    // Calculate the sum of character scores
-    const totalScore = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $unwind: "$characters.scores",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${selectedCharacter}$`,
-            $options: "i",
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total_score: {
-            $sum: "$characters.scores.score",
-          },
-        },
-      },
-    ]);
-
-    // Find the biggest (best) score of the character
-    const bestScore = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${selectedCharacter}$`,
-            $options: "i",
-          },
-        },
-      },
-      {
-        $set: {
-          "characters.scores": {
-            $sortArray: {
-              input: "$characters.scores",
-              sortBy: {
-                score: -1,
-              },
-            },
-          },
-        },
-      },
-    ]);
-
-    // Calculate the total number of weeks since a character has been linked
-    const totalWeeks = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $unwind: "$characters.scores",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${selectedCharacter}$`,
-            $options: "i",
-          },
-        },
-      },
-    ]);
-
-    // Calculate the particiation ratio of the character by returning the score objects greater than 0
-    const participationRatio = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $unwind: "$characters.scores",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${selectedCharacter}$`,
-            $options: "i",
-          },
-          "characters.scores.score": { $gt: 0 },
-        },
-      },
-    ]);
-
-    // Calculate the sum of lifetime character scores
-    let lifetimeList = [];
-
-    for (const user of users) {
-      let totalScore = 0;
-
-      for (const scoreObject of user.characters?.scores) {
-        totalScore += scoreObject.score;
-      }
-
-      lifetimeList.push({
-        name: user.characters.name,
-        score: totalScore,
-      });
-    }
-
-    // Sort the array of lifetime scores
-    lifetimeList.sort((a, b) => {
-      if (a.score === undefined) {
-        return 1;
-      }
-      if (b.score === undefined) {
-        return -1;
-      }
-      return b.score - a.score;
-    });
-
-    // Calculate the sum of weekly character scores
-    let weeklyList = [];
-
-    for (const user of users) {
-      const scoreObject = user.characters.scores.find(
+    // Create a list of characters with their weekly scores
+    const weeklyScoresList = users.map((user) => {
+      // Get the score submitted for last reset
+      const scoreInput = user.characters.scores.find(
         (score) => score.date === lastReset
       );
 
-      if (scoreObject) {
-        weeklyList.push({
-          name: user.characters.name,
-          score: scoreObject.score,
-        });
-      } else {
-        weeklyList.push({
-          name: user.characters.name,
-          score: 0,
-        });
-      }
-    }
-
-    // Sort the array of weekly scores
-    weeklyList.sort((a, b) => {
-      if (a.score === undefined) {
-        return 1;
-      }
-      if (b.score === undefined) {
-        return -1;
-      }
-      return b.score - a.score;
+      return {
+        name: user.characters.name,
+        score: scoreInput ? scoreInput.score : 0,
+      };
     });
 
-    // Get the weekly and lifetime rank of the character
+    // Sort the list of characters in ascending order (weekly score)
+    weeklyScoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    // Create a list of characters with their yearly scores
+    const yearlyScoresList = users.map((user) => {
+      // Get the last 52 scores (one year)
+      const recentScores = user.characters.scores.slice(-52);
+      const totalScore = recentScores.reduce(
+        (sum, scoreInput) => sum + scoreInput.score,
+        0
+      );
+
+      return {
+        name: user.characters.name,
+        score: totalScore,
+      };
+    });
+
+    // Sort the list of characters in ascending order (yearly score)
+    yearlyScoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    // Get the weekly and yearly rank of the character
     const weeklyRank =
-      weeklyList.findIndex(
+      weeklyScoresList.findIndex(
         (character) =>
-          character.name.toLowerCase() === selectedCharacter.toLowerCase()
+          character.name.toLowerCase() === characterOption.toLowerCase()
       ) + 1;
-    const lifetimeRank =
-      lifetimeList.findIndex(
+
+    const yearlyRank =
+      yearlyScoresList.findIndex(
         (character) =>
-          character.name.toLowerCase() === selectedCharacter.toLowerCase()
+          character.name.toLowerCase() === characterOption.toLowerCase()
       ) + 1;
 
     // Create the 'previous scores' embed field
     function getPreviousScores() {
-      const scores = user.characters[0].scores;
-
-      scores.sort(function(a,b){
-        return new Date(a.date) - new Date(b.date);
-      });
-
       let notSubmitted = false;
 
       let content = "\u0060\u0060\u0060";
 
-      // If the user has not submitted a score for this week, pretend it's 0.
-      if (
-        scores[0] &&
-        user.characters[0].scores[scores.length - 1]?.date !== reset
-      ) {
+      // If the user has not submitted a score for this week, count it as a 0 (fill in "Current Score" with 0)
+      if (scores[0] && scores[scores.length - 1]?.date !== reset) {
         content = content.concat(
           scores[scores.length - 1]?.date,
           ": ",
-          scores[scores.length - 1].score?.toLocaleString("en-US"),
+          scores[scores.length - 1].score?.toLocaleString(),
           scores.length !== 1 ? "\n" : ""
         );
         notSubmitted = true;
       }
+
+      // Determine how many previous scores to show (3 or 4 more depending on whether or not user has submitted this week)
       for (
         let i = scores.length - 2;
         i >= scores.length - (!notSubmitted ? 5 : 4);
         i--
       ) {
-        // Only grab the last 3/4 scores before this week
         if (scores[i])
           content = content.concat(
             scores[i].date,
             ": ",
-            scores[i].score.toLocaleString("en-US"),
+            scores[i].score.toLocaleString(),
             scores.length !== 1 ? "\n" : ""
           );
       }
@@ -298,27 +175,28 @@ module.exports = {
       return content;
     }
 
-      // Ranking API
-      const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${selectedCharacter}`;
+    // Fetch Maplestory ranking data
+    const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${characterOption}`;
 
-    // Create and display a profile embed for the selected character (if they exist)
     try {
       axios.get(url).then(async function (res) {
+        // Create and display a profile embed for the selected character
         const profile = new EmbedBuilder()
           .setColor(0xffc3c5)
-          .setTitle(user.characters[0]?.name || "")
+          .setTitle(character.name || "")
           .setAuthor({ name: "Culvert Profile" })
           .setURL(
-            `https://www.nexon.com/maplestory/rankings/north-america/overall-ranking/legendary?world_type=heroic&search_type=character-name&search=${user.characters[0]?.name}`
+            `https://www.nexon.com/maplestory/rankings/north-america/overall-ranking/legendary?world_type=heroic&search_type=character-name&search=${character.name}`
           )
           .setThumbnail(
             "https://i.mapleranks.com/u/" +
-              (res.data.ranks && res.data.ranks[0]?.characterImgURL.slice(38)) || "a.png"
+              (res.data.ranks &&
+                res.data.ranks[0]?.characterImgURL.slice(38)) || "a.png"
           )
           .addFields(
             {
               name: "Class",
-              value: user.characters[0].class,
+              value: character.class,
               inline: true,
             },
             {
@@ -328,9 +206,7 @@ module.exports = {
             },
             {
               name: "Member Since",
-              value: `${dayjs(user.characters[0].memberSince).format(
-                "MMM DD, YYYY"
-              )}`,
+              value: `${dayjs(character.memberSince).format("MMM DD, YYYY")}`,
               inline: true,
             }
           )
@@ -338,12 +214,9 @@ module.exports = {
             {
               name: "Current Score",
               value: `${
-                user.characters[0].scores[user.characters[0].scores.length - 1]
-                  ?.date !== reset
-                  ? 0
-                  : user.characters[0].scores[
-                      user.characters[0].scores.length - 1
-                    ].score?.toLocaleString("en-US") || "0"
+                scores[scores.length - 1]?.date === reset
+                  ? scores[scores.length - 1]?.score.toLocaleString() || "0"
+                  : 0
               }`,
               inline: true,
             },
@@ -354,11 +227,7 @@ module.exports = {
             },
             {
               name: "Personal Best",
-              value: `${
-                bestScore[0].characters.scores[0]?.score.toLocaleString(
-                  "en-US"
-                ) || "0"
-              }`,
+              value: `${bestScore.toLocaleString() || "0"}`,
               inline: true,
             }
           )
@@ -369,24 +238,20 @@ module.exports = {
           })
           .addFields(
             {
-              name: "Lifetime Score",
-              value: `${
-                totalScore[0]?.total_score.toLocaleString("en-US") || "0"
-              }`,
+              name: "Yearly Score",
+              value: `${totalScore.toLocaleString() || "0"}`,
               inline: true,
             },
             {
-              name: "Lifetime Rank",
-              value: `${lifetimeRank}`,
+              name: "Yearly Rank",
+              value: `${yearlyRank}`,
               inline: true,
             },
             {
               name: "Participation",
-              value: `${participationRatio.length}/${
-                totalWeeks.length
-              } (${Math.round(
-                (participationRatio.length / totalWeeks.length || 0) * 100
-              )}%)`,
+              value: `${submittedWeeks.length}/${scores.length || 0} (${
+                participationRatio || 0
+              }%)`,
               inline: true,
             }
           )
@@ -395,14 +260,15 @@ module.exports = {
             iconURL:
               "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
           });
-        // Display responses
+
         interaction.reply({ embeds: [profile] });
       });
     } catch (error) {
-      interaction.reply(
-        `Error - The character **${selectedCharacter}** could not be fetched from the API`
-      );
       console.error(error);
+
+      interaction.reply(
+        `Error - The character **${characterOption}** could not be found on the rankings`
+      );
     }
   },
 };

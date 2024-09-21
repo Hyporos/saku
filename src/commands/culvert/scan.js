@@ -195,7 +195,7 @@ module.exports = {
       // Perform the logic to set the score for the character
       if (user) {
         successCount++;
-        // Check if a score has already been set for the week
+        // Check if a score has already been set for the week // TODO: make this js along with others
         const weekLogged = await culvertSchema.aggregate([
           {
             $unwind: "$characters",
@@ -318,7 +318,7 @@ module.exports = {
           content = content.concat(
             `${character.name}: **${
               !isNaN(character.score)
-                ? character.score.toLocaleString("en-US")
+                ? character.score.toLocaleString()
                 : "0 (NaN)"
             }**`
           );

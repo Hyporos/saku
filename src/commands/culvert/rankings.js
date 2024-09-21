@@ -82,28 +82,17 @@ module.exports = {
         (score) => score.date === lastReset
       );
 
-      if (scoreInput) {
+      if (scoreInput)
         list.push({
           name: character.name,
-          score: scoreInput.score, // TODO: make this score ?? 0
+          score: scoreInput.score,
         });
-      } else {
-        list.push({
-          name: character.name,
-          score: 0,
-        });
-      }
 
       return list;
     }, []);
 
     // Sort the list of characters in ascending order (weekly score)
-    weeklyScoresList.sort((a, b) => {
-      if (a.score === undefined) return 1;
-      if (b.score === undefined) return -1;
-
-      return b.score - a.score;
-    });
+    weeklyScoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
 
     // Set placements for each character, based on weekly scores
     weeklyScoresList.forEach((character, index) => {
@@ -154,7 +143,9 @@ module.exports = {
     // Create a list of characters with their yearly scores
     const yearlyScoresList = characterList.reduce((list, character) => {
       // Sort the character scores, most recent first
-      const sortedScores = character.scores.sort((a, b) => a.date - b.date);
+      const sortedScores = [...character.scores].sort(
+        (a, b) => new Date(a.date) - new Date(b.date)
+      );
 
       // Get the last 52 scores (one year)
       const recentScores = sortedScores.slice(-52);
@@ -172,12 +163,7 @@ module.exports = {
     }, []);
 
     // Sort the list of characters in ascending order (yearly score)
-    yearlyScoresList.sort((a, b) => {
-      if (a.score === undefined) return 1;
-      if (b.score === undefined) return -1;
-
-      return b.score - a.score;
-    });
+    yearlyScoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
 
     // Set placements for each character, based on yearly scores
     yearlyScoresList.forEach((character, index) => {

@@ -93,9 +93,7 @@ module.exports = {
       const scores = character.scores || [];
 
       // Sort all scores by date, from oldest to newest
-      scores.sort(function (a, b) {
-        return new Date(a.date) - new Date(b.date);
-      });
+      scores.sort((a, b) => new Date(a.date) - new Date(b.date));
 
       let weekCount = weeksOption || 8;
       let content = "";
