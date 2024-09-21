@@ -13,10 +13,10 @@ module.exports = {
 
     // Only send a log if the user nickname was changed
     if (oldMember.nickname === newMember.nickname) {
-        return;
+      return;
     }
 
-    // Check if the nickname was changed
+    // Check if the user nickname was changed
     let event = "";
 
     if (oldMember.nickname !== newMember.nickname) {
@@ -38,14 +38,16 @@ module.exports = {
       })
       .setTitle(event)
       .setDescription(
-        `**Before:** ${oldMember.nickname ?? oldMember.user.username}\n**+After:** ${newMember.nickname ?? newMember.user.username}`
+        `**Before:** ${
+          oldMember.nickname ?? oldMember.user.username
+        }\n**+After:** ${newMember.nickname ?? newMember.user.username}`
       )
       .setTimestamp()
       .setFooter({
         text: `ID: ${newMember.id}`,
       });
 
-    // Display event responses
+    // Handle responses
     logChannel.send({ embeds: [log] });
   },
 };

@@ -1,7 +1,7 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const dayjs = require("dayjs");
-var relativeTime = require('dayjs/plugin/relativeTime')
-dayjs.extend(relativeTime)
+var relativeTime = require("dayjs/plugin/relativeTime");
+dayjs.extend(relativeTime);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -41,7 +41,9 @@ module.exports = {
 
     // Create the log embed
     const createdAt = dayjs().from(dayjs(member.user.createdAt), true);
-    const memberCount = member.guild.members.cache.filter(member => !member.user.bot).size;
+    const memberCount = member.guild.members.cache.filter(
+      (member) => !member.user.bot
+    ).size;
 
     const log = new EmbedBuilder()
       .setColor(0x85ff89)
@@ -58,7 +60,7 @@ module.exports = {
         text: `ID: ${member.id}`,
       });
 
-    // Display event responses
+    // Handle responses
     welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
     logChannel.send({ embeds: [log] });
   },

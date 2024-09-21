@@ -1,7 +1,7 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const dayjs = require("dayjs");
-var relativeTime = require('dayjs/plugin/relativeTime')
-dayjs.extend(relativeTime)
+var relativeTime = require("dayjs/plugin/relativeTime");
+dayjs.extend(relativeTime);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -49,7 +49,7 @@ module.exports = {
         text: `ID: ${member.id}`,
       });
 
-    // Display event responses
+    // Handle responses
     logChannel.send({ embeds: [log] });
   },
 };

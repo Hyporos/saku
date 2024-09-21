@@ -65,7 +65,7 @@ module.exports = {
 
     // Calculate the characters total score for the past year (52 weeks)
     const last52Scores = scores.slice(-52);
-    
+
     const totalScore = last52Scores.reduce(
       (sum, score) => sum + score.score,
       0

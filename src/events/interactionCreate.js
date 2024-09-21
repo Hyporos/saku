@@ -9,6 +9,7 @@ module.exports = {
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
 
+      // Display an error if an invalid command was entered
       if (!command) {
         console.error(
           `Error - No command matching /${interaction.commandName} was found`
@@ -16,6 +17,7 @@ module.exports = {
         return;
       }
 
+      // Create a list of culvert commands
       const culvertCommands = [
         "gpq",
         "profile",
@@ -32,9 +34,22 @@ module.exports = {
         "wos",
       ];
 
-      const beeCommands = ["link", "unlink", "rename", "correct", "exception", "scan", "finalize", "wos", "say", "export"];
+      // Create a list of bee-exclusive and owner-exclusive commands
+      const beeCommands = [
+        "link",
+        "unlink",
+        "rename",
+        "correct",
+        "exception",
+        "scan",
+        "finalize",
+        "wos",
+        "say",
+        "export",
+      ];
       const ownerCommands = ["reload"];
 
+      // Display an error message if guests try to use culvert commands
       if (
         interaction.member.roles.cache.has("720006084252663868") &&
         culvertCommands.includes(interaction.commandName)
@@ -45,9 +60,10 @@ module.exports = {
         return;
       }
 
+      // Display an error message if members try to use bee commands
       if (
         !interaction.member.roles.cache.has("720001044746076181") &&
-        interaction.user.id !== "631337640754675725" && // Add me as an exception to use the commands
+        interaction.user.id !== "631337640754675725" && // Add myself as an exception to use the bee commands
         beeCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
@@ -56,6 +72,7 @@ module.exports = {
         return;
       }
 
+      // Display an error message if members try to use owner commands
       if (
         interaction.user.id !== "631337640754675725" &&
         ownerCommands.includes(interaction.commandName)
@@ -66,6 +83,7 @@ module.exports = {
         return;
       }
 
+      // Display an error message if the command fails
       try {
         await command.execute(interaction);
       } catch (error) {
@@ -75,7 +93,8 @@ module.exports = {
         console.error(error);
       }
     }
-    // Handle Autocomplete
+
+    // Handle autocomplete functionality
     else if (interaction.isAutocomplete()) {
       const command = interaction.client.commands.get(interaction.commandName);
 
