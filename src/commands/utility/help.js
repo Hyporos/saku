@@ -32,6 +32,7 @@ module.exports = {
       "8ball",
       "help",
       "ping",
+      "dannis",
     ];
 
     isBee &&
@@ -44,7 +45,8 @@ module.exports = {
         "scan",
         "finalize",
         "wos",
-        "export"
+        "export",
+        "say"
       );
 
     const filtered = choices
@@ -61,6 +63,13 @@ module.exports = {
   async execute(interaction) {
     // Parse the command arguments
     const selectedCommand = interaction.options.getString("command");
+
+    // Check if the command exists or has no help embed associated with it
+    if (!getCommandInfo("description") && selectedCommand !== null) {
+      return interaction.reply(
+        `Error - The command **${selectedCommand}** could not be found`
+      );
+    }
 
     // Check if the sender is a Bee
     const isBee =
@@ -108,6 +117,10 @@ module.exports = {
             return "Display a list of all commands. You can choose to use /help followed by a command name to view more details about that particular command. Did you really just do /help help?";
           case "ping":
             return "Check Saku's response time. It will display both the latency and API ping.";
+          case "say":
+            return "Have Saku relay a message for you in the specified channel";
+          case "dannis":
+            return "Praise the lord";
         }
       } else if (type === "parameters") {
         // Get the argument information for the command
@@ -147,6 +160,10 @@ module.exports = {
           case "help":
             return `\u0060[command]\u0060 - The command to view in depth`;
           case "ping":
+            return `None`;
+          case "say":
+            return `\u0060[message]\u0060 - The message you would like Saku to send\n\u0060[channel]\u0060 - The channel where would like to send the message`;
+          case "dannis":
             return `None`;
         }
       }
@@ -190,14 +207,6 @@ module.exports = {
       });
 
     // Handle responses
-    let response = "";
-
-    if (!getCommandInfo("description") && selectedCommand !== null) {
-      response = `Error - The command **${selectedCommand}** could not be found`;
-    } else {
-      response = { embeds: [selectedCommand ? specificHelp : help] };
-    }
-
-    interaction.reply(response);
+    interaction.reply({ embeds: [selectedCommand ? specificHelp : help] });
   },
 };

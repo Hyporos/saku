@@ -29,9 +29,11 @@ module.exports = {
         "rename",
         "correct",
         "exception",
+        "export",
         "scan",
         "finalize",
         "wos",
+        "fatal",
       ];
 
       // Create a list of bee-exclusive and owner-exclusive commands
@@ -44,8 +46,8 @@ module.exports = {
         "scan",
         "finalize",
         "wos",
-        "say",
         "export",
+        "say",
       ];
       const ownerCommands = ["reload"];
 
