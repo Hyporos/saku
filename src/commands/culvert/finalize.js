@@ -1,10 +1,7 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
-const fs = require("fs");
 const culvertSchema = require("../../culvertSchema.js");
 const { getResetDates } = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
-
-// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -27,8 +24,6 @@ module.exports = {
           "Ignore unsubmittied scores and proceed with finalization"
         )
     ),
-
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
     // Parse the command arguments
@@ -61,40 +56,35 @@ module.exports = {
     // Convert the character names array into a structured string
     let missedCharacters = missedCharactersArray.join(", ");
 
-    if (missedCharactersArray.length !== 0 && overrideOption === false) {
+    if (missedCharactersArray.length !== 0 && !overrideOption) {
       return interaction.reply(
         `Error - The following characters have unsubmitted scores for the week of **${weekOption}**: \n\n${missedCharacters}\n\nIf needed, use the optional parameter to override this step.`
       );
     }
 
-    // Extract the collection data and write it to a JSON file
+    // Extract the collection data
     try {
       const data = await culvertSchema.find({});
-
       const jsonData = JSON.stringify(data, null, 2);
 
-      fs.writeFile(`culvert-${weekOption}.json`, jsonData, (err) => {
-        if (err) {
-          console.error("Error - Could not save JSON to file:", err);
-          return;
-        }
+      // Create a buffer from the JSON data
+      const buffer = Buffer.from(jsonData, "utf-8");
+      const attachment = new AttachmentBuilder(buffer, { name: `culvert-${weekOption}.json` });
+
+      // Handle responses
+      await interaction.reply({
+        content: `${
+          missedCharactersArray.length !== 0
+            ? `**${allCharacters.length - missedCharactersArray.length}/${
+                allCharacters.length
+              }** scores`
+            : "All scores"
+        } have been submitted for the week of **${weekOption}**\n\nJSON backup data:`,
+        files: [attachment],
       });
     } catch (error) {
       console.error("Error - Could not export collection to JSON:", error);
+      interaction.reply("Error - Could not export collection to JSON.");
     }
-
-    const attachment = new AttachmentBuilder(`./culvert-${weekOption}.json`);
-
-    // Handle responses
-    interaction.reply({
-      content: `${
-        missedCharactersArray.length !== 0
-          ? `**${allCharacters.length - missedCharactersArray.length}/${
-              allCharacters.length
-            }** scores`
-          : "All scores"
-      } have been submitted for the week of **${weekOption}**\n\nJSON backup data:`,
-      files: [attachment],
-    });
   },
 };
