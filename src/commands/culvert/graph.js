@@ -126,7 +126,7 @@ module.exports = {
     const borderColorAlpha = graphColor !== "255,189,213" ? 0.7 : 0.6;
 
     const graphTemplate =
-      "https://quickchart.io/chart/render/zm-b385873f-e32c-4e47-8dc8-6d360eea9464";
+      "https://quickchart.io/chart/render/zm-c2f6cd67-0740-44d6-a023-649110e22db9";
 
     const url = `${graphTemplate}?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
 

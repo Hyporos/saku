@@ -149,8 +149,6 @@ module.exports = {
 
     const notFoundChars = [];
 
-    const finalScores = [];
-
     let successCount = 0;
     let failureCount = 0;
 
@@ -302,7 +300,7 @@ module.exports = {
         );
         const bestScore = sortedScores[0]?.score || 0;
 
-        // If the character scores less than 60% of their best, set a sandbag flag
+        // If the character scores less than 85% of their best, set a sandbag flag
         if (
           validCharacter.score !== 0 &&
           !isNaN(validCharacter.score) &&
