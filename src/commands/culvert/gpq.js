@@ -5,6 +5,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const {
   findCharacter,
+  isScoreSubmitted,
   isCharacterLinked,
   getResetDates,
 } = require("../../utility/culvertUtils.js");
@@ -87,55 +88,14 @@ module.exports = {
     const character = await findCharacter(interaction, characterOption);
     if (!character) return;
 
-    // Get the character's highest score
-    const bestScoreResult = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${characterOption}$`,
-            $options: "i",
-          },
-        },
-      },
-      {
-        $set: {
-          "characters.scores": {
-            $sortArray: {
-              input: "$characters.scores",
-              sortBy: {
-                score: -1,
-              },
-            },
-          },
-        },
-      },
-    ]);
-
-    const bestScore = bestScoreResult[0]?.characters?.scores?.[0]?.score;
+    // Find the character's best (highest) score
+    const sortedScores = [...character.scores].sort(
+      (a, b) => b.score - a.score
+    );
+    const bestScore = sortedScores[0]?.score || 0;
 
     // Check if a score has already been set for this week
-    const scoreExistsResult = await culvertSchema.aggregate([
-      {
-        $unwind: "$characters",
-      },
-      {
-        $unwind: "$characters.scores",
-      },
-      {
-        $match: {
-          "characters.name": {
-            $regex: `^${characterOption}$`,
-            $options: "i",
-          },
-          "characters.scores.date": reset,
-        },
-      },
-    ]);
-
-    const scoreExists = scoreExistsResult.length >= 1;
+    const scoreExists = await isScoreSubmitted(characterOption, reset);
 
     // Create or update an existing score on the selected character
     if (!scoreExists) {

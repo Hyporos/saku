@@ -1,7 +1,11 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
-const { getResetDates } = require("../../utility/culvertUtils.js")
+const {
+  getAllCharacters,
+  isScoreSubmitted,
+  getResetDates,
+} = require("../../utility/culvertUtils.js");
 const { createWorker } = require("tesseract.js");
 const Jimp = require("jimp");
 
@@ -28,61 +32,96 @@ module.exports = {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    const image = interaction.options.getAttachment("attach");
-    const selectedWeek = interaction.options.getString("week");
+    // Parse the comand arguments
+    const imageOption = interaction.options.getAttachment("attach");
+    const weekOption = interaction.options.getString("week");
 
     // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
 
-    // Set the day of the week that the culvert score gets reset (Wednesday)
-    dayjs.updateLocale("en", {
-      weekStart: 4,
-    });
+    // Get the current reset date (Thursday 12:00 AM UTC)
+    const { lastReset, reset } = getResetDates();
+    const selectedWeek = weekOption === "this_week" ? reset : lastReset;
 
-    const reset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(1, "day")
-      .format("YYYY-MM-DD");
+    // Get a list of all currently linked characters
+    const characterList = await getAllCharacters();
 
-    const lastReset = dayjs()
-      .utc()
-      .startOf("week")
-      .subtract(8, "day")
-      .format("YYYY-MM-DD");
-
-    // Get the list of character name exceptions
+    // Find an exception for the character name. if no exception exists, keep the entry name
     async function checkExceptions(entryName) {
       const exceptions = await exceptionSchema.find({});
-      // Find the exception. if no exception exists, keep the entry name
 
       const exception = exceptions.find(
         (entry) => entryName.toLowerCase() === entry.exception.toLowerCase()
       );
       const returnedName = exception ? exception.name : entryName;
 
-      console.log(`Exception found for ${returnedName}`);
-
       return returnedName;
     }
 
     // Process the image
-    Jimp.read(image.proxyURL).then(function (image) {
-      image
-        .contrast(1)
-        .grayscale()
-        .invert()
-        .scale(1.4)
-        .write("./processedImage.jpg");
-    });
+    const image = await Jimp.read(imageOption.proxyURL);
+    const buffer = await image
+      .contrast(1)
+      .grayscale()
+      .invert()
+      .scale(1.4)
+      .getBufferAsync(Jimp.MIME_JPEG);
+
+    // Create a state object to track OCR progress
+    let logState = {
+      status: "",
+      progress: 0,
+      lastReportedProgress: 0,
+    };
+
+    // List of statuses to exclude
+    const excludedStatuses = [
+      "loaded tesseract core",
+      "initialized tesseract",
+      "loading language traineddata (from cache)",
+      "loaded language traineddata",
+      "initialized api",
+      "recognizing text",
+    ];
+
+    // Capitalize the first letter of the string (used for OCR status)
+    function capitalizeFirstLetter(string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    function setLog(newState) {
+      logState = { ...logState, ...newState };
+
+      const isRecognizingText = logState.status === "recognizing text";
+      const roundedProgress = Math.floor(logState.progress * 10) * 10; // Round progress to nearest 10%
+
+      // Update "processing image..." percentage
+      if (
+        isRecognizingText &&
+        roundedProgress !== logState.lastReportedProgress
+      ) {
+        logState.lastReportedProgress = roundedProgress;
+        interaction.editReply(`Processing image... ${roundedProgress}%`);
+      }
+
+      // Update status message if it has changed and is not excluded
+      else if (!excludedStatuses.includes(logState.status)) {
+        interaction.editReply(`${capitalizeFirstLetter(logState.status)}...`);
+      }
+    }
 
     // Use OCR to read all text in the image
     const worker = await createWorker({
-      logger: (m) => console.log(m),
+      logger: (message) => {
+        setLog({
+          status: message.status,
+          progress: message.progress,
+        });
+      },
     });
 
     const processTextEntries = async () => {
-      interaction.editReply("Processing image...");
+      interaction.editReply("Loading tesseract core...");
 
       await worker.loadLanguage("eng+fra+spa+dan+swe+ita");
       await worker.initialize("eng+fra+spa+dan+swe+ita");
@@ -92,7 +131,7 @@ module.exports = {
 
       const {
         data: { text },
-      } = await worker.recognize("./processedImage.jpg");
+      } = await worker.recognize(buffer);
 
       await worker.terminate();
 
@@ -104,68 +143,69 @@ module.exports = {
 
     interaction.editReply("Submitting scores...");
 
+    // Declare necessary variables
     const validScores = [];
     const NaNScores = [];
-    let bestScore = 0;
+
+    const notFoundChars = [];
+
+    const finalScores = [];
 
     let successCount = 0;
     let failureCount = 0;
-    const notFoundChars = [];
 
     // Select name and score from each entry and push into a separate array
     for (const entry of entryArray) {
-      // Log character names which have invalid scores
-      if (isNaN(Number(entry.split(" ").pop()))) {
-        NaNScores.push(entry.split(" ")[0]);
-      }
-      // Log character names which are valid
-      if (entry.split(" ")[0] !== "") {
+      const entryParts = entry.split(" ");
+      const name = entryParts[0];
+      const score = Number(entryParts.pop());
+
+      if (name) {
+        if (isNaN(score)) {
+          // Log character names which have invalid scores
+          NaNScores.push(name);
+        }
+        // Log character names which are valid
         validScores.push({
-          name: await checkExceptions(entry.split(" ")[0]),
-          score: Number(entry.split(" ").pop()),
+          name: await checkExceptions(name),
+          score,
           sandbag: false,
         });
       }
     }
 
-    for (const character of validScores) {
+    for (const validCharacter of validScores) {
+      const matchingNames = [];
+
       // Get the first and last 4 letters of the character name to use for better database matching
-      console.log(character);
-      const nameBeginning = character.name.substring(0, 4);
-      const nameEnd = character.name.substring(character.name.length - 4);
-
-      // Get and unwind the list of character names
-      const characterList = await culvertSchema.aggregate([
-        {
-          $unwind: "$characters",
-        },
-      ]);
-
-      // Store "half matched" character names in a separate array
-      const halfMatched = [];
+      const nameBeginning = validCharacter.name.substring(0, 4);
+      const nameEnd = validCharacter.name.substring(
+        validCharacter.name.length - 4
+      );
 
       for (const character of characterList) {
-        if (!character.characters.name) continue;
-        const name = character.characters.name.toLowerCase(); // Convert name to lowercase for case-insensitive search
+        if (!character.name) continue;
 
         // Find all names which match with the iterated nameBeginning or nameEnd
-        const matches = name.match(
-          new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi")
-        );
+        const isNameMatching = character.name
+          .toLowerCase()
+          .match(new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi"));
 
-        if (matches && matches.length > 0) {
-          halfMatched.push(character.characters.name.toLowerCase());
+        // Store matched character names in a separate array
+        if (isNameMatching && isNameMatching.length > 0) {
+          matchingNames.push(character.name.toLowerCase());
         }
       }
 
-      // Set the user object to the user in the entry
-      let user;
+      // Set the character to the the proper character in the scanned entry
+      let character;
 
       // If more than one name was matched, perform a more accurate search
-      if (halfMatched.length > 1) {
-        for (const duplicateName of halfMatched) {
-          if (duplicateName.includes(character.name.toLowerCase())) {
-            user = await culvertSchema.findOne(
+      if (matchingNames.length > 1) {
+        for (const duplicateName of matchingNames) {
+          if (duplicateName.includes(validCharacter.name.toLowerCase())) {
+            // Find the specified duplicate character
+            const user = await culvertSchema.findOne(
               {
                 "characters.name": {
                   $regex: `^${duplicateName}$`,
@@ -174,58 +214,53 @@ module.exports = {
               },
               { "characters.$": 1 }
             );
+            character = user?.characters[0];
           }
         }
       } else {
-        user = await culvertSchema.findOne(
+        // Find the specified character, when no duplicates found
+        const namePattern = `${nameBeginning}|${nameEnd}`;
+        const user = await culvertSchema.findOne(
           {
-            "characters.name": {
-              $regex: `^${nameBeginning}|${nameEnd}$`,
-              $options: "i",
-            },
+            "characters.name": { $regex: `^${namePattern}$`, $options: "i" },
           },
           { "characters.$": 1 }
         );
+        character = user?.characters[0];
       }
 
       // Perform the logic to set the score for the character
-      if (user) {
+      if (character) {
         successCount++;
-        // Check if a score has already been set for the week // TODO: make this js along with others
-        const weekLogged = await culvertSchema.aggregate([
-          {
-            $unwind: "$characters",
-          },
-          {
-            $unwind: "$characters.scores",
-          },
-          {
-            $match: {
-              "characters.name": user?.characters[0]?.name,
-              "characters.scores.date":
-                selectedWeek === "this_week" ? reset : lastReset,
-            },
-          },
-        ]);
+        // Check if a score has already been set for the selected week
+        const scoreExists = await isScoreSubmitted(
+          character.name,
+          selectedWeek
+        );
 
-        if (weekLogged.length < 1) {
+        // Update the name of the validCharacter to the one found in the database
+        validCharacter.name = character.name;
+
+        if (!scoreExists) {
           // Create a new score on the selected character
           await culvertSchema.findOneAndUpdate(
             {
-              "characters.name": user?.characters[0]?.name || "",
+              "characters.name": validCharacter?.name || "",
             },
             {
               $addToSet: {
                 "characters.$[nameElem].scores": {
-                  score: !isNaN(character.score) ? character.score : 0,
-                  date: selectedWeek === "this_week" ? reset : lastReset,
+                  score: !isNaN(validCharacter.score)
+                    ? validCharacter.score
+                    : 0,
+                  date: selectedWeek,
                 },
               },
             },
             {
               arrayFilters: [
                 {
-                  "nameElem.name": user?.characters[0]?.name || "",
+                  "nameElem.name": character?.name || "",
                 },
               ],
               new: true,
@@ -235,27 +270,25 @@ module.exports = {
           // Update an existing score on the selected character
           await culvertSchema.findOneAndUpdate(
             {
-              "characters.name": user?.characters[0]?.name || "",
-              "characters.scores.date":
-                selectedWeek === "this_week" ? reset : lastReset,
+              "characters.name": character?.name || "",
+              "characters.scores.date": selectedWeek,
             },
             {
               $set: {
                 "characters.$[nameElem].scores.$[dateElem].score": !isNaN(
-                  character.score
+                  validCharacter.score
                 )
-                  ? character.score
+                  ? validCharacter.score
                   : 0,
               },
             },
             {
               arrayFilters: [
                 {
-                  "nameElem.name": user?.characters[0]?.name || "",
+                  "nameElem.name": character?.name || "",
                 },
                 {
-                  "dateElem.date":
-                    selectedWeek === "this_week" ? reset : lastReset,
+                  "dateElem.date": selectedWeek,
                 },
               ],
               new: true,
@@ -263,44 +296,23 @@ module.exports = {
           );
         }
 
-        // Find the biggest (best) score of the character
-        bestScore = await culvertSchema.aggregate([
-          {
-            $unwind: "$characters",
-          },
-          {
-            $match: {
-              "characters.name": {
-                $regex: `^${user?.characters[0]?.name}$`,
-                $options: "i",
-              },
-            },
-          },
-          {
-            $set: {
-              "characters.scores": {
-                $sortArray: {
-                  input: "$characters.scores",
-                  sortBy: {
-                    score: -1,
-                  },
-                },
-              },
-            },
-          },
-        ]);
+        // Find the character's best (highest) score
+        const sortedScores = [...character.scores].sort(
+          (a, b) => b.score - a.score
+        );
+        const bestScore = sortedScores[0]?.score || 0;
 
         // If the character scores less than 60% of their best, set a sandbag flag
         if (
-          character.score !== 0 &&
-          !isNaN(character.score) &&
-          character.score < bestScore[0].characters.scores[0]?.score * 0.85
+          validCharacter.score !== 0 &&
+          !isNaN(validCharacter.score) &&
+          validCharacter.score < bestScore * 0.85
         ) {
-          character.sandbag = true;
+          validCharacter.sandbag = true;
         }
       } else {
         failureCount++;
-        notFoundChars.push(character.name);
+        notFoundChars.push(validCharacter.name);
       }
     }
 
@@ -309,16 +321,17 @@ module.exports = {
       let content = "";
 
       validScores.forEach((character) => {
-        // If the character name is valid, include it in the list
+        // If the character's name could not be read, change their score to 0 (NAN) Otherwise, add to list
         if (!notFoundChars.includes(character.name)) {
-          content = content.concat(
-            `${character.name}: **${
-              !isNaN(character.score)
-                ? character.score.toLocaleString()
-                : "0 (NaN)"
-            }**`
-          );
+          if (NaNScores.includes(character.name)) {
+            content = content.concat(`${character.name}: **0 (NaN)**`);
+          } else {
+            content = content.concat(
+              `${character.name}: **${character.score.toLocaleString()}**`
+            );
+          }
 
+          // Add a sakuPeek emote if the character has sandbagged
           if (character.sandbag) {
             content = content.concat(` <:sakuPeek:1134862404900106381>\n`);
           } else {
@@ -330,25 +343,28 @@ module.exports = {
       return content;
     }
 
-    // Display responses
+    // Display the list of characters which were read
     let response = `Submitted **${successCount - NaNScores.length}/${
       validScores.length
     }** scores for ${
-      selectedWeek === "this_week"
+      weekOption === "this_week"
         ? `this week (${reset})`
         : `last week (${lastReset})`
     }\n\n${getSuccessList()}`;
 
+    // Display the error message for unreadable names
     if (notFoundChars.length > 0) {
       response = response.concat(
         "\n\nThe following characters could not be found:\n- "
       );
+
       for (const name of notFoundChars) {
         response = response.concat(`**${name}** - `);
       }
       response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
     }
 
+    // Display the error message for characters with unreadable scores
     if (NaNScores.length > 0) {
       response = response.concat(
         "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
@@ -376,7 +392,5 @@ module.exports = {
     for (chunk of messageChunks) {
       await interaction.followUp(chunk);
     }
-
-    ////console.log("Scan complete");
   },
 };

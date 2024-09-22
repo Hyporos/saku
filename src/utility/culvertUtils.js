@@ -32,6 +32,7 @@ async function findCharacter(interaction, characterName) {
   return user.characters[0];
 }
 
+
 /**
  * Check if a character already exists in the database (is linked to a user)
  *
@@ -55,6 +56,38 @@ async function isCharacterLinked(interaction, characterName) {
 }
 
 /**
+ * Check if a character has a submitted score on the given date
+ *
+ * @param {Object} characterName - The character name to be used for the query.
+ * @param {string} scoreDate - The date to check for scores
+ */
+
+async function isScoreSubmitted(characterName, scoreDate) {
+  const scoreExistsResult = await culvertSchema.aggregate([
+    {
+      $unwind: "$characters",
+    },
+    {
+      $unwind: "$characters.scores",
+    },
+    {
+      $match: {
+        "characters.name": {
+          $regex: `^${characterName}$`,
+          $options: "i",
+        },
+        "characters.scores.date": scoreDate,
+      },
+    },
+  ]);
+
+  const scoreExists = scoreExistsResult.length >= 1
+
+  return scoreExists;
+}
+
+
+/**
  * Gets a list of all currently linked characters
  */
 
@@ -68,6 +101,7 @@ async function getAllCharacters() {
     },
   ]);
 }
+
 
 /**
  * Return the properly cased name of a character
@@ -83,6 +117,7 @@ async function getCasedName(characterName) {
 
   return casedName.characters[0].name;
 }
+
 
 /**
  * Gets the current reset and last reset dates based on Thursday 12:00 AM UTC.
@@ -115,6 +150,7 @@ function getResetDates() {
 module.exports = {
   findCharacter,
   isCharacterLinked,
+  isScoreSubmitted,
   getAllCharacters,
   getCasedName,
   getResetDates,
