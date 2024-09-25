@@ -2,6 +2,7 @@ const { Events } = require("discord.js");
 const mongoose = require("mongoose");
 const os = require("os");
 const { checkForCrashes } = require("../utility/botUtils");
+const { setBirthdays } = require("../utility/cronUtils");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -27,5 +28,7 @@ module.exports = {
       const channel = client.channels.cache.get("1288222696731054120");
       checkForCrashes(channel);
     }
+
+    await setBirthdays(client);
   },
 };

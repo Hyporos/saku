@@ -9,7 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("birthday")
     .setDescription(
-      "Set your birthday date! The bot will announce it in the server :)"
+      "Set your birthday! The bot will announce it in the server :)"
     )
     .addStringOption((option) =>
       option

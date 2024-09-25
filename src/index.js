@@ -3,11 +3,16 @@ const {
   Collection,
   GatewayIntentBits,
   Partials,
+  EmbedBuilder
 } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
 const cron = require("cron");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const User = require("./schemas/userSchema");
 const { createScheduledJob } = require("./utility/botUtils");
 require("dotenv").config();
@@ -87,44 +92,6 @@ updateGuildJob.start();
 
 // culvertFlagJobAM.start();
 // culvertFlagJobPM.start();
-
-const setBirthdays = async () => {
-  try {
-    const users = await User.find({});
-    for (const user of users) {
-      const birthdayDate = user.birthdayDate;
-      if (!birthdayDate) continue; // Skip users without a birthday date
-      // Parse the birthday date using dayjs
-      const birthday = dayjs(birthdayDate, "MM DD");
-      // Extract day and month
-      const month = birthday.month() + 1; // dayjs month is zero-based, so we add 1
-      const day = birthday.date() - 1;
-      console.log(month, day);
-      // Create a cron schedule for the user's birthday at midnight
-      const cronSchedule = `* * ${day} ${month} *`;
-      // Create a birthday event for the user
-      new cron.CronJob(
-        cronSchedule,
-        () => {
-          const channel = client.channels.cache.get("1090002887410729090");
-          if (!channel) {
-            console.log("Error - Birthday message channel not found");
-            return;
-          }
-          channel.send(
-            `It's a special day today!\nEverybody wish <@${user.id}> a happy birthday! <:sakuParty:1072880580187930735>`
-          );
-        },
-        true // Start the job right away
-      );
-    }
-    console.log("Birthday events set up successfully");
-  } catch (error) {
-    console.error("Error setting up birthday events:", error);
-  }
-};
-
-setBirthdays();
 
 // Grab all of the slash command files
 client.commands = new Collection();
