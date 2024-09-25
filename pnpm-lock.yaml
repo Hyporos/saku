@@ -59,6 +59,9 @@ dependencies:
   tesseract.js:
     specifier: ^4.1.2
     version: 4.1.2
+  timezone-support:
+    specifier: ^3.1.0
+    version: 3.1.0
 
 packages:
 
@@ -1408,6 +1411,16 @@ packages:
     resolution: {integrity: sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==}
     dev: false
 
+  /moment-timezone@0.5.39:
+    resolution: {integrity: sha512-hoB6suq4ISDj7BDgctiOy6zljBsdYT0++0ZzZm9rtxIvJhIbQ3nmbgSWe7dNFGurl6/7b1OUkHlmN9JWgXVz7w==}
+    dependencies:
+      moment: 2.30.1
+    dev: false
+
+  /moment@2.30.1:
+    resolution: {integrity: sha512-uEmtNhbDOrWPFS+hdjFCBfy9f2YoyzRpwcl+DqpC6taX21FzsTLQVbMV/W7PzNSX6x/bhC1zA3c2UQ5NzH6how==}
+    dev: false
+
   /mongodb-connection-string-url@2.6.0:
     resolution: {integrity: sha512-WvTZlI9ab0QYtTYnuMLgobULWhokRjtC7db9LtcVfJ+Hsnyr5eo6ZtNAt3Ly24XZScGMelOcGtm7lSn0332tPQ==}
     dependencies:
@@ -2011,6 +2024,14 @@ packages:
       zlibjs: 0.3.1
     transitivePeerDependencies:
       - encoding
+    dev: false
+
+  /timezone-support@3.1.0:
+    resolution: {integrity: sha512-N04dOzxt7Bw3PZ5ts8ofkQx6RsqWDo8cUQ/a8fdtywB58NIctmdbUUDWZSrgtI7c2jzA6MZ1Z6jY6OtBvc+CUQ==}
+    engines: {node: '>=14.8'}
+    hasBin: true
+    dependencies:
+      moment-timezone: 0.5.39
     dev: false
 
   /timm@1.7.1:

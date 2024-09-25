@@ -12,6 +12,9 @@ const userSchema = new Schema(
     birthdayDate: {
       type: String,
     },
+    timezone: {
+      type: String,
+    },
   },
   { versionKey: false }
 );
