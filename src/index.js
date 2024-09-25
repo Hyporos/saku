@@ -9,6 +9,7 @@ const path = require("node:path");
 const cron = require("cron");
 const dayjs = require("dayjs");
 const User = require('./schemas/userSchema');
+const { createScheduledJob } = require("./utility/botUtils");
 require("dotenv").config();
 const express = require("express");
 const routes = require("./routes/routes");
@@ -38,26 +39,54 @@ const client = new Client({
   partials: [Partials.GuildMember],
 });
 
-const createScheduledEvent = (schedule, message) => {
-  return new cron.CronJob(schedule, () => {
-    const channel = client.channels.cache.get("719788426022617142");
-    if (channel) {
-      channel.send(message);
-    } else {
-      console.log(`Error - Channel ${channel} not found`);
-    }
-  });
-};
+const remindersScanChannel = "1090002887410729090";
+const sakuChannel = "719788426022617142";
 
-const ursusAfternoonEvent = createScheduledEvent(
+const ursusAfternoonEvent = createScheduledJob(
+  client,
+  sakuChannel,
   "0 14 * * *",
   "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710439231:t> to <t:1710453631:t> your local time)"
 );
 
-const ursusNightEvent = createScheduledEvent(
+const ursusNightEvent = createScheduledJob(
+  client,
+  sakuChannel,
   "0 21 * * *",
   "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
 );
+
+const updateGuildJob = createScheduledJob(
+  client,
+  remindersScanChannel,
+  "0 0 * * 4",
+  "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
+);
+
+// // 12:00 AM every 2nd day
+// const culvertFlagJobAM = createScheduledJob(
+//   client,
+//   "1090002887410729090",
+//   "0 0 */2 * *",
+//   "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
+// );
+
+// // 12:00 PM every 2nd day
+// const culvertFlagJobPM = createScheduledJob(
+//   client,
+//   "1090002887410729090",
+//   "0 12 */2 * *",
+//   "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
+// );
+
+// Start cron jobs
+ursusAfternoonEvent.start();
+ursusNightEvent.start();
+
+updateGuildJob.start();
+
+// culvertFlagJobAM.start();
+// culvertFlagJobPM.start();
 
 const setBirthdays = async () => {
   try {
@@ -94,10 +123,6 @@ const setBirthdays = async () => {
 }
 
 setBirthdays();
-
-// Start cron jobs
-ursusAfternoonEvent.start();
-ursusNightEvent.start();
 
 // Grab all of the slash command files
 client.commands = new Collection();

@@ -1,5 +1,7 @@
 const { Events } = require("discord.js");
 const mongoose = require("mongoose");
+const os = require("os");
+const { checkForCrashes } = require("../utility/botUtils");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -19,5 +21,11 @@ module.exports = {
 
     // Display event responses
     console.log(`Ready! Logged in as ${client.user.tag}`);
+
+    // Report a recent crash to the server, if any
+    if (os.hostname() !== "DESKTOP-15LSGET") {
+      const channel = client.channels.cache.get("1288222696731054120");
+      checkForCrashes(channel);
+    }
   },
 };
