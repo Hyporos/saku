@@ -47,7 +47,7 @@ const setBirthdays = async (client) => {
       const hour = midnight.tz("America/Toronto").hour();
 
       // Create a cron schedule for the user's birthday at midnight
-      const cronSchedule = `* ${hour} ${day} ${month} *`;
+      const cronSchedule = `0 ${hour} ${day} ${month} *`;
 
       // Create a birthday job for the user
       new cron.CronJob(

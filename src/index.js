@@ -64,7 +64,7 @@ const ursusNightEvent = createScheduledJob(
 const updateGuildJob = createScheduledJob(
   client,
   remindersScanChannel,
-  "0 0 * * 4",
+  "0 8 * * 4",
   "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
 );
 

@@ -118,6 +118,7 @@ module.exports = {
           progress: message.progress,
         });
       },
+      cachePath: "./tessdata",
     });
 
     const processTextEntries = async () => {
