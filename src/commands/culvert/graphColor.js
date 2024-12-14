@@ -19,7 +19,9 @@ module.exports = {
           { name: "Red", value: "red" },
           { name: "Orange", value: "orange" },
           { name: "Yellow", value: "yellow" },
-          { name: "Green", value: "green" }
+          { name: "Green", value: "green" },
+          { name: "Mint Green", value: "mint" },
+          { name: "Lavender", value: "lavender" }
         )
     ),
 
@@ -39,6 +41,8 @@ module.exports = {
         orange: "214,110,45",
         yellow: "180,170,31",
         green: "58,180,31",
+        mint: "173,235,179",
+        lavender: "216,185,255",
       };
 
       return colorMap[color];

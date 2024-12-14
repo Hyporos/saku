@@ -230,6 +230,12 @@ module.exports = {
 
       // Perform the logic to set the score for the character
       if (character) {
+
+        // Don't perform any operations on characters that joined after the reset date
+        if (weekOption === lastReset && dayjs(character.memberSince).isAfter(lastReset)) {
+          continue;
+        }
+
         successCount++;
         // Check if a score has already been set for the selected week
         const scoreExists = await isScoreSubmitted(

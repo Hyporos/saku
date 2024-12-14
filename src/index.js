@@ -50,21 +50,21 @@ const sakuChannel = "719788426022617142";
 const ursusAfternoonEvent = createScheduledJob(
   client,
   sakuChannel,
-  "0 14 * * *",
-  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710439231:t> to <t:1710453631:t> your local time)"
+  "0 13 * * *",
+  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710435631:t> to <t:1710450031:t> your local time)"
 );
 
 const ursusNightEvent = createScheduledJob(
   client,
   sakuChannel,
-  "0 21 * * *",
-  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
+  "0 20 * * *",
+  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710460831:t> to <t:1710388831:t> your local time)"
 );
 
 const updateGuildJob = createScheduledJob(
   client,
   remindersScanChannel,
-  "0 8 * * 4",
+  "0 19 * * 3",
   "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
 );
 

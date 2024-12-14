@@ -26,6 +26,9 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    // Command may take longer to execute. Defer the initial reply.
+    await interaction.deferReply();
+
     // Parse the command arguments
     let weekOption = interaction.options.getString("week");
     const overrideOption = interaction.options.getBoolean("override") || false;
@@ -57,7 +60,7 @@ module.exports = {
     let missedCharacters = missedCharactersArray.join(", ");
 
     if (missedCharactersArray.length !== 0 && !overrideOption) {
-      return interaction.reply(
+      return interaction.followUp(
         `Error - The following characters have unsubmitted scores for the week of **${weekOption}**: \n\n${missedCharacters}\n\nIf needed, use the optional parameter to override this step.`
       );
     }
@@ -72,7 +75,7 @@ module.exports = {
       const attachment = new AttachmentBuilder(buffer, { name: `culvert-${weekOption}.json` });
 
       // Handle responses
-      await interaction.reply({
+      await interaction.followUp({
         content: `${
           missedCharactersArray.length !== 0
             ? `**${allCharacters.length - missedCharactersArray.length}/${
@@ -84,7 +87,7 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error - Could not export collection to JSON:", error);
-      interaction.reply("Error - Could not export collection to JSON.");
+      interaction.followUp("Error - Could not export collection to JSON.");
     }
   },
 };

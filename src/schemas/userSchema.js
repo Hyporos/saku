@@ -15,6 +15,16 @@ const userSchema = new Schema(
     timezone: {
       type: String,
     },
+    level: {
+      type: Number,
+      required: true,
+      default: 1,
+    },
+    exp: {
+      type: Number,
+      required: true,
+      default: 0,
+    }
   },
   { versionKey: false }
 );
