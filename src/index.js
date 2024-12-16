@@ -47,6 +47,7 @@ const client = new Client({
 
 const remindersScanChannel = "1090002887410729090";
 const sakuChannel = "719788426022617142";
+const announcementsChannel = '720002714683179070';
 
 const ursusAfternoonEvent = createScheduledJob(
   client,
@@ -85,6 +86,38 @@ const culvertFlagJobPM = createScheduledJob(
   "Reminder to complete Culvert and Flag Race!"
 );
 
+const mpReminderEmbed = new EmbedBuilder()
+  .setTitle("Spiegelmann's Watching")
+  .setDescription("Get your EXP coupons!")
+  .setColor(0xffc3c5);
+
+const rpReminderEmbed = new EmbedBuilder()
+  .setTitle("It's the end of the month!")
+  .setDescription("Don't forget to use up any expiring Reward Points.")
+  .setColor(0xffc3c5);
+
+// 7:00 PM every Sunday
+const mpReminderJob = createScheduledJob(
+  client,
+  announcementsChannel,
+  "0 19 * * 0",
+  {
+    content: "<@&962201169588019221>", // Ping for MP role
+    embeds: [mpReminderEmbed],
+  }
+);
+
+// // 7:00 PM on the last day of every month
+// const rpReminderJob = createScheduledJob(
+//   client,
+//   announcementsChannel,
+//   "0 19 L * *",
+//   {
+//     content: "<@&962201297757540372>", // Ping for RP role
+//     embeds: [rpReminderEmbed],
+//   },
+// );
+
 // Start cron jobs
 ursusAfternoonEvent.start();
 ursusNightEvent.start();
@@ -93,6 +126,9 @@ updateGuildJob.start();
 
 culvertFlagJobAM.start();
 culvertFlagJobPM.start();
+
+mpReminderJob.start();
+// rpReminderJob.start();
 
 // Grab all of the slash command files
 client.commands = new Collection();
