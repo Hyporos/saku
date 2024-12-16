@@ -69,21 +69,21 @@ const updateGuildJob = createScheduledJob(
   "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
 );
 
-// // 12:00 AM every 2nd day
-// const culvertFlagJobAM = createScheduledJob(
-//   client,
-//   "1090002887410729090",
-//   "0 0 */2 * *",
-//   "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
-// );
+// 12:00 AM every 2nd day
+const culvertFlagJobAM = createScheduledJob(
+  client,
+  "1090002887410729090",
+  "0 7 */2 * *",
+  "Reminder to complete Culvert and Flag Race!"
+);
 
-// // 12:00 PM every 2nd day
-// const culvertFlagJobPM = createScheduledJob(
-//   client,
-//   "1090002887410729090",
-//   "0 12 */2 * *",
-//   "IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710464431:t> to <t:1710392431:t> your local time)"
-// );
+// 12:00 PM every 2nd day
+const culvertFlagJobPM = createScheduledJob(
+  client,
+  "1090002887410729090",
+  "0 19 */2 * *",
+  "Reminder to complete Culvert and Flag Race!"
+);
 
 // Start cron jobs
 ursusAfternoonEvent.start();
@@ -91,8 +91,8 @@ ursusNightEvent.start();
 
 updateGuildJob.start();
 
-// culvertFlagJobAM.start();
-// culvertFlagJobPM.start();
+culvertFlagJobAM.start();
+culvertFlagJobPM.start();
 
 // Grab all of the slash command files
 client.commands = new Collection();
