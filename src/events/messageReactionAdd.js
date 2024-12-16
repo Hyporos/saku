@@ -29,6 +29,7 @@ module.exports = {
           const attachment = message.attachments.first();
           const isImage = /\.(jpg|jpeg|png|gif|webp)/i.test(attachment.url);
 
+          // If the attachment is an image, set it as the embed image. If not, add it to the description
           if (isImage) {
             embedImage = attachment.url;
           } else {
