@@ -72,7 +72,7 @@ const updateGuildJob = createScheduledJob(
 // 12:00 AM every 2nd day
 const culvertFlagJobAM = createScheduledJob(
   client,
-  "1090002887410729090",
+  sakuChannel,
   "0 7 */2 * *",
   "Reminder to complete Culvert and Flag Race!"
 );
@@ -80,7 +80,7 @@ const culvertFlagJobAM = createScheduledJob(
 // 12:00 PM every 2nd day
 const culvertFlagJobPM = createScheduledJob(
   client,
-  "1090002887410729090",
+  sakuChannel,
   "0 19 */2 * *",
   "Reminder to complete Culvert and Flag Race!"
 );
