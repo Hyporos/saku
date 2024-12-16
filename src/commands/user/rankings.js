@@ -26,7 +26,7 @@ module.exports = {
             }));
             
             embed.addFields({ 
-                name: '\u200B',
+                name: 'Rankings',
                 value: rankings.join('\n') || 'No rankings available'
             });
     

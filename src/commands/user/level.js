@@ -7,16 +7,22 @@ const { getRequiredExp } = require("../../config/levels.js");
 module.exports = {
     async execute(interaction) {
         try {
-            const user = await getDiscordUser(interaction.user.id);
+            // Get target user or default to command user
+            const targetUser = interaction.options.getUser("user") || interaction.user;
+            const targetMember = await interaction.guild.members.fetch(targetUser.id);
+            
+            const user = await getDiscordUser(targetUser.id);
+
             const rankings = await getDiscordUserRankings();
-            const rank = rankings.findIndex((u) => u._id === interaction.user.id) + 1;
+            const userRank = rankings.findIndex(u => u._id === targetUser.id);
+            const rank = userRank === -1 ? "Unranked" : `#${userRank + 1}`;
             const requiredExp = getRequiredExp(user.level);
 
             const embed = new EmbedBuilder()
                 .setColor(0xffc3c5)
-                .setTitle(`${interaction.user.username}`)
+                .setTitle(`${targetMember.nickname || targetUser.username}`)
                 .addFields(
-                    { name: "Rank", value: `#${rank}`, inline: true },
+                    { name: "Rank", value: rank, inline: true },
                     { name: "Level", value: `${user.level}`, inline: true },
                     { name: "Experience", value: `${user.exp}/${requiredExp}`, inline: true }
                 );

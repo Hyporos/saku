@@ -25,12 +25,11 @@ async function getDiscordUser(userId) {
  * @param {number} [options.skip=0] - Number of users to skip
  * @returns {Promise<Array>} Array of users sorted by level and exp
  */
-async function getDiscordUserRankings({ limit = 10, skip = 0 } = {}) {
+async function getDiscordUserRankings({ skip = 0 } = {}) {
     try {
         const rankings = await userSchema
             .find({})
             .sort({ level: -1, exp: -1 })
-            .limit(limit)
             .skip(skip);
 
         return rankings;

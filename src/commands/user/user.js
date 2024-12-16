@@ -9,7 +9,13 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName("level")
-                .setDescription("View your current level and exp")
+                .setDescription("View level and exp")
+                .addUserOption(option =>
+                    option
+                        .setName("user")
+                        .setDescription("Check another user")
+                        .setRequired(false)
+                )
         )
         .addSubcommand(subcommand =>
             subcommand
