@@ -8,6 +8,7 @@ const {
 } = require("../../utility/culvertUtils.js");
 const { createWorker } = require("tesseract.js");
 const Jimp = require("jimp");
+const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -229,12 +230,8 @@ module.exports = {
       }
 
       // Perform the logic to set the score for the character
-      if (character) {
-
-        // Don't perform any operations on characters that joined after the reset date
-        if (weekOption === lastReset && dayjs(character.memberSince).isAfter(lastReset)) {
-          continue;
-        }
+      // Don't perform any operations on characters that joined after the reset date
+      if (character && dayjs(character.memberSince).isBefore(selectedWeek)) {
 
         successCount++;
         // Check if a score has already been set for the selected week

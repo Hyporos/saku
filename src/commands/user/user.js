@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require("discord.js");
 const levelCommand = require("./level.js");
 const rankingsCommand = require("./rankings.js");
 
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("user")
@@ -9,11 +11,11 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName("level")
-                .setDescription("View level and exp")
+                .setDescription("View your or another user's level and exp")
                 .addUserOption(option =>
                     option
                         .setName("user")
-                        .setDescription("Check another user")
+                        .setDescription("The user you would like to view")
                         .setRequired(false)
                 )
         )
@@ -23,29 +25,24 @@ module.exports = {
                 .setDescription("View the server leaderboard")
         ),
 
+    // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
     async execute(interaction) {
         try {
-            const subcommand = interaction.options.getSubcommand();
+            // Parse the comand arguments
+            const subcommandOption = interaction.options.getSubcommand();
             
-            switch (subcommand) {
+            // Execute the appropriate subcommand
+            switch (subcommandOption) {
                 case "level":
                     await levelCommand.execute(interaction);
                     break;
                 case "rankings":
                     await rankingsCommand.execute(interaction);
                     break;
-                default:
-                    await interaction.reply({
-                        content: "Invalid subcommand",
-                        ephemeral: true
-                    });
             }
         } catch (error) {
-            console.error("Error executing user command:", error);
-            await interaction.reply({
-                content: "There was an error executing this command",
-                ephemeral: true
-            });
+            await interaction.reply("Error - Could not execute user command");
         }
     }
 };

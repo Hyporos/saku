@@ -1,39 +1,38 @@
-const { EmbedBuilder } = require("discord.js");
+const { generateLevelCanvas } = require("../../canvas/levelCanvas");
 const { getDiscordUser, getDiscordUserRankings } = require("../../utility/userUtils.js");
 const { getRequiredExp } = require("../../config/levels.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
-    async execute(interaction) {
-        try {
-            // Get target user or default to command user
-            const targetUser = interaction.options.getUser("user") || interaction.user;
-            const targetMember = await interaction.guild.members.fetch(targetUser.id);
-            
-            const user = await getDiscordUser(targetUser.id);
+  async execute(interaction) {
+    try {
+      // Get target user or default to command user
+      const targetUser = interaction.options.getUser("user") || interaction.user;
+      const targetMember = await interaction.guild.members.fetch(targetUser.id);
 
-            const rankings = await getDiscordUserRankings();
-            const userRank = rankings.findIndex(u => u._id === targetUser.id);
-            const rank = userRank === -1 ? "Unranked" : `#${userRank + 1}`;
-            const requiredExp = getRequiredExp(user.level);
+      // Get user info from the database. If not found, set default values
+      let user = await getDiscordUser(targetUser.id);
+      if (!user) {
+        user = { level: 1, exp: 0 };
+      }
 
-            const embed = new EmbedBuilder()
-                .setColor(0xffc3c5)
-                .setTitle(`${targetMember.nickname || targetUser.username}`)
-                .addFields(
-                    { name: "Rank", value: rank, inline: true },
-                    { name: "Level", value: `${user.level}`, inline: true },
-                    { name: "Experience", value: `${user.exp}/${requiredExp}`, inline: true }
-                );
+      // Set the rank for the user
+      const rankings = await getDiscordUserRankings();
+      const userRank = rankings.findIndex((u) => u._id === targetUser.id);
+      const rank = userRank === -1 ? "Unranked" : `#${userRank + 1}`;
 
-            await interaction.reply({ embeds: [embed] });
-        } catch (error) {
-            console.error('Error fetching user info:', error);
-            await interaction.reply({
-                content: 'Error retrieving user information',
-                ephemeral: true
-            });
-        }
+      // Get the required exp for the user's current level
+      const requiredExp = getRequiredExp(user.level);
+
+      // Run the function to generate the User Level canvas
+      const attachment = await generateLevelCanvas(targetMember, user, requiredExp, rank);
+
+      // Send the User Level canvas
+      await interaction.reply({ files: [attachment] });
+
+    } catch (error) {
+      await interaction.reply("Error - Could not retrieve user information");
     }
+  },
 };
