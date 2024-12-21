@@ -61,9 +61,13 @@ module.exports = {
         updatedExp -= requiredExp;
         newLevel++;
 
-        await message.channel.send(
+        try {
+          await message.channel.send(
             `${message.author.toString()} has reached level **${newLevel}**.`
-        );
+          );
+        } catch (sendError) {
+          console.error("Failed to send level up message - ", sendError);
+        }
       }
 
       // Update user with new exp and level

@@ -4,7 +4,7 @@ const { request } = require("undici");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-async function generateLevelCanvas(targetMember, user, requiredExp, rank) {
+async function generateUserLevelCanvas(targetMember, user, requiredExp, rank) {
   // Create the User Level canvas
   const canvas = createCanvas(600, 150);
   const context = canvas.getContext("2d");
@@ -83,4 +83,4 @@ async function generateLevelCanvas(targetMember, user, requiredExp, rank) {
   return attachment;
 }
 
-module.exports = { generateLevelCanvas };
+module.exports = { generateUserLevelCanvas };

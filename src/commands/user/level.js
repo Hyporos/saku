@@ -1,4 +1,4 @@
-const { generateLevelCanvas } = require("../../canvas/levelCanvas");
+const { generateUserLevelCanvas } = require("../../canvas/userLevelCanvas.js");
 const { getDiscordUser, getDiscordUserRankings } = require("../../utility/userUtils.js");
 const { getRequiredExp } = require("../../config/levels.js");
 
@@ -26,7 +26,7 @@ module.exports = {
       const requiredExp = getRequiredExp(user.level);
 
       // Run the function to generate the User Level canvas
-      const attachment = await generateLevelCanvas(targetMember, user, requiredExp, rank);
+      const attachment = await generateUserLevelCanvas(targetMember, user, requiredExp, rank);
 
       // Send the User Level canvas
       await interaction.reply({ files: [attachment] });
