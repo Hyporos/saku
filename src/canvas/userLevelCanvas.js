@@ -49,29 +49,29 @@ async function generateUserLevelCanvas(targetMember, user, requiredExp, rank) {
   context.font = "18px Quicksand";
   context.fillStyle = "rgba(255, 255, 255, 0.85)";
 
-  context.fillText(`Level: ${user.level}    EXP: ${user.exp}/${requiredExp}    Rank: ${rank}`, 160, 79);
+  context.fillText(`Level: ${user.level}     EXP: ${user.exp}/${requiredExp}     Rank: ${rank}`, 160, 79);
 
   // Draw the progress bar background
   context.fillStyle = "#36383f";
   context.beginPath();
-  context.moveTo(160, 100);
-  context.arcTo(570, 100, 570, 125, 10);
-  context.arcTo(570, 125, 160, 125, 10);
-  context.arcTo(160, 125, 160, 100, 10);
-  context.arcTo(160, 100, 570, 100, 10); 
+  context.moveTo(160, 103); // 2 pixels higher
+  context.arcTo(565, 103, 565, 123, 10); // Adjusted width and 2 pixels higher
+  context.arcTo(565, 123, 160, 123, 10); // 2 pixels higher
+  context.arcTo(160, 123, 160, 103, 10); // 2 pixels higher
+  context.arcTo(160, 103, 565, 103, 10); // 2 pixels higher
   context.closePath();
   context.fill();
 
   // Draw the filled part of the progress bar
-  const progressBarWidth = (user.exp / requiredExp) * 400;
+  const progressBarWidth = (user.exp / requiredExp) * 395; // Adjusted width
 
   context.fillStyle = "#ffc3c5";
   context.beginPath();
-  context.moveTo(160, 100);
-  context.arcTo(160 + progressBarWidth, 100, 160 + progressBarWidth, 125, 10);
-  context.arcTo(160 + progressBarWidth, 125, 160, 125, 10);
-  context.arcTo(160, 125, 160, 100, 10);
-  context.arcTo(160, 100, 160 + progressBarWidth, 100, 10);
+  context.moveTo(160, 103); // 2 pixels higher
+  context.arcTo(160 + progressBarWidth, 103, 160 + progressBarWidth, 123, 10); // 2 pixels higher
+  context.arcTo(160 + progressBarWidth, 123, 160, 123, 10); // 2 pixels higher
+  context.arcTo(160, 123, 160, 103, 10); // 2 pixels higher
+  context.arcTo(160, 103, 160 + progressBarWidth, 103, 10); // 2 pixels higher
   context.closePath();
   context.fill();
 

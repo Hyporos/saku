@@ -32,6 +32,7 @@ module.exports = {
       await interaction.reply({ files: [attachment] });
 
     } catch (error) {
+      console.error(error);
       await interaction.reply("Error - Could not retrieve user information");
     }
   },

@@ -22,14 +22,15 @@ async function generateUserRankingsCanvas(interaction, users) {
     const avatar = await loadImage(await body.arrayBuffer());
 
     // Position values
-    const x = 80;
+    const x = 85;
     const y = 22 + i * 52.4;
     const size = 35;
 
     // Draw the ranking number
     context.font = "18px Quicksand";
     context.fillStyle = "rgba(255, 255, 255, 0.85)";
-    context.fillText(`#${i + 1}`, 35, y + size / 2 + 7);
+    
+    context.fillText(`#${i + 1}`, 40, y + size / 2 + 7);
 
     context.save();
     context.beginPath();
@@ -46,11 +47,11 @@ async function generateUserRankingsCanvas(interaction, users) {
 
     // Draw the user's level and exp on the same line
     context.font = "16px Quicksand";
-    context.fillStyle = "rgba(255, 255, 255, 0.85)";
+    context.fillStyle = "#ffffff";
     context.fillText(`Level:`, canvas.width - 200, y + size / 2 + 7);
     context.fillStyle = "#ffc3c5";
     context.fillText(`${user.level}`, canvas.width - 153, y + size / 2 + 7);
-    context.fillStyle = "rgba(255, 255, 255, 0.85)";
+    context.fillStyle = "#ffffff";
     context.fillText(`EXP:`, canvas.width - 115, y + size / 2 + 7);
     context.fillStyle = "#ffc3c5";
     context.fillText(`${user.exp}`, canvas.width - 78, y + size / 2 + 7);
