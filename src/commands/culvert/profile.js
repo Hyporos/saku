@@ -52,6 +52,9 @@ module.exports = {
     // Parse the command arguments
     const characterOption = interaction.options.getString("character");
 
+    // Command may take longer to execute. Defer the initial reply.
+    await interaction.deferReply();
+
     // Get the last reset current reset dates (Thursday 12:00 AM UTC)
     const { lastReset, reset } = getResetDates();
 
@@ -262,12 +265,12 @@ module.exports = {
               "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
           });
 
-        interaction.reply({ embeds: [profile] });
+        interaction.editReply({ embeds: [profile] });
       });
     } catch (error) {
       console.error(error);
 
-      interaction.reply(
+      interaction.editReply(
         `Error - The character **${characterOption}** could not be found on the rankings`
       );
     }
