@@ -52,21 +52,21 @@ const announcementsChannel = '720002714683179070';
 const ursusAfternoonEvent = createScheduledJob(
   client,
   sakuChannel,
-  "0 13 * * *",
+  "0 14 * * *",
   "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710435631:t> to <t:1710450031:t> your local time)"
 );
 
 const ursusNightEvent = createScheduledJob(
   client,
   sakuChannel,
-  "0 20 * * *",
+  "0 21 * * *",
   "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710460831:t> to <t:1710388831:t> your local time)"
 );
 
 const updateGuildJob = createScheduledJob(
   client,
   remindersScanChannel,
-  "0 19 * * 3",
+  "0 20 * * 3",
   "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
 );
 
@@ -74,7 +74,7 @@ const updateGuildJob = createScheduledJob(
 const culvertFlagJobAM = createScheduledJob(
   client,
   sakuChannel,
-  "0 7 */2 * *",
+  "0 8 */2 * *",
   "Reminder to complete Culvert and Flag Race!"
 );
 
@@ -82,7 +82,7 @@ const culvertFlagJobAM = createScheduledJob(
 const culvertFlagJobPM = createScheduledJob(
   client,
   sakuChannel,
-  "0 19 */2 * *",
+  "0 20 */2 * *",
   "Reminder to complete Culvert and Flag Race!"
 );
 
@@ -96,11 +96,11 @@ const rpReminderEmbed = new EmbedBuilder()
   .setDescription("Don't forget to use up any expiring Reward Points.")
   .setColor(0xffc3c5);
 
-// 7:00 PM every Sunday
+// 8:00 PM every Saturday
 const mpReminderJob = createScheduledJob(
   client,
   announcementsChannel,
-  "0 19 * * 0",
+  "0 20 * * 6",
   {
     content: "<@&962201169588019221>", // Ping for MP role
     embeds: [mpReminderEmbed],
