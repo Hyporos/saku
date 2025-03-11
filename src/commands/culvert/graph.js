@@ -69,6 +69,13 @@ module.exports = {
       );
     }
 
+    // Check if the user entered an invalid amount of weeks
+    if (weeksOption > 1000) {
+      return interaction.reply(
+        "Error - The number of weeks to display must be less than 1,000"
+      );
+    }
+
     // Find the specified character
     const character = await findCharacter(interaction, characterOption);
     if (!character) return;
