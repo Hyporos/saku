@@ -9,9 +9,7 @@ module.exports = {
   name: Events.GuildMemberRemove,
   async execute(member) {
     // Fetch the channels to log messages to
-    const logChannel = await member.guild.channels.cache.find(
-      (channel) => channel.name === "server-log"
-    );
+    const logChannel = member.guild.channels.cache.get('804899301632770078');
     await logChannel.fetch();
 
     // Fetch the roles that the user had

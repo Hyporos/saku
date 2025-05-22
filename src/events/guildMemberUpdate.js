@@ -6,9 +6,7 @@ module.exports = {
   name: Events.GuildMemberUpdate,
   async execute(oldMember, newMember) {
     // Fetch the channels to log messages to
-    const logChannel = await newMember.guild.channels.cache.find(
-      (channel) => channel.name === "server-log"
-    );
+    const logChannel = oldMember.guild.channels.cache.get('804899301632770078');
     await logChannel.fetch();
 
     // Only send a log if the user nickname was changed

@@ -9,35 +9,16 @@ module.exports = {
   name: Events.GuildMemberAdd,
   async execute(member, client) {
     // Fetch the channels to send welcome messages to
-    const welcomeChannel = await member.guild.channels.cache.find(
-      (channel) => channel.name === "🤝│introductions"
-    );
+    const welcomeChannel = member.guild.channels.cache.get('720002479005237258');
     await welcomeChannel.fetch();
 
-    const logChannel = await member.guild.channels.cache.find(
-      (channel) => channel.name === "server-log"
-    );
+    const logChannel = member.guild.channels.cache.get('804899301632770078');
     await logChannel.fetch();
 
-    // Create the welcome embed
-    const welcome = new EmbedBuilder()
-      .setColor(0xffc3c5)
-      .setAuthor({
-        name: `Welcome to Saku, ${member.user.username}!`,
-        iconURL:
-          "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
-      })
-      .setDescription(
-        `Hey ${member.user}!\n\nTo gain access to our Discord, please write a little introduction about yourself and change your Discord nickname to your Preferred Name (IGN). For example: miche (superbbzzzzz)\n\n✦ • ────────────── · · · · · · · · ✦`
-      )
-      .setImage(
-        "https://media.discordapp.net/attachments/670464920198053891/1128866120561070160/Welcome.png"
-      )
-      .setFooter({
-        text: "We hope you enjoy your stay here!",
-        iconURL:
-          "https://cdn.discordapp.com/emojis/1113499485042130945.webp?size=96&quality=lossless",
-      });
+    // Create the welcome message
+    const welcomeMessage = `${member.user} Welcome to Saku's Discord server! Change your nickname to Preferred Name (IGN).
+
+Then comment: Preferred Name / IGN / Reason for joining (e.g. new member, bossing with miche, guest of miche, emotes only)`;
 
     // Create the log embed
     const createdAt = dayjs().from(dayjs(member.user.createdAt), true);
@@ -61,7 +42,7 @@ module.exports = {
       });
 
     // Handle responses
-    welcomeChannel.send({ content: `${member.user}`, embeds: [welcome] });
+    welcomeChannel.send(welcomeMessage);
     logChannel.send({ embeds: [log] });
   },
 };
