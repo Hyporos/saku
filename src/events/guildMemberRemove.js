@@ -17,7 +17,7 @@ module.exports = {
     // Fetch the roles that the user had
     function getMemberRoles() {
       const roles = member.roles.cache;
-      const roleNames = ["Guests/Friends", "Member", "Alliance", "Legacy"];
+      const roleNames = ["Friends", "Member", "Alliance", "Legacy"];
 
       for (const roleName of roleNames) {
         const foundRole = roles.find((role) => role.name === roleName);
