@@ -1,14 +1,6 @@
-/**
- * Level progression where each level requires increasingly more EXP:
- * Level 1: 75 EXP
- * Level 2: 175 EXP
- * Level 3: 275 EXP
- * Level 4: 375 EXP
- * Each level requires 100 more EXP than previous
- */
-
 const MAX_LEVEL = 100;
 
+// Create an array of 100 levels with increasing EXP requirements
 function generateLevels() {
     const levels = [];
     let increment = 75; // Starting EXP for level 1
@@ -29,6 +21,7 @@ const LEVELS = generateLevels();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
+// This module exports a function to get the required EXP for a given level
 module.exports = {
     getRequiredExp: (level) => LEVELS[level - 1]?.requiredExp ?? Infinity,
 };
