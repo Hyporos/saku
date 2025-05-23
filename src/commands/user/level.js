@@ -33,7 +33,7 @@ module.exports = {
 
     } catch (error) {
       console.error(error);
-      await interaction.reply("Error - Could not retrieve user information");
+      await interaction.reply("Error - Could not retrieve user level");
     }
   },
 };

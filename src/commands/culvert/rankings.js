@@ -45,12 +45,12 @@ module.exports = {
     // Create pagination buttons and action row
     const previous = new ButtonBuilder()
       .setCustomId("previous")
-      .setEmoji("<:singleleftchevron:1286237594707038220>")
+      .setEmoji("<:singleleftchevron:1375242927634120804>")
       .setStyle(ButtonStyle.Primary);
 
     const next = new ButtonBuilder()
       .setCustomId("next")
-      .setEmoji("<:singlerightchevron:1286237595629649970>")
+      .setEmoji("<:singlerightchevron:1375242928787689693>")
       .setStyle(ButtonStyle.Primary);
 
     const first = new ButtonBuilder()
