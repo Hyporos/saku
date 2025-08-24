@@ -130,13 +130,15 @@ module.exports = {
     const weeklyRank =
       weeklyScoresList.findIndex(
         (character) =>
-          character.name.toLowerCase() === characterOption.toLowerCase()
+          (typeof character?.name === "string" ? character.name.toLowerCase() : "") ===
+          (typeof characterOption === "string" ? characterOption.toLowerCase() : "")
       ) + 1;
 
     const yearlyRank =
       yearlyScoresList.findIndex(
         (character) =>
-          character.name.toLowerCase() === characterOption.toLowerCase()
+          (typeof character?.name === "string" ? character.name.toLowerCase() : "") ===
+          (typeof characterOption === "string" ? characterOption.toLowerCase() : "")
       ) + 1;
 
     // Create the 'previous scores' embed field

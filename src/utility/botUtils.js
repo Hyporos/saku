@@ -57,7 +57,7 @@ function checkForCrashes(channel) {
 
 
 /**
- * Finds a character based on the given name
+ * Creates a scheduled job that sends a message to a specified channel.
  *
  * @param {Object} client - The client object from Discord.js.
  * @param {string} channel - The channel id for the message to be sent to.
