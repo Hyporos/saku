@@ -54,7 +54,8 @@ module.exports = {
 
         return hasNoScore && wasInGuild;
       })
-      .map((character) => character.name);
+      .map((character) => character.name)
+      .filter((name) => name && typeof name === "string" && name.trim()); // Filter out invalid names
 
     // Convert the character names array into a structured string
     let missedCharacters = missedCharactersArray.join(", ");
