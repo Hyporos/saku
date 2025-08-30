@@ -48,6 +48,7 @@ module.exports = {
         "wos",
         "export",
         "say",
+        "guildprofile",
       ];
       const ownerCommands = ["reload"];
 
