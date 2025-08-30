@@ -35,7 +35,7 @@ router.get("/character/:name", async (req, res) => {
 router.get("/rankings/:name", async (req, res) => {
   try {
     const response = await axios.get(
-      `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${req.params.name}`
+      `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${req.params.name}`
     );
 
     const characterImgURL = response.data.ranks[0].characterImgURL;

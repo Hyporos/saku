@@ -182,7 +182,7 @@ module.exports = {
     }
 
     // Fetch Maplestory ranking data
-    const url = `https://www.nexon.com/api/maplestory/no-auth/v1/ranking/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${characterOption}`;
+    const url = `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${characterOption}`;
 
     try {
       axios.get(url).then(async function (res) {
