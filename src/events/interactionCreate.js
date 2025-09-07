@@ -49,6 +49,7 @@ module.exports = {
         "export",
         "say",
         "guildprofile",
+        "subtract",
       ];
       const ownerCommands = ["reload"];
 
