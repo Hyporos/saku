@@ -9,6 +9,7 @@ const {
 const { createWorker } = require("tesseract.js");
 const Jimp = require("jimp");
 const dayjs = require("dayjs");
+const sharp = require("sharp");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -59,8 +60,42 @@ module.exports = {
       return returnedName;
     }
 
+    function isWebpBuffer(buf) {
+      // Check for the "RIFF" and "WEBP" signatures in the buffer
+      return (
+        buf.length > 12 &&
+        buf.toString("ascii", 0, 4) === "RIFF" &&
+        buf.toString("ascii", 8, 12) === "WEBP"
+      );
+    }
+
+    async function fetchBuffer(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Image fetch failed");
+      return Buffer.from(await res.arrayBuffer());
+    }
+
+    async function loadNormalizedImage(attachment) {
+      const url = attachment.proxyURL || attachment.url;
+      let buf = await fetchBuffer(url);
+
+      const lowerCT = (attachment.contentType || "").toLowerCase();
+      const looksWebp =
+        lowerCT.includes("webp") ||
+        url.toLowerCase().endsWith(".webp") ||
+        isWebpBuffer(buf);
+
+      if (looksWebp) {
+        // Convert to PNG for Jimp
+        buf = await sharp(buf).png().toBuffer();
+      }
+
+      return Jimp.read(buf);
+    }
+
     // Process the image
-    const image = await Jimp.read(imageOption.proxyURL);
+    const image = await loadNormalizedImage(imageOption);
+
     const buffer = await image
       .contrast(1)
       .grayscale()
