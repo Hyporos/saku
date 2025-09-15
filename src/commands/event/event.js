@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const addCommand = require("./add.js");
 const subtractCommand = require("./subtract.js");
 const mobcountCommand = require("./mobcount.js");
+const leaderboardCommand = require("./leaderboard.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -53,11 +54,29 @@ module.exports = {
             .setDescription("The user's mob count you wish to view")
             .setRequired(false)
         )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("leaderboard")
+        .setDescription("View the mob count leaderboard")
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
+    // Restrict command usage to specific channels
+    const ALLOWED_CHANNEL_IDS = [
+      "1416900120972230676",
+      "1090002887410729090",
+    ];
+
+    if (!ALLOWED_CHANNEL_IDS.includes(interaction.channelId)) {
+      return interaction.reply({
+        content: "Error - You can only use this command in the designated event channels",
+        ephemeral: true,
+      });
+    }
+
     try {
       // Parse the comand arguments
       const subcommandOption = interaction.options.getSubcommand();
@@ -72,6 +91,9 @@ module.exports = {
           break;
         case "mobcount":
           await mobcountCommand.execute(interaction);
+          break;
+        case "leaderboard":
+          await leaderboardCommand.execute(interaction);
           break;
       }
     } catch (error) {
