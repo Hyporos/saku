@@ -33,6 +33,7 @@ module.exports = {
         "scan",
         "finalize",
         "wos",
+        "changeid",
         "fatal",
       ];
 
@@ -46,6 +47,7 @@ module.exports = {
         "scan",
         "finalize",
         "wos",
+        "changeid",
         "export",
         "say",
         "guildprofile",
