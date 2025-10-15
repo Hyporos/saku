@@ -59,7 +59,7 @@ module.exports = {
     const { lastReset, reset } = getResetDates();
 
     // Find the specified character
-    const character = await findCharacter(interaction, characterOption);
+    const character = await findCharacter(interaction, characterOption, true);
     if (!character) return;
 
     // Get and sort all scores by date, from oldest to newest
@@ -143,6 +143,11 @@ module.exports = {
 
     // Create the 'previous scores' embed field
     function getPreviousScores() {
+      // Handle case where there are no scores
+      if (!scores || scores.length === 0) {
+        return "\u0060\u0060\u0060No scores yet\u0060\u0060\u0060";
+      }
+
       let notSubmitted = false;
 
       let content = "\u0060\u0060\u0060";
@@ -202,7 +207,7 @@ module.exports = {
           .addFields(
             {
               name: "Class",
-              value: character.class,
+              value: character.class || "Unknown",
               inline: true,
             },
             {

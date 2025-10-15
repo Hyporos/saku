@@ -12,9 +12,10 @@ dayjs.extend(updateLocale);
  *
  * @param {Object} interaction - The interaction object from Discord.js.
  * @param {string} characterName - The character name to be used for the query.
+ * @param {boolean} deferred - Whether the interaction has been deferred (default: false).
  */
 
-async function findCharacter(interaction, characterName) {
+async function findCharacter(interaction, characterName, deferred = false) {
   const user = await culvertSchema.findOne(
     {
       "characters.name": { $regex: `^${characterName}$`, $options: "i" },
@@ -23,9 +24,12 @@ async function findCharacter(interaction, characterName) {
   );
 
   if (!user) {
-    await interaction.reply(
-      `Error - The character **${characterName}** is not linked to any user`
-    );
+    const errorMessage = `Error - The character **${characterName}** is not linked to any user`;
+    if (deferred) {
+      await interaction.editReply(errorMessage);
+    } else {
+      await interaction.reply(errorMessage);
+    }
     return null;
   }
 
