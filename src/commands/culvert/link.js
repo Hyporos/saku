@@ -147,7 +147,7 @@ module.exports = {
         // Let the lab rat be tested on secretly...
         if (characterOption.toLowerCase() !== "druu") {
           culvertChannel.send(
-            `Welcome to Saku, ${userOption}! Your character **${characterOption}** has just been linked to Saku's official discord bot.\n\nIn the ${culvertChannel} channel, you can view your culvert progression with various commands, such as \`/profile\` and \`/graph\`.\nSubmit your weekly scores with the \`/gpq\` command if you wish to view your stats early, otherwise they will be automatically submitted by the end of the week.\n\nTo learn more, use the \`/help\` command.`
+            `Welcome to Saku, ${userOption}! Your character **${characterOption}** has just been linked to Saku's official discord bot.\n\nIn the ${culvertChannel} channel, you can view your culvert progression with various commands, such as \`/profile\` and \`/graph\`.\n\nSubmit your weekly scores with the \`/gpq\` command if you wish to view your stats early, otherwise they will be automatically submitted by the end of the week.\n\nTo learn more, use the \`/help\` command.`
           );
         }
       })
