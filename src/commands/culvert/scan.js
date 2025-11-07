@@ -183,7 +183,7 @@ module.exports = {
     // Declare necessary variables
     const validScores = [];
     const NaNScores = [];
-
+    const zeroScores = [];
     const notFoundChars = [];
 
     let successCount = 0;
@@ -196,13 +196,17 @@ module.exports = {
       const score = Number(entryParts.pop());
 
       if (name) {
+        const checkedName = await checkExceptions(name);
         if (isNaN(score)) {
           // Log character names which have invalid scores
-          NaNScores.push(name);
+          NaNScores.push({ name: checkedName });
+        } else if (score === 0) {
+          // Log character names which have a score of 0
+          zeroScores.push({ name: checkedName });
         }
         // Log character names which are valid
         validScores.push({
-          name: await checkExceptions(name),
+          name: checkedName,
           score,
           sandbag: false,
         });
@@ -234,6 +238,7 @@ module.exports = {
 
       // Set the character to the the proper character in the scanned entry
       let character;
+      let userDiscordId;
 
       // If more than one name was matched, perform a more accurate search
       if (matchingNames.length > 1) {
@@ -247,9 +252,10 @@ module.exports = {
                   $options: "i",
                 },
               },
-              { "characters.$": 1 }
+              { "characters.$": 1, _id: 1 }
             );
             character = user?.characters[0];
+            userDiscordId = user?._id;
           }
         }
       } else {
@@ -259,9 +265,10 @@ module.exports = {
           {
             "characters.name": { $regex: `^${namePattern}$`, $options: "i" },
           },
-          { "characters.$": 1 }
+          { "characters.$": 1, _id: 1 }
         );
         character = user?.characters[0];
+        userDiscordId = user?._id;
       }
 
       // Perform the logic to set the score for the character
@@ -276,7 +283,23 @@ module.exports = {
         );
 
         // Update the name of the validCharacter to the one found in the database
+        const oldName = validCharacter.name;
         validCharacter.name = character.name;
+        validCharacter.discordId = userDiscordId;
+
+        // Also update the NaNScores entry if this character has a NaN score
+        const nanScoreEntry = NaNScores.find(n => n.name === oldName || n.name === character.name);
+        if (nanScoreEntry) {
+          nanScoreEntry.name = character.name;
+          nanScoreEntry.discordId = userDiscordId;
+        }
+
+        // Also update the zeroScores entry if this character has a score of 0
+        const zeroScoreEntry = zeroScores.find(z => z.name === oldName || z.name === character.name);
+        if (zeroScoreEntry) {
+          zeroScoreEntry.name = character.name;
+          zeroScoreEntry.discordId = userDiscordId;
+        }
 
         if (!scoreExists) {
           // Create a new score on the selected character
@@ -349,7 +372,10 @@ module.exports = {
         }
       } else {
         failureCount++;
-        notFoundChars.push(validCharacter.name);
+        notFoundChars.push({
+          name: validCharacter.name,
+          discordId: userDiscordId,
+        });
       }
     }
 
@@ -359,8 +385,10 @@ module.exports = {
 
       validScores.forEach((character) => {
         // If the character's name could not be read, change their score to 0 (NAN) Otherwise, add to list
-        if (!notFoundChars.includes(character.name)) {
-          if (NaNScores.includes(character.name)) {
+        const notFoundChar = notFoundChars.find(c => c.name === character.name);
+        if (!notFoundChar) {
+          const isNaN = NaNScores.find(n => n.name === character.name);
+          if (isNaN) {
             content = content.concat(`${character.name}: **0 (NaN)**`);
           } else {
             content = content.concat(
@@ -392,24 +420,34 @@ module.exports = {
     // Display the error message for unreadable names
     if (notFoundChars.length > 0) {
       response = response.concat(
-        "\n\nThe following characters could not be found:\n- "
+        "\n\nThe following characters could not be found:\n"
       );
 
-      for (const name of notFoundChars) {
-        response = response.concat(`**${name}** - `);
+      for (const char of notFoundChars) {
+        response = response.concat(`- **${char.name}**\n`);
       }
-      response = response.slice(0, -3); // Remove the unnecessary hyphen at the end
     }
 
     // Display the error message for characters with unreadable scores
     if (NaNScores.length > 0) {
       response = response.concat(
-        "\n\nThe following characters' scores could not be read and have defaulted to 0:\n- "
+        "\n\nThe following characters' scores could not be read and have defaulted to 0:\n"
       );
-      for (const name of NaNScores) {
-        response = response.concat(`**${name}** - `);
+      for (const nanScore of NaNScores) {
+        const discordId = nanScore.discordId || "Unknown";
+        response = response.concat(`- **${nanScore.name}** | ID: ${discordId}\n`);
       }
-      response = response.slice(0, -3);
+    }
+
+    // Display the list of characters with a score of 0
+    if (zeroScores.length > 0) {
+      response = response.concat(
+        "\n\nThe following characters have not submitted any scores:\n"
+      );
+      for (const zeroScore of zeroScores) {
+        const discordId = zeroScore.discordId || "Unknown";
+        response = response.concat(`- **${zeroScore.name}** | ID: ${discordId}\n`);
+      }
     }
 
     // If message is longer than 2000 characters, split into multiple messages
