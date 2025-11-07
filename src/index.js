@@ -70,20 +70,36 @@ const updateGuildJob = createScheduledJob(
   "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
 );
 
-// 12:00 AM every 2nd day
-const culvertFlagJobAM = createScheduledJob(
+// Monday 8:00 AM
+const culvertFlagJobMondayAM = createScheduledJob(
   client,
   sakuChannel,
-  "0 8 */2 * *",
+  "0 8 * * 1",
   "Reminder to complete Culvert and Flag Race!"
 );
 
-// 12:00 PM every 2nd day
-const culvertFlagJobPM = createScheduledJob(
+// Monday 8:00 PM
+const culvertFlagJobMondayPM = createScheduledJob(
   client,
   sakuChannel,
-  "0 20 */2 * *",
+  "0 20 * * 1",
   "Reminder to complete Culvert and Flag Race!"
+);
+
+// Wednesday 8:00 AM
+const culvertFlagJobWednesdayAM = createScheduledJob(
+  client,
+  sakuChannel,
+  "0 8 * * 3",
+  "Reminder to complete Culvert and Flag Race!"
+);
+
+// Sunday 8:00 PM
+const culvertFlagJobSundayPM = createScheduledJob(
+  client,
+  sakuChannel,
+  "0 20 * * 0",
+  "https://media.discordapp.net/attachments/1147319860481765500/1435854458381668445/image.png?ex=690e23eb&is=690cd26b&hm=67db9a7562919556cccd537f67c07d353ac7658ff7e2ba2f5e42cd1818efa3ca&=&format=webp&quality=lossless"
 );
 
 const mpReminderEmbed = new EmbedBuilder()
@@ -124,8 +140,10 @@ ursusNightEvent.start();
 
 updateGuildJob.start();
 
-culvertFlagJobAM.start();
-culvertFlagJobPM.start();
+culvertFlagJobMondayAM.start();
+culvertFlagJobMondayPM.start();
+culvertFlagJobWednesdayAM.start();
+culvertFlagJobSundayPM.start();
 
 mpReminderJob.start();
 // rpReminderJob.start();
