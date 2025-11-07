@@ -6,10 +6,9 @@ const {
   isScoreSubmitted,
   getResetDates,
 } = require("../../utility/culvertUtils.js");
-const { createWorker } = require("tesseract.js");
-const Jimp = require("jimp");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const dayjs = require("dayjs");
-const sharp = require("sharp");
+require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -41,6 +40,9 @@ module.exports = {
     // Command may take longer to execute. Defer the initial reply.
     await interaction.deferReply();
 
+    // Immediately show progress
+    await interaction.editReply("Preparing to analyze image...");
+
     // Get the current reset date (Thursday 12:00 AM UTC)
     const { lastReset, reset } = getResetDates();
     const selectedWeek = weekOption === "this_week" ? reset : lastReset;
@@ -60,125 +62,80 @@ module.exports = {
       return returnedName;
     }
 
-    function isWebpBuffer(buf) {
-      // Check for the "RIFF" and "WEBP" signatures in the buffer
-      return (
-        buf.length > 12 &&
-        buf.toString("ascii", 0, 4) === "RIFF" &&
-        buf.toString("ascii", 8, 12) === "WEBP"
-      );
-    }
-
     async function fetchBuffer(url) {
       const res = await fetch(url);
       if (!res.ok) throw new Error("Image fetch failed");
       return Buffer.from(await res.arrayBuffer());
     }
 
-    async function loadNormalizedImage(attachment) {
-      const url = attachment.proxyURL || attachment.url;
-      let buf = await fetchBuffer(url);
+    // Initialize Gemini AI
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-      const lowerCT = (attachment.contentType || "").toLowerCase();
-      const looksWebp =
-        lowerCT.includes("webp") ||
-        url.toLowerCase().endsWith(".webp") ||
-        isWebpBuffer(buf);
-
-      if (looksWebp) {
-        // Convert to PNG for Jimp
-        buf = await sharp(buf).png().toBuffer();
-      }
-
-      return Jimp.read(buf);
+    // Progress tracking
+    let currentProgress = 0;
+    async function updateProgress(progress, message) {
+      currentProgress = progress;
+      await interaction.editReply(`${message} ${progress}%`);
     }
 
-    // Process the image
-    const image = await loadNormalizedImage(imageOption);
+    await updateProgress(10, "Analyzing image...");
 
-    const buffer = await image
-      .contrast(1)
-      .grayscale()
-      .invert()
-      .scale(1.4)
-      .getBufferAsync(Jimp.MIME_JPEG);
+    // Fetch the image and convert to base64
+    const imageBuffer = await fetchBuffer(imageOption.proxyURL || imageOption.url);
+    const base64Image = imageBuffer.toString('base64');
 
-    // Create a state object to track OCR progress
-    let logState = {
-      status: "",
-      progress: 0,
-      lastReportedProgress: 0,
-    };
+    await updateProgress(20, "Analyzing image...");
 
-    // List of statuses to exclude
-    const excludedStatuses = [
-      "loaded tesseract core",
-      "initialized tesseract",
-      "loading language traineddata (from cache)",
-      "loaded language traineddata",
-      "initialized api",
-      "recognizing text",
-    ];
+    const prompt = `You are analyzing a MapleStory guild culvert participation screenshot.
+Extract ONLY the character names and their culvert scores from this image.
 
-    // Capitalize the first letter of the string (used for OCR status)
-    function capitalizeFirstLetter(string) {
-      return string.charAt(0).toUpperCase() + string.slice(1);
+The format should be one entry per line: CharacterName Score
+
+Rules:
+- Only include the character name (first column) and the culvert score (last number in the row)
+- Ignore all other columns (class, level, world, guild, etc.)
+- If a score cannot be read or is blank/hidden, use 0
+- Return ONLY the name and score separated by a space, nothing else
+- Each entry on a new line
+- Preserve exact character names including special characters (ö, á, etc.)
+- Do not include headers or any other text
+
+Example output:
+PlayerName1 63100
+PlayerName2 62918
+PlayerName3 0`;
+
+    let entryArray;
+    
+    try {
+      await updateProgress(30, "Processing image...");
+      
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: base64Image,
+            mimeType: imageOption.contentType || "image/png"
+          }
+        },
+        prompt
+      ]);
+
+      await updateProgress(60, "Processing image...");
+
+      const response = await result.response;
+      const text = response.text();
+
+      // Parse the AI response into the same format as OCR
+      entryArray = text.trim().split(/\r?\n/);
+
+      await updateProgress(70, "Submitting scores...");
+    } catch (error) {
+      console.error("Gemini API Error:", error);
+      return interaction.editReply(
+        "Error - Failed to analyze the image with Gemini API."
+      );
     }
-
-    function setLog(newState) {
-      logState = { ...logState, ...newState };
-
-      const isRecognizingText = logState.status === "recognizing text";
-      const roundedProgress = Math.floor(logState.progress * 10) * 10; // Round progress to nearest 10%
-
-      // Update "processing image..." percentage
-      if (
-        isRecognizingText &&
-        roundedProgress !== logState.lastReportedProgress
-      ) {
-        logState.lastReportedProgress = roundedProgress;
-        interaction.editReply(`Processing image... ${roundedProgress}%`);
-      }
-
-      // Update status message if it has changed and is not excluded
-      else if (!excludedStatuses.includes(logState.status)) {
-        interaction.editReply(`${capitalizeFirstLetter(logState.status)}...`);
-      }
-    }
-
-    // Use OCR to read all text in the image
-    const worker = await createWorker({
-      logger: (message) => {
-        setLog({
-          status: message.status,
-          progress: message.progress,
-        });
-      },
-      cachePath: "./tessdata",
-    });
-
-    const processTextEntries = async () => {
-      interaction.editReply("Loading tesseract core...");
-
-      await worker.loadLanguage("eng+fra+spa+dan+swe+ita");
-      await worker.initialize("eng+fra+spa+dan+swe+ita");
-      await worker.setParameters({
-        tessedit_char_blacklist: ",.…",
-      });
-
-      const {
-        data: { text },
-      } = await worker.recognize(buffer);
-
-      await worker.terminate();
-
-      // Return an array of each entry/line in the culvert score page
-      return text.split(/\r?\n/);
-    };
-
-    const entryArray = await processTextEntries();
-
-    interaction.editReply("Submitting scores...");
 
     // Declare necessary variables
     const validScores = [];
@@ -188,6 +145,8 @@ module.exports = {
 
     let successCount = 0;
     let failureCount = 0;
+
+    await updateProgress(80, "Submitting scores...");
 
     // Select name and score from each entry and push into a separate array
     for (const entry of entryArray) {
@@ -212,6 +171,11 @@ module.exports = {
         });
       }
     }
+
+    await updateProgress(90, "Submitting scores...");
+
+    let processedCount = 0;
+    const totalCharacters = validScores.length;
 
     for (const validCharacter of validScores) {
       const matchingNames = [];
@@ -461,6 +425,8 @@ module.exports = {
 
       return chunks;
     }
+
+    await updateProgress(100, "Submitting scores...");
 
     const messageChunks = splitMessage(response, 2000);
 
