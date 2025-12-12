@@ -180,23 +180,41 @@ PlayerName3 0`;
     for (const validCharacter of validScores) {
       const matchingNames = [];
 
-      // Get the first and last 4 letters of the character name to use for better database matching
-      const nameBeginning = validCharacter.name.substring(0, 4);
-      const nameEnd = validCharacter.name.substring(
-        validCharacter.name.length - 4
-      );
+      // Check if the name is truncated with ellipsis
+      const isTruncated = validCharacter.name.endsWith("...");
+      
+      let nameBeginning, nameEnd, truncatedPrefix;
+      
+      if (isTruncated) {
+        // For truncated names, remove the "..." and use the entire prefix for matching
+        truncatedPrefix = validCharacter.name.slice(0, -3);
+        nameBeginning = truncatedPrefix.substring(0, 4);
+      } else {
+        // Get the first and last 4 letters of the character name to use for better database matching
+        nameBeginning = validCharacter.name.substring(0, 4);
+        nameEnd = validCharacter.name.substring(
+          validCharacter.name.length - 4
+        );
+      }
 
       for (const character of characterList) {
         if (!character.name) continue;
 
-        // Find all names which match with the iterated nameBeginning or nameEnd
-        const isNameMatching = character.name
-          .toLowerCase()
-          .match(new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi"));
+        if (isTruncated) {
+          // For truncated names, match any name that starts with the truncated prefix
+          if (character.name.toLowerCase().startsWith(truncatedPrefix.toLowerCase())) {
+            matchingNames.push(character.name.toLowerCase());
+          }
+        } else {
+          // Find all names which match with the iterated nameBeginning or nameEnd
+          const isNameMatching = character.name
+            .toLowerCase()
+            .match(new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi"));
 
-        // Store matched character names in a separate array
-        if (isNameMatching && isNameMatching.length > 0) {
-          matchingNames.push(character.name.toLowerCase());
+          // Store matched character names in a separate array
+          if (isNameMatching && isNameMatching.length > 0) {
+            matchingNames.push(character.name.toLowerCase());
+          }
         }
       }
 
@@ -207,7 +225,28 @@ PlayerName3 0`;
       // If more than one name was matched, perform a more accurate search
       if (matchingNames.length > 1) {
         for (const duplicateName of matchingNames) {
-          if (duplicateName.includes(validCharacter.name.toLowerCase())) {
+          const searchName = isTruncated 
+            ? truncatedPrefix.toLowerCase() 
+            : validCharacter.name.toLowerCase();
+          
+          if (isTruncated) {
+            // For truncated names, find the name that starts with the prefix
+            if (duplicateName.startsWith(searchName)) {
+              // Find the specified duplicate character
+              const user = await culvertSchema.findOne(
+                {
+                  "characters.name": {
+                    $regex: `^${duplicateName}$`,
+                    $options: "i",
+                  },
+                },
+                { "characters.$": 1, _id: 1 }
+              );
+              character = user?.characters[0];
+              userDiscordId = user?._id;
+              break; // Take the first match
+            }
+          } else if (duplicateName.includes(searchName)) {
             // Find the specified duplicate character
             const user = await culvertSchema.findOne(
               {
@@ -224,15 +263,28 @@ PlayerName3 0`;
         }
       } else {
         // Find the specified character, when no duplicates found
-        const namePattern = `${nameBeginning}|${nameEnd}`;
-        const user = await culvertSchema.findOne(
-          {
-            "characters.name": { $regex: `^${namePattern}$`, $options: "i" },
-          },
-          { "characters.$": 1, _id: 1 }
-        );
-        character = user?.characters[0];
-        userDiscordId = user?._id;
+        if (isTruncated) {
+          // For truncated names with a single match, use the matched name
+          const matchedName = matchingNames[0];
+          const user = await culvertSchema.findOne(
+            {
+              "characters.name": { $regex: `^${matchedName}$`, $options: "i" },
+            },
+            { "characters.$": 1, _id: 1 }
+          );
+          character = user?.characters[0];
+          userDiscordId = user?._id;
+        } else {
+          const namePattern = `${nameBeginning}|${nameEnd}`;
+          const user = await culvertSchema.findOne(
+            {
+              "characters.name": { $regex: `^${namePattern}$`, $options: "i" },
+            },
+            { "characters.$": 1, _id: 1 }
+          );
+          character = user?.characters[0];
+          userDiscordId = user?._id;
+        }
       }
 
       // Perform the logic to set the score for the character
