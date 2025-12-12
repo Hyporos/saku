@@ -27,6 +27,7 @@ module.exports = {
         "I saw dannis in game last night. This must be a sign",
         "please lord dannis grant me some pitched i need some help to catch up with saku culvert requirement increase :PepeHands:",
         "Dannis I've been a good boy this week please bless me",
+        "https://media.discordapp.net/attachments/1178171097858973746/1449167606023065610/image.png?ex=693dea01&is=693c9881&hm=e9cad76dc9ca55b82378bb307cb4b01f5aa12efb48d2a4f15e50871e5a2d0d53&=&format=webp&quality=lossless"
       ];
 
       return phrases[Math.floor(Math.random() * phrases.length)];
