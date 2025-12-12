@@ -33,6 +33,7 @@ module.exports = {
         "scan",
         "finalize",
         "wos",
+        "culvertping",
         "changeid",
         "fatal",
       ];
@@ -45,6 +46,7 @@ module.exports = {
         "correct",
         "exception",
         "scan",
+        "culvertping",
         "finalize",
         "wos",
         "changeid",

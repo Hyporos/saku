@@ -44,6 +44,7 @@ module.exports = {
         "correct",
         "exception",
         "scan",
+        "culvertping",
         "finalize",
         "wos",
         "export",
@@ -106,6 +107,8 @@ module.exports = {
             return "Add a character exception to /scan. If a name is being incorrectly read by the bot, you can add an exception (alternative name) for the bot to recognize.";
           case "scan":
             return "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert.";
+          case "culvertping":
+            return "Scan a list of character names from a screenshot and create a pingable list of their names. Best used with a screenshot from the Culvert board of character names who have a score of 0.";
           case "finalize":
             return "View a list of characters that have unsubmitted scores for the given week. Use this to confirm whether or not /scan has missed any characters or if members have left the guild. If successful, a JSON containing all user data will be returned.";
           case "wos":
@@ -151,7 +154,9 @@ module.exports = {
           case "exception":
             return `\u0060[name]\u0060 - The name of the character\n\u0060[exception]\u0060 - The alternative name, which is being incorrectly scanned`;
           case "scan":
-            return `\u0060[week]\u0060 - Submit the scores for either the current or the last week`;
+            return `\u0060[attach]\u0060 - Screenshot of the culvert character name and score list \n\u0060[week]\u0060 - Submit the scores for either the current or the last week`;
+          case "culvertping":
+            return `\u0060[attach]\u0060 - Screenshot containing the list of character names to ping`;
           case "finalize":
             return `\u0060[week]\u0060 - Check the scores for either the current or the last week\n\u0060[override]\u0060 - Ignore unsubmitted scores and proceed with finalization`;
           case "wos":
@@ -189,7 +194,7 @@ module.exports = {
         name: "Culvert",
         value: `\u0060gpq\u0060, \u0060profile\u0060, \u0060graph\u0060, \u0060graphcolor\u0060, \u0060rankings\u0060${
           isBee
-            ? ", \u0060link\u0060, \u0060unlink\u0060, \u0060rename\u0060, \u0060changeid\u0060, \u0060correct\u0060, \u0060exception\u0060, \u0060scan\u0060, \u0060finalize\u0060, \u0060wos\u0060, \u0060export\u0060"
+            ? ", \u0060link\u0060, \u0060unlink\u0060, \u0060rename\u0060, \u0060changeid\u0060, \u0060correct\u0060, \u0060exception\u0060, \u0060scan\u0060, \u0060culvertping\u0060, \u0060finalize\u0060, \u0060wos\u0060, \u0060export\u0060"
             : ""
         }`,
       })
