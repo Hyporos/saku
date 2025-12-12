@@ -57,7 +57,11 @@ const ursusAfternoonEvent = createScheduledJob(
   client,
   sakuChannel,
   `0 ${13 + dstOffset} * * *`,
-  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710435631:t> to <t:1710450031:t> your local time)"
+  () => {
+    const now = dayjs().tz("America/New_York").hour(13 + dstOffset).minute(0).second(0);
+    const end = now.add(4, 'hours');
+    return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
+  }
 );
 
 // 8:00 PM EST every day
@@ -65,7 +69,11 @@ const ursusNightEvent = createScheduledJob(
   client,
   sakuChannel,
   `0 ${20 + dstOffset} * * *`,
-  "<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:1710460831:t> to <t:1710388831:t> your local time)"
+  () => {
+    const now = dayjs().tz("America/New_York").hour(20 + dstOffset).minute(0).second(0);
+    const end = now.add(4, 'hours');
+    return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
+  }
 );
 
 // Wednesday 7:00 PM EST

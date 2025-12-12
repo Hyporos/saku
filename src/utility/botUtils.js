@@ -62,7 +62,7 @@ function checkForCrashes(channel) {
  * @param {Object} client - The client object from Discord.js.
  * @param {string} channel - The channel id for the message to be sent to.
  * @param {string} schedule - The cron schedule to be used for the job.
- * @param {string} message - The message to be sent to the channel.
+ * @param {string|Function} message - The message to be sent to the channel, or a function that returns the message.
  */
 
 const createScheduledJob = (client, channelId, schedule, message) => {
@@ -73,7 +73,8 @@ const createScheduledJob = (client, channelId, schedule, message) => {
       console.log(`Error - Channel ${channelId} not found`);
     }
 
-    channel.send(message);
+    const messageContent = typeof message === 'function' ? message() : message;
+    channel.send(messageContent);
   });
 };
 
