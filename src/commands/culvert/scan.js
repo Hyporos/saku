@@ -126,6 +126,12 @@ PlayerName3 0`;
       const response = await result.response;
       const text = response.text();
 
+      // Log the raw AI response for debugging
+      console.log("=== SCAN DEBUG ===");
+      console.log("Raw AI Response:");
+      console.log(text);
+      console.log("==================");
+
       // Parse the AI response into the same format as OCR
       entryArray = text.trim().split(/\r?\n/);
 
@@ -154,13 +160,18 @@ PlayerName3 0`;
       const name = entryParts[0];
       const score = Number(entryParts.pop());
 
+      // Log parsing details for debugging
+      console.log(`Parsing entry: "${entry}" -> Name: "${name}", Score: ${score}`);
+
       if (name) {
         const checkedName = await checkExceptions(name);
         if (isNaN(score)) {
           // Log character names which have invalid scores
+          console.log(`  -> NaN score for ${checkedName}`);
           NaNScores.push({ name: checkedName });
         } else if (score === 0) {
           // Log character names which have a score of 0
+          console.log(`  -> Zero score for ${checkedName}`);
           zeroScores.push({ name: checkedName });
         }
         // Log character names which are valid
