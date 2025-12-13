@@ -180,14 +180,22 @@ PlayerName3 0`;
     for (const validCharacter of validScores) {
       const matchingNames = [];
 
-      // Check if the name is truncated with ellipsis
-      const isTruncated = validCharacter.name.endsWith("...");
+      // Check if the name is truncated with ellipsis (., .., or ...)
+      const isTruncated = validCharacter.name.endsWith("...") || 
+                          validCharacter.name.endsWith("..") || 
+                          validCharacter.name.endsWith(".");
       
       let nameBeginning, nameEnd, truncatedPrefix;
       
       if (isTruncated) {
-        // For truncated names, remove the "..." and use the entire prefix for matching
-        truncatedPrefix = validCharacter.name.slice(0, -3);
+        // For truncated names, remove the ellipsis and use the entire prefix for matching
+        if (validCharacter.name.endsWith("...")) {
+          truncatedPrefix = validCharacter.name.slice(0, -3);
+        } else if (validCharacter.name.endsWith("..")) {
+          truncatedPrefix = validCharacter.name.slice(0, -2);
+        } else {
+          truncatedPrefix = validCharacter.name.slice(0, -1);
+        }
         nameBeginning = truncatedPrefix.substring(0, 4);
       } else {
         // Get the first and last 4 letters of the character name to use for better database matching
