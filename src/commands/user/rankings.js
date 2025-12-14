@@ -157,7 +157,7 @@ module.exports = {
             // Update the message with new page
             await modalSubmitInteraction.update({
               files: [newAttachment],
-              components: [createPaginationRow(page)],
+              components: [createPaginationRow(page, maxPage)],
             });
           } else {
             // Handle navigation buttons

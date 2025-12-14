@@ -1,6 +1,9 @@
 const { AttachmentBuilder } = require("discord.js");
-const { createCanvas, loadImage } = require("@napi-rs/canvas");
+const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const { request } = require("undici");
+
+// Register the Quicksand font
+GlobalFonts.registerFromPath(require.resolve("../assets/fonts/Quicksand-Regular.ttf"), "Quicksand");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -69,10 +72,10 @@ async function generateUserRankingsCanvas(interaction, users) {
 
     context.fillStyle = "#ffffff";
 
-    const displayName = (member.nickname || member.user.username).replace(
-      /\s*\(.*?\)\s*/g,
-      ""
-    );
+    const displayName = (member.nickname || member.user.username)
+      .replace(/\s*\(.*?\)\s*/g, "")
+      .replace(/\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu, "")
+      .trim();
     context.fillText(displayName, x + size + 10, y + size / 2 + 7);
 
     // Draw the user's level and exp on the same line

@@ -1,6 +1,9 @@
 const { AttachmentBuilder } = require("discord.js");
-const { createCanvas, loadImage } = require("@napi-rs/canvas");
+const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const { request } = require("undici");
+
+// Register the Quicksand font
+GlobalFonts.registerFromPath(require.resolve("../assets/fonts/Quicksand-Regular.ttf"), "Quicksand");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -33,10 +36,11 @@ async function generateUserLevelCanvas(targetMember, user, requiredExp, rank) {
   context.font = "24px Quicksand";
   context.fillStyle = "#ffffff";
 
-  context.fillText(targetMember.nickname || targetMember.username, 160, 44); // Use the user's server specific nickname if available
+  const displayName = (targetMember.nickname || targetMember.username).replace(/\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu, "").trim();
+  context.fillText(displayName, 160, 44); // Use the user's server specific nickname if available
 
   // Draw a thin line below the username
-  const usernameWidth = context.measureText(targetMember.nickname || targetMember.username).width;
+  const usernameWidth = context.measureText(displayName).width;
 
   context.beginPath();
   context.moveTo(160, 54);
