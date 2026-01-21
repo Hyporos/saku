@@ -5,7 +5,7 @@ const path = require("path");
 
 const FATAL_DATA_FILE = path.join(__dirname, "../data/fatalMessage.json");
 const GUILD_ID = "719788426022617138";
-const CHANNEL_ID = "1147319860481765500";
+const CHANNEL_ID = "1463623492015620137";
 
 // IP addresses for all 40 channels
 const ipAddresses = [
@@ -62,14 +62,25 @@ function ensureDataDir() {
   }
 }
 
-// Save message ID to file (no-op, always use the hardcoded dev message)
+// Save message ID to file
 function saveMessageId(messageId) {
-  // No-op: always use the dev channel/message
+  ensureDataDir();
+  fs.writeFileSync(FATAL_DATA_FILE, JSON.stringify({
+    messageId: messageId
+  }, null, 2));
 }
 
-// Load message ID from file (always return the dev message)
+// Load message ID from file
 function loadMessageId() {
-  return "1463578248850964623";
+  try {
+    if (fs.existsSync(FATAL_DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(FATAL_DATA_FILE, "utf8"));
+      return data.messageId || null;
+    }
+  } catch (error) {
+    console.error("Error loading fatal message ID:", error);
+  }
+  return null;
 }
 
 // Ping a single channel once and return the latency
