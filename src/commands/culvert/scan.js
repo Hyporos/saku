@@ -50,6 +50,13 @@ module.exports = {
     // Get a list of all currently linked characters
     const characterList = await getAllCharacters();
 
+    // Normalize confusable characters for better matching
+    function normalizeConfusableChars(str) {
+      return str
+        .replace(/[Il1|]/g, 'i')  // Normalize I, l, 1, | to 'i'
+        .replace(/[O0]/g, 'o');    // Also handle O/0 confusion
+    }
+
     // Find an exception for the character name. if no exception exists, keep the entry name
     async function checkExceptions(entryName) {
       const exceptions = await exceptionSchema.find({});
@@ -185,9 +192,6 @@ PlayerName3 0`;
 
     await updateProgress(90, "Submitting scores...");
 
-    let processedCount = 0;
-    const totalCharacters = validScores.length;
-
     for (const validCharacter of validScores) {
       const matchingNames = [];
 
@@ -221,14 +225,21 @@ PlayerName3 0`;
 
         if (isTruncated) {
           // For truncated names, match any name that starts with the truncated prefix
-          if (character.name.toLowerCase().startsWith(truncatedPrefix.toLowerCase())) {
+          const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
+          const normalizedPrefix = normalizeConfusableChars(truncatedPrefix.toLowerCase());
+
+          if (normalizedCharName.startsWith(normalizedPrefix)) {
             matchingNames.push(character.name.toLowerCase());
           }
         } else {
+          // Normalize the character name and the search patterns
+          const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
+          const normalizedBeginning = normalizeConfusableChars(nameBeginning.toLowerCase());
+          const normalizedEnd = normalizeConfusableChars(nameEnd.toLowerCase());
+
           // Find all names which match with the iterated nameBeginning or nameEnd
-          const isNameMatching = character.name
-            .toLowerCase()
-            .match(new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi"));
+          const isNameMatching = normalizedCharName
+            .match(new RegExp(`^${normalizedBeginning}|${normalizedEnd}$`, "gi"));
 
           // Store matched character names in a separate array
           if (isNameMatching && isNameMatching.length > 0) {
@@ -244,13 +255,16 @@ PlayerName3 0`;
       // If more than one name was matched, perform a more accurate search
       if (matchingNames.length > 1) {
         for (const duplicateName of matchingNames) {
-          const searchName = isTruncated 
-            ? truncatedPrefix.toLowerCase() 
+          const searchName = isTruncated
+            ? truncatedPrefix.toLowerCase()
             : validCharacter.name.toLowerCase();
-          
+
+          const normalizedDuplicate = normalizeConfusableChars(duplicateName);
+          const normalizedSearch = normalizeConfusableChars(searchName);
+
           if (isTruncated) {
             // For truncated names, find the name that starts with the prefix
-            if (duplicateName.startsWith(searchName)) {
+            if (normalizedDuplicate.startsWith(normalizedSearch)) {
               // Find the specified duplicate character
               const user = await culvertSchema.findOne(
                 {
@@ -265,7 +279,7 @@ PlayerName3 0`;
               userDiscordId = user?._id;
               break; // Take the first match
             }
-          } else if (duplicateName.includes(searchName)) {
+          } else if (normalizedDuplicate.includes(normalizedSearch)) {
             // Find the specified duplicate character
             const user = await culvertSchema.findOne(
               {
@@ -454,13 +468,10 @@ PlayerName3 0`;
 
     // Display the error message for unreadable names
     if (notFoundChars.length > 0) {
+      const notFoundNames = notFoundChars.map(char => `**${char.name}**`).join(', ');
       response = response.concat(
-        "\n\nThe following characters could not be found:\n"
+        `\n\nThe following characters could not be found:\n${notFoundNames}\n`
       );
-
-      for (const char of notFoundChars) {
-        response = response.concat(`- **${char.name}**\n`);
-      }
     }
 
     // Display the error message for characters with unreadable scores
@@ -476,13 +487,10 @@ PlayerName3 0`;
 
     // Display the list of characters with a score of 0
     if (zeroScores.length > 0) {
+      const zeroScoreNames = zeroScores.map(z => `**${z.name}**`).join(', ');
       response = response.concat(
-        "\n\nThe following characters have not submitted any scores:\n"
+        `\n\nThe following characters have not submitted any scores:\n${zeroScoreNames}\n`
       );
-      for (const zeroScore of zeroScores) {
-        const discordId = zeroScore.discordId || "Unknown";
-        response = response.concat(`- **${zeroScore.name}** | ID: ${discordId}\n`);
-      }
     }
 
     // If message is longer than 2000 characters, split into multiple messages
