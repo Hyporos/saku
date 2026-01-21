@@ -35,7 +35,6 @@ module.exports = {
         "wos",
         "culvertping",
         "changeid",
-        "fatal",
       ];
 
       // Create a list of bee-exclusive and owner-exclusive commands
