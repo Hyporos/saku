@@ -31,8 +31,15 @@ module.exports = {
     );
     if (!characterLinked) return;
 
-    // Get the properly cased name of the character
+    // Get the properly cased name of the character and the user's Discord ID
     const characterNameCased = await getCasedName(characterOption);
+
+    // Get the user ID who owns this character
+    const userDoc = await culvertSchema.findOne(
+      { "characters.name": { $regex: `^${characterOption}$`, $options: "i" } },
+      { _id: 1 }
+    );
+    const userId = userDoc?._id;
 
     // Remove the character from the database
     await culvertSchema.findOneAndUpdate(
@@ -51,7 +58,7 @@ module.exports = {
 
     // Handle responses
     interaction.reply(
-      `Unlinked and removed all of **${characterNameCased}**'s scores from the database`
+      `Unlinked and removed all of **${characterNameCased}** (<@${userId}>)'s scores from the database`
     );
   },
 };
