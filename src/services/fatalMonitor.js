@@ -164,12 +164,12 @@ function calculateStatsForMessage(channelPings, frequencyHistory) {
   // Store both lists for this round (channels can score 1 or 2 points)
   frequencyHistory.push({ avgPing: top5ByAvgPing, stdDev: top5ByStdDev });
 
-  // Keep only last 10 rounds
-  if (frequencyHistory.length > 10) {
+  // Keep only last 25 rounds
+  if (frequencyHistory.length > 25) {
     frequencyHistory.shift();
   }
 
-  // Calculate frequency from history (last 10 rounds only)
+  // Calculate frequency from history (last 25 rounds only)
   // +1 for top 5 avg ping, +2 for top 5 std dev (max +3 per round)
   const channelFrequency = {};
   for (let i = 0; i < ipAddresses.length; i++) {
