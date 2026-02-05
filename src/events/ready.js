@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const os = require("os");
 const { checkForCrashes } = require("../utility/botUtils");
 const { setBirthdays } = require("../utility/cronUtils");
-const { startFatalMonitor } = require("../services/fatalMonitor");
+const { startLatencyMonitor } = require("../services/latencyMonitor");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -32,7 +32,7 @@ module.exports = {
 
     await setBirthdays(client);
 
-    // Start the Fatal channel monitor
-    await startFatalMonitor(client);
+    // Start the server latency monitor
+    await startLatencyMonitor(client);
   },
 };
