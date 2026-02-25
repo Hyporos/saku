@@ -5,26 +5,22 @@ const { Events, EmbedBuilder } = require("discord.js");
 module.exports = {
   name: Events.GuildMemberUpdate,
   async execute(oldMember, newMember) {
-    // Fetch the channels to log messages to
-    const logChannel = oldMember.guild.channels.cache.get('804899301632770078');
-    await logChannel.fetch();
-
     // Only send a log if the user nickname was changed
-    if (oldMember.nickname === newMember.nickname) {
-      return;
-    }
+    if (oldMember.nickname === newMember.nickname) return;
+
+    // Fetch the channel to log messages to
+    const logChannel = await oldMember.guild.channels.fetch('804899301632770078').catch(() => null);
+    if (!logChannel) return;
 
     // Check if the user nickname was changed
     let event = "";
 
-    if (oldMember.nickname !== newMember.nickname) {
-      if (!oldMember.nickname && newMember.nickname) {
-        event = "Nickname added";
-      } else if (oldMember.nickname && !newMember.nickname) {
-        event = "Nickname removed";
-      } else {
-        event = "Nickname changed";
-      }
+    if (!oldMember.nickname && newMember.nickname) {
+      event = "Nickname added";
+    } else if (oldMember.nickname && !newMember.nickname) {
+      event = "Nickname removed";
+    } else {
+      event = "Nickname changed";
     }
 
     // Create the log embed

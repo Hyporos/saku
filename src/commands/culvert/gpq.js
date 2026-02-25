@@ -50,9 +50,13 @@ module.exports = {
       .filter((choice) => choice.toLowerCase().includes(value))
       .slice(0, 25);
 
-    await interaction.respond(
-      filtered.map((choice) => ({ name: choice, value: choice }))
-    );
+    try {
+      await interaction.respond(
+        filtered.map((choice) => ({ name: choice, value: choice }))
+      );
+    } catch (error) {
+      if (error.code !== 10062) throw error;
+    }
   },
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
