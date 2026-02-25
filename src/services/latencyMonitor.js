@@ -56,22 +56,6 @@ const ipAddresses = [
 const port = 8585;
 let pingLoop = null;
 
-// Configuration constants
-const CONFIG = {
-  PING_ATTEMPTS: 5,
-  PING_TIMEOUT: 3000,
-  PING_HISTORY_SIZE: 10,
-  FREQUENCY_HISTORY_SIZE: 25,
-  UPDATE_INTERVAL: 10000, // 10 seconds
-  TOP_CHANNELS_COUNT: 5
-};
-
-// Scoring weights for frequency calculation
-const SCORING = {
-  AVG_PING_WEIGHT: 1,
-  STD_DEV_WEIGHT: 2
-};
-
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Ensure data directory exists
@@ -109,27 +93,40 @@ function pingSingleAttempt(ip) {
     const startTime = Date.now();
     const socket = new net.Socket();
 
-    socket.setTimeout(CONFIG.PING_TIMEOUT);
+    socket.setTimeout(3000);
 
-    const cleanup = (result) => {
+    socket.on("connect", () => {
+      const latency = Date.now() - startTime;
       socket.removeAllListeners();
       socket.destroy();
-      resolve(result);
-    };
+      resolve(latency);
+    });
 
-    socket.on("connect", () => cleanup(Date.now() - startTime));
-    socket.on("timeout", () => cleanup(null));
-    socket.on("error", () => cleanup(null));
+    socket.on("timeout", () => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(null);
+    });
+
+    socket.on("error", () => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(null);
+    });
 
     socket.connect(port, ip);
   });
 }
 
-// Ping a channel multiple times and return the median latency
+// Ping a channel 5 times and return the median latency
 async function pingChannel(ip) {
-  const results = await Promise.all(
-    Array(CONFIG.PING_ATTEMPTS).fill().map(() => pingSingleAttempt(ip))
-  );
+  const results = await Promise.all([
+    pingSingleAttempt(ip),
+    pingSingleAttempt(ip),
+    pingSingleAttempt(ip),
+    pingSingleAttempt(ip),
+    pingSingleAttempt(ip)
+  ]);
 
   // Filter out null results (failed pings)
   const validResults = results.filter(r => r !== null);
@@ -150,41 +147,9 @@ function calculateStdDev(values, mean) {
   return Math.sqrt(avgSquaredDiff);
 }
 
-// Calculate frequency scores for worst and best performing channels
-function calculateFrequencyScores(frequencyHistory) {
-  const channelFrequency = {};
-  const channelBestFrequency = {};
-  
-  // Initialize frequency counters
-  for (let i = 0; i < ipAddresses.length; i++) {
-    channelFrequency[i + 1] = 0;
-    channelBestFrequency[i + 1] = 0;
-  }
-
-  // Calculate scores from history
-  frequencyHistory.forEach(round => {
-    // High latency channels
-    round.avgPing.forEach(channelNum => {
-      channelFrequency[channelNum] += SCORING.AVG_PING_WEIGHT;
-    });
-    round.stdDev.forEach(channelNum => {
-      channelFrequency[channelNum] += SCORING.STD_DEV_WEIGHT;
-    });
-    
-    // Best performing (for optimal usage)
-    round.bestAvgPing.forEach(channelNum => {
-      channelBestFrequency[channelNum] += SCORING.AVG_PING_WEIGHT;
-    });
-    round.bestStdDev.forEach(channelNum => {
-      channelBestFrequency[channelNum] += SCORING.STD_DEV_WEIGHT;
-    });
-  });
-
-  return { channelFrequency, channelBestFrequency };
-}
-
-// Calculate current channel statistics
-function calculateCurrentStats(channelPings) {
+// Calculate stats for a single message's data
+function calculateStatsForMessage(channelPings, frequencyHistory) {
+  // Calculate current stats for all channels
   const currentStats = [];
   for (let channelNum in channelPings) {
     const pings = channelPings[channelNum];
@@ -198,52 +163,82 @@ function calculateCurrentStats(channelPings) {
       });
     }
   }
-  return currentStats;
-}
 
-// Get top performing channels by metric
-function getTopChannels(stats, metric, ascending = false) {
-  const sorted = [...stats].sort((a, b) => 
-    ascending ? a[metric] - b[metric] : b[metric] - a[metric]
-  );
-  return sorted.slice(0, CONFIG.TOP_CHANNELS_COUNT).map(stat => stat.channelNumber);
-}
+  // Find top 5 by highest avg ping
+  const top5ByAvgPing = [...currentStats]
+    .sort((a, b) => b.avgPing - a.avgPing)
+    .slice(0, 5)
+    .map(stat => stat.channelNumber);
 
-// Update frequency history with current round data
-function updateFrequencyHistory(currentStats, frequencyHistory) {
-  const roundData = {
-    avgPing: getTopChannels(currentStats, 'avgPing'),
-    stdDev: getTopChannels(currentStats, 'stdDev'),
-    bestAvgPing: getTopChannels(currentStats, 'avgPing', true),
-    bestStdDev: getTopChannels(currentStats, 'stdDev', true)
-  };
-  
-  frequencyHistory.push(roundData);
-  
-  // Keep only last N rounds
-  if (frequencyHistory.length > CONFIG.FREQUENCY_HISTORY_SIZE) {
+  // Find top 5 by highest std dev
+  const top5ByStdDev = [...currentStats]
+    .sort((a, b) => b.stdDev - a.stdDev)
+    .slice(0, 5)
+    .map(stat => stat.channelNumber);
+
+  // Find top 5 by lowest avg ping (best performing)
+  const top5ByLowestAvgPing = [...currentStats]
+    .sort((a, b) => a.avgPing - b.avgPing)
+    .slice(0, 5)
+    .map(stat => stat.channelNumber);
+
+  // Find top 5 by lowest std dev (most stable)
+  const top5ByLowestStdDev = [...currentStats]
+    .sort((a, b) => a.stdDev - b.stdDev)
+    .slice(0, 5)
+    .map(stat => stat.channelNumber);
+
+  // Store all lists for this round
+  frequencyHistory.push({ 
+    avgPing: top5ByAvgPing, 
+    stdDev: top5ByStdDev,
+    bestAvgPing: top5ByLowestAvgPing,
+    bestStdDev: top5ByLowestStdDev
+  });
+
+  // Keep only last 25 rounds
+  if (frequencyHistory.length > 25) {
     frequencyHistory.shift();
   }
-  
-  return roundData;
-}
 
-// Build final channel statistics object
-function buildChannelStats(channelPings, channelFrequency, channelBestFrequency) {
+  // Calculate frequency from history (last 25 rounds only)
+  // +1 for top 5 avg ping, +2 for top 5 std dev (max +3 per round)
+  const channelFrequency = {};
+  const channelBestFrequency = {};
+  for (let i = 0; i < ipAddresses.length; i++) {
+    channelFrequency[i + 1] = 0;
+    channelBestFrequency[i + 1] = 0;
+  }
+
+  frequencyHistory.forEach(round => {
+    round.avgPing.forEach(channelNum => {
+      channelFrequency[channelNum] += 1;
+    });
+    round.stdDev.forEach(channelNum => {
+      channelFrequency[channelNum] += 2; // Double weight for std dev
+    });
+    // Track best performing channels
+    round.bestAvgPing.forEach(channelNum => {
+      channelBestFrequency[channelNum] += 1;
+    });
+    round.bestStdDev.forEach(channelNum => {
+      channelBestFrequency[channelNum] += 2; // Double weight for std dev
+    });
+  });
+
+  // Calculate final statistics for all channels
   const channelStats = {};
-  
   for (let channelNum in channelPings) {
     const pings = channelPings[channelNum];
-    const hasData = pings.length > 0;
-    
-    if (hasData) {
+
+    if (pings.length > 0) {
       const avgPing = pings.reduce((a, b) => a + b, 0) / pings.length;
       const stdDev = calculateStdDev(pings, avgPing);
-      
+
       channelStats[channelNum] = {
         channel: `Ch${channelNum}`,
-        avgPing,
-        stdDev,
+        avgPing: avgPing,
+        stdDev: stdDev,
         frequency: channelFrequency[channelNum],
         bestFrequency: channelBestFrequency[channelNum],
         failed: false,
@@ -259,57 +254,41 @@ function buildChannelStats(channelPings, channelFrequency, channelBestFrequency)
       };
     }
   }
-  
-  return channelStats;
-}
 
-// Get ranked channels based on primary and secondary sort criteria
-function getRankedChannels(channels, primaryMetric, secondaryMetric, secondaryAscending = false) {
-  return channels
-    .sort((a, b) => {
-      if (b[primaryMetric] !== a[primaryMetric]) {
-        return b[primaryMetric] - a[primaryMetric];
-      }
-      // Secondary sort - lower is better for avgPing, higher for stdDev
-      return secondaryAscending 
-        ? a[secondaryMetric] - b[secondaryMetric]
-        : b[secondaryMetric] - a[secondaryMetric];
-    })
-    .slice(0, CONFIG.TOP_CHANNELS_COUNT);
-}
-
-// Format channel data into a table string
-function formatChannelTable(channels, frequencyField) {
-  const header = "Channel    Frequency    Avg Ping     Std Deviation";
-  const rows = channels.map(channel => 
-    `${channel.channel.padEnd(10)} ${String(channel[frequencyField]).padEnd(12)} ${channel.avgPing.toFixed(2).padEnd(12)} ${channel.stdDev.toFixed(2)} ms`
+  // Convert to array and sort
+  const statsArray = Object.values(channelStats).filter(
+    (stat) => !stat.failed
   );
-  
-  return "```\n" + header + "\n" + rows.join("\n") + "\n```";
-}
 
-// Calculate stats for a single message's data
-function calculateStatsForMessage(channelPings, frequencyHistory) {
-  const currentStats = calculateCurrentStats(channelPings);
-  updateFrequencyHistory(currentStats, frequencyHistory);
+  // Check if all channels failed
+  const failedChannels = Object.values(channelStats).filter(
+    (stat) => stat.failed
+  );
 
-  // Calculate frequency scores from history
-  const { channelFrequency, channelBestFrequency } = calculateFrequencyScores(frequencyHistory);
+  // Top 5 high latency channels (sorted by frequency, then by stdDev as tiebreaker)
+  const highLatencyChannels = statsArray
+    .sort((a, b) => {
+      if (b.frequency !== a.frequency) {
+        return b.frequency - a.frequency;
+      }
+      return b.stdDev - a.stdDev;
+    })
+    .slice(0, 5);
 
-  // Build final channel statistics
-  const channelStats = buildChannelStats(channelPings, channelFrequency, channelBestFrequency);
-
-  // Separate working and failed channels
-  const allStats = Object.values(channelStats);
-  const workingChannels = allStats.filter(stat => !stat.failed);
-  const failedChannels = allStats.filter(stat => stat.failed);
-
-  // Get ranked channel lists
-  const highLatencyChannels = getRankedChannels(workingChannels, 'frequency', 'stdDev');
-  const lowLatencyChannels = getRankedChannels(workingChannels, 'bestFrequency', 'avgPing', true);
+  // Top 5 low latency channels (sorted by bestFrequency, then by avgPing as tiebreaker)
+  const lowLatencyChannels = statsArray
+    .sort((a, b) => {
+      if (b.bestFrequency !== a.bestFrequency) {
+        return b.bestFrequency - a.bestFrequency;
+      }
+      return a.avgPing - b.avgPing; // Lower ping is better
+    })
+    .slice(0, 5);
 
   return { failedChannels, highLatencyChannels, lowLatencyChannels, historyLength: frequencyHistory.length };
 }
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Function to build the embed
 function buildEmbed(failedChannels, highLatencyChannels, lowLatencyChannels, formattedTime) {
@@ -317,22 +296,38 @@ function buildEmbed(failedChannels, highLatencyChannels, lowLatencyChannels, for
     .setTitle("Channel Latency Analysis")
     .setColor(0xffc3c5)
     .setDescription(
-      `Every ${CONFIG.UPDATE_INTERVAL / 1000} seconds, all 40 channels are pinged ${CONFIG.PING_ATTEMPTS} times. Frequency is calculated using the top ${CONFIG.TOP_CHANNELS_COUNT} channels by avg ping and std deviation.\n\n**Results vary by location.** This bot is hosted in Ashburn, Virginia. Your optimal channels may differ based on your geographic location and ISP routing.\n\u200b`
+      "Every 10 seconds, all 40 channels are pinged 5 times. Frequency is calculated using the top 5 channels by avg ping and std deviation.\n\n**Results vary by location.** This bot is hosted in Ashburn, Virginia. Your optimal channels may differ based on your geographic location and ISP routing.\n\u200b"
     );
 
-  // Add channel ranking fields
-  embed.addFields(
-    {
-      name: "Low Latency Channels", 
-      value: formatChannelTable(lowLatencyChannels, 'bestFrequency'),
-      inline: false,
-    },
-    {
-      name: "High Latency Channels",
-      value: formatChannelTable(highLatencyChannels, 'frequency'),
-      inline: false,
-    }
-  );
+  embed.addFields({
+    name: "Low Latency Channels",
+    value:
+      "```" +
+      "Channel    Frequency    Avg Ping     Std Deviation\n" +
+      lowLatencyChannels
+        .map(
+          (s) =>
+            `${s.channel.padEnd(10)} ${String(s.bestFrequency).padEnd(12)} ${s.avgPing.toFixed(2).padEnd(12)} ${s.stdDev.toFixed(2)} ms`
+        )
+        .join("\n") +
+      "```",
+    inline: false,
+  });
+
+  embed.addFields({
+    name: "High Latency Channels",
+    value:
+      "```" +
+      "Channel    Frequency    Avg Ping     Std Deviation\n" +
+      highLatencyChannels
+        .map(
+          (s) =>
+            `${s.channel.padEnd(10)} ${String(s.frequency).padEnd(12)} ${s.avgPing.toFixed(2).padEnd(12)} ${s.stdDev.toFixed(2)} ms`
+        )
+        .join("\n") +
+      "```",
+    inline: false,
+  });
 
   if (failedChannels.length > 0) {
     embed.addFields({
@@ -358,6 +353,7 @@ function buildEmbed(failedChannels, highLatencyChannels, lowLatencyChannels, for
 
 // Start the latency monitor
 async function startLatencyMonitor(client) {
+  console.log("Starting High Latency Channel Monitor...");
 
   // Data structures (frequencies reset on restart)
   const channelPings = {};
@@ -380,7 +376,7 @@ async function startLatencyMonitor(client) {
   if (savedMessageId) {
     try {
       postedMessage = await targetChannel.messages.fetch(savedMessageId);
-      console.log("Loaded existing latency analysis message");
+      console.log("Loaded existing High Latency analysis message");
     } catch (error) {
       console.log("Could not fetch saved message, will create new one");
     }
@@ -401,8 +397,8 @@ async function startLatencyMonitor(client) {
 
         if (latency !== null) {
           channelPings[channelNumber].push(latency);
-          // Keep only last N pings
-          if (channelPings[channelNumber].length > CONFIG.PING_HISTORY_SIZE) {
+          // Keep only last 10 pings (10 rounds × 1 ping)
+          if (channelPings[channelNumber].length > 10) {
             channelPings[channelNumber].shift();
           }
         }
@@ -413,7 +409,7 @@ async function startLatencyMonitor(client) {
 
       // Check if all channels failed
       if (stats.failedChannels.length === ipAddresses.length) {
-        console.error("Latency Monitor: All channels failed connection attempts");
+        console.error("High Latency Monitor: All channels failed connection attempts");
         return;
       }
 
@@ -430,21 +426,21 @@ async function startLatencyMonitor(client) {
           embeds: [buildEmbed(stats.failedChannels, stats.highLatencyChannels, stats.lowLatencyChannels, formattedTime)],
         });
         saveMessageId(postedMessage.id);
-        console.log("Created new latency analysis message");
+        console.log("Created new High Latency analysis message");
       } else {
         await postedMessage.edit({
           embeds: [buildEmbed(stats.failedChannels, stats.highLatencyChannels, stats.lowLatencyChannels, formattedTime)],
         });
       }
     } catch (error) {
-      console.error("Error in latency monitor loop:", error);
+      console.error("Error in High Latency monitor loop:", error);
     }
-  }, CONFIG.UPDATE_INTERVAL);
+  }, 10000);
 
   // Initial ping right away
   pingLoop._onTimeout();
 
-  console.log("Channel Latency Monitor started successfully");
+  console.log("High Latency Channel Monitor started successfully");
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
