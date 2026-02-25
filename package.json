@@ -1,37 +1,8 @@
 {
   "name": "saku",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@jimp/plugin-threshold": "^0.22.10",
-    "@napi-rs/canvas": "^0.1.65",
-    "axios": "^1.5.0",
-    "canvas": "^2.11.2",
-    "cors": "^2.8.5",
-    "cron": "^3.1.6",
-    "csv": "^6.3.3",
-    "dayjs": "^1.11.9",
-    "discord.js": "^14.13.0",
-    "dotenv": "^16.3.1",
-    "express": "^4.19.2",
-    "fast-csv": "^5.0.1",
-    "fs": "0.0.1-security",
-    "got": "^13.0.0",
-    "jimp": "^0.22.10",
-    "mongodb": "^6.0.0",
-    "mongoose": "^7.5.0",
-    "node-cron": "^3.0.3",
-    "sharp": "^0.32.5",
-    "tesseract.js": "^4.1.2",
-    "timezone-support": "^3.1.0",
-    "undici": "^7.2.0"
+    "bot": "pnpm --filter bot dev",
+    "webapp": "pnpm --filter webapp dev"
   }
 }
