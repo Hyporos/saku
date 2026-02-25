@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+
+  /* Firefox */
+  @supports not selector(::-webkit-scrollbar) {
+    *{
+      scrollbar-width: thin;
+      scrollbar-color: #B5B7C830 #B5B7C810;
+    }
+  }
+
+  /* Chrome, Edge, and Safari */
+  *::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #B5B7C810;
+    border-radius: 5px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #B5B7C830;
+    border-radius: 14px;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background font-karla text-white
+  }
+}
