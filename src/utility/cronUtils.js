@@ -1,7 +1,10 @@
 const { EmbedBuilder } = require("discord.js");
 const User = require("../schemas/userSchema.js");
+const Culvert = require("../schemas/culvertSchema.js");
 const cron = require("cron");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+dayjs.extend(utc);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -64,4 +67,91 @@ const setBirthdays = async (client) => {
   }
 };
 
-module.exports = { setBirthdays };
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const ANNIVERSARY_CHANNEL_ID = "1147319860481765500";
+const GUILD_ID = "719788426022617138";
+
+/**
+ * Schedules a daily midnight UTC job that announces server join anniversaries.
+ *
+ * @param {Object} client - The Discord.js client.
+ */
+const setAnniversaries = (client) => {
+  new cron.CronJob(
+    "0 0 * * *",
+    async () => {
+      try {
+        const guild = client.guilds.cache.get(GUILD_ID);
+        if (!guild) {
+          console.error("Error - Guild not found for anniversary check");
+          return;
+        }
+
+        await guild.members.fetch();
+
+        const today = dayjs.utc();
+        const culvertUsers = await Culvert.find({});
+
+        const celebrants = culvertUsers
+          .flatMap((doc) => {
+            if (!doc.characters.length) return [];
+
+            // Use the earliest memberSince across all characters
+            const earliest = doc.characters.reduce((min, char) => {
+              const date = dayjs.utc(char.memberSince, "MMM DD, YYYY");
+              return date.isBefore(min) ? date : min;
+            }, dayjs.utc(doc.characters[0].memberSince, "MMM DD, YYYY"));
+
+            const isAnniversary =
+              earliest.month() === today.month() &&
+              earliest.date() === today.date() &&
+              earliest.year() < today.year();
+
+            if (!isAnniversary) return [];
+
+            const member = guild.members.cache.get(doc._id);
+            if (!member) return [];
+
+            return [{ member, years: today.year() - earliest.year() }];
+          })
+          .sort((a, b) => b.years - a.years);
+
+        if (!celebrants.length) return;
+
+        const channel = client.channels.cache.get(ANNIVERSARY_CHANNEL_ID);
+        if (!channel) {
+          console.error("Error - Anniversary channel not found");
+          return;
+        }
+
+        const description = celebrants
+          .map(
+            ({ member, years }) =>
+              `${member.user} — **${years}** year${years !== 1 ? "s" : ""} in the guild!`
+          )
+          .join("\n");
+
+        const embed = new EmbedBuilder()
+          .setColor(0xffd700)
+          .setTitle("Happy Anniversary!")
+          .setDescription(description)
+          .setTimestamp()
+          .setFooter({
+            text: "Thank you for being a part of Saku!",
+            iconURL:
+              "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
+          });
+
+        channel.send({ embeds: [embed] });
+      } catch (error) {
+        console.error("Error - Could not send anniversary announcements:", error);
+      }
+    },
+    null,
+    true,
+    "UTC"
+  );
+};
+
+module.exports = { setBirthdays, setAnniversaries };

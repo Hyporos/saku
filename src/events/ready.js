@@ -2,7 +2,7 @@ const { Events } = require("discord.js");
 const mongoose = require("mongoose");
 const os = require("os");
 const { checkForCrashes } = require("../utility/botUtils");
-const { setBirthdays } = require("../utility/cronUtils");
+const { setBirthdays, setAnniversaries } = require("../utility/cronUtils");
 const { startLatencyMonitor } = require("../services/latencyMonitor");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -31,6 +31,7 @@ module.exports = {
     }
 
     await setBirthdays(client);
+    setAnniversaries(client);
 
     // Start the server latency monitor
     await startLatencyMonitor(client);
