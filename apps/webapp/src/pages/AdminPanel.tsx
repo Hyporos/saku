@@ -282,8 +282,7 @@ const AdminPanel = () => {
   // Search + pagination state
   const [charSearch, setCharSearch] = useState("");
   const [charPage, setCharPage] = useState(1);
-  const [charDateFrom, setCharDateFrom] = useState("");
-  const [charDateTo, setCharDateTo] = useState("");
+
   const [userSearch, setUserSearch] = useState("");
   const [userPage, setUserPage] = useState(1);
   const [scoreSearch, setScoreSearch] = useState("");
@@ -607,9 +606,8 @@ const AdminPanel = () => {
 
   const filteredChars = liveCharacters.filter(
     (c) =>
-      (normalizeCharName(c.name).toLowerCase().includes(normalizeCharName(charSearch).toLowerCase()) ||
-      String(c.userId).toLowerCase().includes(charSearch.toLowerCase())) &&
-      (!charDateFrom || !charDateTo || (c.memberSince >= charDateFrom && c.memberSince <= charDateTo))
+      normalizeCharName(c.name).toLowerCase().includes(normalizeCharName(charSearch).toLowerCase()) ||
+      String(c.userId).toLowerCase().includes(charSearch.toLowerCase())
   );
   const { pageCount: charPageCount, paged: pagedChars } = applySortAndPage(filteredChars, charSort, charPage);
 
@@ -963,7 +961,7 @@ const AdminPanel = () => {
         {canCreate && (
           <button
             onClick={() => openCreate(createSection)}
-            className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-4 py-2 transition-colors"
+            className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-4 py-1.5 transition-colors"
           >
             <FaPlus size={11} style={{ marginBottom: "1px" }} />
             Add New
@@ -1032,9 +1030,10 @@ const AdminPanel = () => {
       return detailScoreSort.dir === "asc" ? cmp : -cmp;
     });
 
-    // Apply date range filter if set
-    if (detailDateFrom) detailScores = detailScores.filter((e) => e.date >= detailDateFrom);
-    if (detailDateTo)   detailScores = detailScores.filter((e) => e.date <= detailDateTo);
+    // Apply date range filter only when both ends are selected
+    if (detailDateFrom && detailDateTo) {
+      detailScores = detailScores.filter((e) => e.date >= detailDateFrom && e.date <= detailDateTo);
+    }
 
     // Pagination for score history (10 per page)
     const detailScorePageCount = Math.max(1, Math.ceil(detailScores.length / SCORE_DETAIL_PAGE_SIZE));
@@ -1206,7 +1205,7 @@ const AdminPanel = () => {
         </div>
 
         {/* Score history */}
-        <div className="bg-panel rounded-xl overflow-hidden flex-shrink-0">
+        <div className="bg-panel rounded-xl flex-shrink-0">
           {/* Header — entry count + date range filter + add score */}
           <div className="px-6 py-5 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1224,6 +1223,8 @@ const AdminPanel = () => {
                   align="right"
                   subtle
                   compact
+                  wednesdayOnly
+                  dropUp
                 />
               )}
               <button
@@ -1668,18 +1669,6 @@ const AdminPanel = () => {
                 onChange={(e) => { setCharSearch(e.target.value); setCharPage(1); }}
                 className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-0"
               />
-              <DatePicker
-                mode="range"
-                from={charDateFrom}
-                to={charDateTo}
-                onRangeChange={(f, t) => { setCharDateFrom(f); setCharDateTo(t); setCharPage(1); }}
-                wednesdayOnly
-                subtle
-                compact
-                placeholder="All Dates"
-                align="right"
-                dropUp
-              />
             </div>
             {usersLoading ? (
               <p className="px-6 py-8 text-sm text-tertiary/50 text-center">Loading...</p>
@@ -1759,18 +1748,6 @@ const AdminPanel = () => {
               title="Scores"
               count={filteredScores.length}
               createSection="scores"
-              extra={
-                <DatePicker
-                  mode="single"
-                  value={scoreDateFilter}
-                  onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
-                  wednesdayOnly
-                  subtle
-                  compact
-                  placeholder="All Dates"
-                  align="right"
-                />
-              }
             />
             <div className="bg-tertiary/20 h-px" />
             <div className="flex items-center gap-3 px-6 py-4 border-b border-tertiary/[6%]">
@@ -1780,7 +1757,17 @@ const AdminPanel = () => {
                 placeholder="Filter by character name..."
                 value={scoreSearch}
                 onChange={(e) => { setScoreSearch(e.target.value); setScorePage(1); }}
-                className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none w-full max-w-xs"
+                className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-0"
+              />
+              <DatePicker
+                mode="single"
+                value={scoreDateFilter}
+                onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
+                wednesdayOnly
+                subtle
+                compact
+                placeholder="All Dates"
+                align="right"
               />
             </div>
             {usersLoading ? (
@@ -1822,7 +1809,7 @@ const AdminPanel = () => {
                           {/* Character — always read-only, clickable to open char detail */}
                           <td className="px-6 py-4 text-sm">
                             <button
-                              className="text-accent hover:underline text-left"
+                              className="text-accent hover:opacity-70 transition-opacity text-left"
                               onClick={() => { const c = liveCharacters.find((x) => x.name === score.character); if (c) openCharDetail(c); }}
                             >{score.character}</button>
                           </td>
@@ -1965,12 +1952,12 @@ const AdminPanel = () => {
                                 onChange={(v) => setExcInlineEdit((s) => s && { ...s, name: v })}
                                 onKeyDown={(e) => { if (e.key === "Enter") inlineSaveException(); if (e.key === "Escape") setExcInlineEdit(null); }}
                                 suggestions={liveCharacters.map((c) => c.name)}
-                                inputClassName="w-[175px] bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
-                                autoFocus
+                                className="w-[175px]"
+                                inputClassName="w-full bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
                               />
                             ) : (
                               <button
-                                className="text-accent hover:underline text-left"
+                                className="text-accent hover:opacity-70 transition-opacity text-left"
                                 onClick={() => { const c = liveCharacters.find((x) => x.name === exc.name); if (c) openCharDetail(c); }}
                               >{exc.name}</button>
                             )}
@@ -2253,7 +2240,7 @@ const AdminPanel = () => {
               setSearch(""); setCharSearch(""); setUserSearch(""); setScoreSearch("");
               setCharPage(1); setUserPage(1); setScorePage(1); setExcPage(1);
               setCharSort(null); setUserSort(null); setScoreSort(null); setExcSort(null);
-              setCharDateFrom(""); setCharDateTo(""); setScoreDateFilter("");
+              setScoreDateFilter("");
               setExcInlineEdit(null); setScoreTabInlineEdit(null);
               setCharDetail(null);
               setUserDetail(null);

@@ -233,7 +233,7 @@ const DatePicker = (props: DatePickerProps) => {
                   ? dayjs((props as DatePickerRangeProps).from).format("MMM DD")
                   : "Start"}
               </span>
-              <FaArrowRight size={9} className="text-tertiary/40 flex-shrink-0" />
+              <FaArrowRight size={9} className="text-tertiary/40 flex-shrink-0 self-center" />
               <span className={cn(
                 "flex-1 text-center text-xs rounded-md py-1 transition-colors",
                 picking === "to" ? "bg-accent/15 text-accent" : "border border-tertiary/20 text-tertiary"
