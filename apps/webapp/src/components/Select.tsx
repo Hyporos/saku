@@ -70,7 +70,7 @@ const Select = ({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-2.5 bg-background border rounded-lg px-3 py-1.5 text-sm text-white transition-colors focus:outline-none cursor-pointer min-w-[120px]",
+          "inline-flex items-center gap-2.5 bg-background border rounded-lg px-3 py-1.5 text-sm text-white transition-colors focus:outline-none cursor-pointer w-full",
           open ? "border-accent/40" : "border-tertiary/20 hover:border-tertiary/40"
         )}
       >
@@ -101,7 +101,7 @@ const Select = ({
       {visible && (
         <div
           className={cn(
-            "absolute top-full mt-1 z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] py-1 min-w-full w-max transition-all duration-[180ms]",
+            "absolute top-full mt-1 z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] py-1 min-w-full transition-all duration-[180ms]",
             align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left",
             animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1"
           )}

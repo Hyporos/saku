@@ -26,6 +26,7 @@ import {
   FaHistory,
   FaUnlink,
   FaShieldAlt,
+  FaExchangeAlt,
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -315,7 +316,11 @@ const AdminPanel = () => {
   const [userDetail, setUserDetail] = useState<UserDetail | null>(null);
 
   // Context tracking — when a char detail was opened from a user detail, remember who "back" goes to
-  const [prevContext, setPrevContext] = useState<{ type: "user"; userId: string; username: string | null } | null>(null);
+  const [prevContext, setPrevContext] = useState<
+    | { type: "user"; userId: string; username: string | null }
+    | { type: "char"; charName: string }
+    | null
+  >(null);
 
   // Inline edits for detail pages
   const [charEdits, setCharEdits] = useState({ memberSince: "", avatar: "", graphColor: "" });
@@ -359,6 +364,12 @@ const AdminPanel = () => {
   };
   const confirm = (payload: ModalPayload) => setModal({ ...payload, isOpen: true });
 
+  // Transfer character modal state
+  const [transferModal, setTransferModal] = useState<{ isOpen: boolean; char: CharDetail | null }>({ isOpen: false, char: null });
+  const [transferToInput, setTransferToInput] = useState("");
+  const [transferDeleteSource, setTransferDeleteSource] = useState(false);
+  const closeTransferModal = () => { setTransferModal({ isOpen: false, char: null }); setTransferToInput(""); setTransferDeleteSource(false); };
+
   const refreshUsers = () => {
     setUsersLoading(true);
     return axios
@@ -378,9 +389,11 @@ const AdminPanel = () => {
   };
 
   // Navigate to a character's URL and open its detail view simultaneously
-  const openCharDetail = (char: CharDetail, fromUser?: UserDetail) => {
+  const openCharDetail = (char: CharDetail, fromUser?: UserDetail, fromChar?: CharDetail) => {
     if (fromUser) {
       setPrevContext({ type: "user", userId: String(fromUser._id), username: fromUser.username ?? null });
+    } else if (fromChar) {
+      setPrevContext({ type: "char", charName: fromChar.name });
     } else {
       setPrevContext(null);
     }
@@ -501,6 +514,22 @@ const AdminPanel = () => {
     await refreshUsers();
   };
 
+  const transferCharacter = async () => {
+    if (!transferModal.char) return;
+    const toUser = liveUsers.find((u) => u.username === transferToInput);
+    if (!toUser) return;
+    await axios.post(`${BOT_API}/bot/api/admin/characters/transfer`, {
+      fromUserId: transferModal.char.userId,
+      characterName: transferModal.char.name,
+      toUserId: toUser.id,
+      deleteSource: transferDeleteSource,
+    });
+    closeTransferModal();
+    setCharDetail(null);
+    navigate("/admin/characters");
+    await refreshUsers();
+  };
+
   // Fetch MapleStory API data when a character detail is opened.
   // Track charApiDataFor so we never show a previous character's image on the new character.
   useEffect(() => {
@@ -615,9 +644,10 @@ const AdminPanel = () => {
   );
   const { pageCount: charPageCount, paged: pagedChars } = applySortAndPage(filteredChars, charSort, charPage);
 
-  const toggleSort = (current: SortState | null, field: string, setter: (s: SortState) => void) => {
+  const toggleSort = (current: SortState | null, field: string, setter: (s: SortState | null) => void) => {
     if (current?.field === field) {
-      setter({ field, dir: current.dir === "asc" ? "desc" : "asc" });
+      if (current.dir === "asc") setter({ field, dir: "desc" });
+      else setter(null); // 3rd click cancels sort
     } else {
       setter({ field, dir: "asc" });
     }
@@ -1078,6 +1108,10 @@ const AdminPanel = () => {
               const found = userData.find((u) => String(u._id) === prevContext.userId);
               if (found) { setUserDetail(found); navigate(`/admin/users/${prevContext.userId}`); }
               else navigate("/admin/users");
+            } else if (prevContext?.type === "char") {
+              const prevChar = liveCharacters.find((c) => c.name === prevContext.charName);
+              if (prevChar) openCharDetail(prevChar);
+              else navigate("/admin/characters");
             } else {
               navigate("/admin/characters");
             }
@@ -1085,7 +1119,7 @@ const AdminPanel = () => {
           className="flex items-center gap-2 text-sm text-tertiary hover:text-white transition-colors self-start"
         >
           <FaArrowLeft size={12} />
-          {prevContext?.type === "user" ? `Back to ${prevContext.username ?? "User"}` : "Back to Characters"}
+          {prevContext?.type === "user" ? `Back to ${prevContext.username ?? "User"}` : prevContext?.type === "char" ? `Back to ${prevContext.charName}` : "Back to Characters"}
         </button>
 
         {/* Header — avatar inside bg-background panel, slightly more room */}
@@ -1124,13 +1158,22 @@ const AdminPanel = () => {
                 Save
               </button>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); deleteCharacter(charDetail.userId, charDetail.name); }}
-              title="Unlink character"
-              className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0 ml-2"
-            >
-              <FaUnlink size={11} /> Unlink Character
-            </button>
+            <div className="flex items-center gap-2 ml-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setTransferModal({ isOpen: true, char: charDetail }); }}
+                title="Transfer character to another user"
+                className="flex items-center gap-1.5 text-xs text-tertiary border border-tertiary/20 hover:border-tertiary/40 hover:text-white rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
+              >
+                <FaExchangeAlt size={11} /> Transfer Character
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteCharacter(charDetail.userId, charDetail.name); }}
+                title="Unlink character"
+                className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
+              >
+                <FaUnlink size={11} /> Unlink Character
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1195,9 +1238,10 @@ const AdminPanel = () => {
           {/* Graph Color */}
           <div className="px-6 py-4 flex items-center gap-4">
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Graph Color</span>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5  w-[126px]">
               <Select
                 variant="color"
+                className="w-[126px]"
                 options={GRAPH_COLORS.map((c) => ({ label: c.name, value: c.value, color: rgbCss(c.value) }))}
                 value={charEdits.graphColor}
                 onChange={(v) => { setCharEdits((p) => ({ ...p, graphColor: v })); setGraphColorDirty(true); }}
@@ -1250,7 +1294,7 @@ const AdminPanel = () => {
                   from={detailDateFrom}
                   to={detailDateTo}
                   onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
-                  placeholder="All dates"
+                  placeholder="All Dates"
                   align="right"
                   subtle
                   compact
@@ -1463,7 +1507,9 @@ const AdminPanel = () => {
           <div className="px-6 py-4 flex items-center gap-4">
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Role</span>
             <div className="flex items-center gap-1.5 text-sm text-tertiary">
-              {(userMemberData?.role ?? userDetail.role) === "bee"}
+              {(userMemberData?.role ?? userDetail.role) === "bee"
+                ? <FaShieldAlt size={11} className="text-accent" />
+                : <FaUserAlt size={11} className="text-tertiary/60" />}
               <span className="capitalize">{userMemberData?.role ?? userDetail.role ?? "—"}</span>
             </div>
           </div>
@@ -1799,8 +1845,8 @@ const AdminPanel = () => {
                           {/* Character — always read-only, clickable to open char detail */}
                           <td className="px-6 py-4 text-sm">
                             <button
-                              className="text-accent hover:opacity-70 transition-opacity text-left"
-                              onClick={() => { const c = liveCharacters.find((x) => x.name === score.character); if (c) openCharDetail(c); }}
+                              className="text-accent hover:text-white transition-colors text-left"
+                              onClick={() => { const c = liveCharacters.find((x) => x.name === score.character); if (c) openCharDetail(c, undefined, charDetail ?? undefined); }}
                             >{score.character}</button>
                           </td>
                           {/* Date — editable when in edit mode */}
@@ -1947,8 +1993,8 @@ const AdminPanel = () => {
                               />
                             ) : (
                               <button
-                                className="text-accent hover:opacity-70 transition-opacity text-left"
-                                onClick={() => { const c = liveCharacters.find((x) => x.name === exc.name); if (c) openCharDetail(c); }}
+                                className="text-accent hover:text-white transition-colors text-left"
+                                onClick={() => { const c = liveCharacters.find((x) => x.name === exc.name); if (c) openCharDetail(c, undefined, charDetail ?? undefined); }}
                               >{exc.name}</button>
                             )}
                           </td>
@@ -2359,6 +2405,77 @@ const AdminPanel = () => {
           confirmWord={modal.variant === "sensitive" ? modal.confirmWord : undefined}
         />
       )}
+
+      {/* Transfer Character modal */}
+      {transferModal.isOpen && transferModal.char && (() => {
+        const transferToUser = liveUsers.find((u) => u.username === transferToInput);
+        const isSelf = transferToUser?.id === transferModal.char!.userId;
+        const canTransfer = !!transferToUser && !isSelf;
+        return (
+          <>
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60]"
+              onClick={closeTransferModal}
+            />
+            <div className="fixed inset-0 flex items-center justify-center z-[70] pointer-events-none">
+              <div
+                className="bg-panel border border-tertiary/[8%] rounded-2xl p-8 w-[440px] pointer-events-auto drop-shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col gap-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Icon + title */}
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center mt-0.5">
+                    <FaExchangeAlt size={15} className="text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg">Transfer <span className="text-accent">{transferModal.char.name}</span>?</h3>
+                    <p className="text-sm text-tertiary mt-1 leading-relaxed">Select a Discord user to transfer this character to.</p>
+                  </div>
+                </div>
+
+                {/* Destination input */}
+                <AutocompleteInput
+                  value={transferToInput}
+                  onChange={setTransferToInput}
+                  suggestions={liveUsers.filter((u) => u.id !== transferModal.char!.userId).map((u) => u.username ?? u.id).filter(Boolean) as string[]}
+                  placeholder="Search Discord username..."
+                  autoFocus
+                  inputClassName={cn(inputCls)}
+                />
+                {isSelf && <p className="text-xs text-red-400 -mt-3">Cannot transfer to the same user.</p>}
+
+                {/* Delete source checkbox */}
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <Checkbox checked={transferDeleteSource} onChange={() => setTransferDeleteSource((v) => !v)} />
+                  <span className="text-sm text-tertiary">Also delete the source user from database</span>
+                </label>
+
+                {/* Actions */}
+                <div className="flex gap-3 mt-1">
+                  <button
+                    disabled={!canTransfer}
+                    onClick={transferCharacter}
+                    className={cn(
+                      "flex-1 rounded-lg py-2.5 text-sm transition-colors",
+                      canTransfer
+                        ? "bg-accent/15 hover:bg-accent/20 text-accent"
+                        : "bg-background/60 text-tertiary/30 cursor-not-allowed"
+                    )}
+                  >
+                    Transfer
+                  </button>
+                  <button
+                    onClick={closeTransferModal}
+                    className="flex-1 bg-background hover:bg-background/60 text-tertiary rounded-lg py-2.5 text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </section>
   );
 };

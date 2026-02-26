@@ -72,34 +72,40 @@ const MEMBER_ROLE_ID = "750000646345719899";
 
 router.get("/admin/users", async (req, res) => {
   try {
-    const users = await culvertSchema.find({}, { _id: 1, characters: 1 });
-
-    // Enrich each user with their Discord username and filter to Member/Bee roles only
     const discordClient = req.app.get("client");
-    const guild = discordClient?.guilds.cache.get(process.env.SAKU_GUILD_ID);
-    const results = (await Promise.all(
-      users.map(async (u) => {
-        let member = null;
-        if (guild) {
-          member =
-            guild.members.cache.get(String(u._id)) ??
-            (await guild.members.fetch(String(u._id)).catch(() => null));
-          // Only include users with the Member role or the Bee role
-          const hasMember = member?.roles.cache.has(MEMBER_ROLE_ID);
-          const hasBee = member?.roles.cache.has(BEE_ROLE_ID);
-          if (!hasMember && !hasBee) return null;
-        }
-        const username = member?.user?.username ?? null;
-        const nickname = member?.nickname ?? null;
-        const joinedAt = member?.joinedAt?.toISOString() ?? null;
-        const role = member?.roles.cache.has(BEE_ROLE_ID) ? "bee" : "member";
-        const rawAvatar = member?.user?.avatar;
-        const avatarUrl = rawAvatar
-          ? `https://cdn.discordapp.com/avatars/${u._id}/${rawAvatar}.webp?size=128`
-          : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(String(u._id)) % 5n)}.png`;
-        return { _id: u._id, graphColor: u.characters[0]?.graphColor ?? "255,189,213", characters: u.characters, username, nickname, joinedAt, role, avatarUrl };
-      })
-    )).filter(Boolean);
+    const guild = discordClient?.guilds.cache.get(process.env.SAKU_GUILD_ID)
+                  || await discordClient.guilds.fetch(process.env.SAKU_GUILD_ID).catch(() => null);
+
+    if (!guild) return res.status(503).json({ error: "Guild not found" });
+
+    // Fetch all guild members, filter to Member/Bee role holders
+    const allMembers = await guild.members.fetch();
+    const relevantMembers = allMembers.filter(
+      (m) => m.roles.cache.has(MEMBER_ROLE_ID) || m.roles.cache.has(BEE_ROLE_ID)
+    );
+
+    // Load all DB records at once and key by Discord ID
+    const dbUsers = await culvertSchema.find({}, { _id: 1, characters: 1 });
+    const dbMap = new Map(dbUsers.map((u) => [String(u._id), u]));
+
+    const results = relevantMembers.map((member) => {
+      const dbUser = dbMap.get(String(member.id));
+      const role = member.roles.cache.has(BEE_ROLE_ID) ? "bee" : "member";
+      const avatarUrl = member.displayAvatarURL({ extension: "webp", size: 128 });
+      return {
+        _id: String(member.id),
+        graphColor: dbUser?.characters?.[0]?.graphColor ?? "255,189,213",
+        characters: dbUser?.characters ?? [],
+        username: member.user.username,
+        nickname: member.nickname || null,
+        joinedAt: member.joinedAt?.toISOString() ?? null,
+        role,
+        avatarUrl,
+      };
+    });
+
+    // Sort by username alphabetically
+    results.sort((a, b) => (a.username ?? "").localeCompare(b.username ?? ""));
     res.json(results);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -194,6 +200,47 @@ router.patch("/admin/characters/:userId/:name", async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error("Error updating character:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.post("/admin/characters/transfer", async (req, res) => {
+  try {
+    const { fromUserId, characterName, toUserId, deleteSource } = req.body;
+
+    // Find the character in the source user's document
+    const sourceDoc = await culvertSchema.findOne(
+      { _id: fromUserId, "characters.name": { $regex: `^${characterName}$`, $options: "i" } },
+      { "characters.$": 1 }
+    );
+    if (!sourceDoc?.characters?.[0]) {
+      return res.status(404).json({ error: "Character not found" });
+    }
+    const character = sourceDoc.characters[0].toObject();
+
+    // Push the character into the destination user (upsert if they have no DB doc yet)
+    await culvertSchema.findByIdAndUpdate(
+      toUserId,
+      { $addToSet: { characters: character } },
+      { upsert: true }
+    );
+
+    // Remove the character from the source user
+    await culvertSchema.findByIdAndUpdate(fromUserId, {
+      $pull: { characters: { name: { $regex: `^${characterName}$`, $options: "i" } } },
+    });
+
+    if (deleteSource) {
+      // Checkbox checked — delete the source user document regardless of remaining characters
+      await culvertSchema.deleteOne({ _id: fromUserId });
+    } else {
+      // Silently clean up if the source user now has no characters left
+      await culvertSchema.deleteOne({ _id: fromUserId, characters: { $size: 0 } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error transferring character:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
