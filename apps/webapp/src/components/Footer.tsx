@@ -9,3 +9,5 @@ const Footer = () => {
 };
 
 export default Footer;
+
+// TODO WEBAPP: Action History, Error Console, Crash Log, Cron Job Manager, Alias Editor (change name between discord ids), Backfill Trigger, growth trends, server status, missing scores tracker

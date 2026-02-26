@@ -56,13 +56,13 @@ module.exports = {
       ];
       const ownerCommands = ["reload"];
 
-      // Display an error message if guests try to use culvert commands
+      // Display an error message if Friends try to use culvert commands
       if (
         interaction.member.roles.cache.has("720006084252663868") &&
         culvertCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
-          `Error - Guests do not have permission to use this command`
+          `Error - Friends do not have permission to use this command`
         );
         return;
       }

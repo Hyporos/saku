@@ -1,8 +1,6 @@
 packages:
-  - apps/*
+  - apps/bot
+  - apps/webapp
 
 onlyBuiltDependencies:
-  - canvas
   - esbuild
-  - sharp
-  - tesseract.js

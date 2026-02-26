@@ -28,8 +28,9 @@ app.use(express.json());
 
 app.use(cors());
 
-app.listen(3000, () => {
-  console.log(`Server Started at ${3000}`);
+const PORT = process.env.PORT || 25637;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server Started at ${PORT}`);
 });
 
 app.use("/api", routes);
@@ -44,6 +45,9 @@ const client = new Client({
     [GatewayIntentBits.GuildMessageReactions],
   partials: [Partials.GuildMember],
 });
+
+// Make the Discord client accessible inside Express route handlers via req.app.get("client")
+app.set("client", client);
 
 const remindersScanChannel = "1090002887410729090";
 const sakuChannel = "719788426022617142";

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const exceptionSchema = require("../../schemas/exceptionSchema.js");
 const {
   isCharacterLinked,
   getCasedName,
@@ -55,6 +56,12 @@ module.exports = {
         },
       }
     );
+
+    // Delete the user document entirely if they have no more characters
+    await culvertSchema.deleteOne({ _id: userId, characters: { $size: 0 } });
+
+    // Remove any exceptions tied to this character name
+    await exceptionSchema.deleteMany({ name: { $regex: `^${characterNameCased}$`, $options: "i" } });
 
     // Handle responses
     interaction.reply(

@@ -20,16 +20,8 @@ const culvertSchema = new Schema(
           type: String,
           required: true,
         },
-        avatar: {
-          type: String,
-          required: true,
-        },
         class: {
           type: String,
-          required: true,
-        },
-        level: {
-          type: Number,
           required: true,
         },
         memberSince: {

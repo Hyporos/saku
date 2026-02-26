@@ -1,6 +1,9 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 
+// Route through server.js proxy to avoid Mixed Content / CORS issues
+const BOT_API = import.meta.env.VITE_BOT_API_URL ?? "http://localhost:8000";
+
 const useCharacter = (characterName: string) => {
   const [characterData, setCharacterData] = useState<{
     name: string;
@@ -21,7 +24,7 @@ const useCharacter = (characterName: string) => {
   useEffect(() => {
     // Saku Bot API (MongoDB)
     axios
-      .get(`http://localhost:3000/api/character/${characterName}`)
+      .get(`${BOT_API}/bot/api/character/${characterName}`)
       .then((res) => {
         setCharacterData((prevData) => ({
           ...prevData,
@@ -37,7 +40,7 @@ const useCharacter = (characterName: string) => {
 
     // Saku Bot API (MapleStory Rankings)
     axios
-      .get(`http://localhost:3000/api/rankings/${characterName}`)
+      .get(`${BOT_API}/bot/api/rankings/${characterName}`)
       .then((res) => {
         setCharacterData((prevData) => ({
           ...prevData,

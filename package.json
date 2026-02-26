@@ -3,6 +3,6 @@
   "private": true,
   "scripts": {
     "bot": "pnpm --filter bot dev",
-    "webapp": "pnpm --filter webapp dev"
+    "webapp": "pnpm --filter saku-webapp dev"
   }
 }
