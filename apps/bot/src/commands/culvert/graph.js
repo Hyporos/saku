@@ -91,14 +91,6 @@ module.exports = {
       );
     }
 
-    // Get the user's selected graph color
-    const user = await culvertSchema.findOne(
-      {
-        "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
-      },
-      { graphColor: 1 }
-    );
-
     // Fetch the x and y axis labels for the graph
     function getLabels(axis) {
       const scores = character.scores || [];
@@ -133,7 +125,7 @@ module.exports = {
     // QuickChart Template Values & Link
     const xLabels = getLabels("x");
     const yLabels = getLabels("y");
-    const graphColor = user.graphColor || "255,189,213";
+    const graphColor = character.graphColor || "255,189,213";
     const borderColorAlpha = graphColor !== "255,189,213" ? 0.7 : 0.6;
 
     const graphTemplate =

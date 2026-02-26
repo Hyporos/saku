@@ -48,18 +48,20 @@ module.exports = {
       return colorMap[color];
     }
 
-    // Update the user's graph color
-    const user = await culvertSchema.findOneAndUpdate(
-      { _id: interaction.user.id },
-      { $set: { graphColor: getGraphColor(colorOption) } }
-    );
+    // Fetch the user to check the current color before updating
+    const user = await culvertSchema.findById(interaction.user.id, { characters: 1 });
 
     // Handle responses
     let content;
 
-    if (user.graphColor === getGraphColor(colorOption)) {
+    if (user?.characters[0]?.graphColor === getGraphColor(colorOption)) {
       content = `Error - Your graph color is already set to ${colorOption}`;
     } else {
+      // Update graphColor on every character belonging to this user
+      await culvertSchema.findByIdAndUpdate(
+        interaction.user.id,
+        { $set: { "characters.$[].graphColor": getGraphColor(colorOption) } }
+      );
       content = `Your graph color has been changed to ${colorOption}`;
     }
 

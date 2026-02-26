@@ -72,7 +72,7 @@ const MEMBER_ROLE_ID = "750000646345719899";
 
 router.get("/admin/users", async (req, res) => {
   try {
-    const users = await culvertSchema.find({}, { _id: 1, graphColor: 1, characters: 1 });
+    const users = await culvertSchema.find({}, { _id: 1, characters: 1 });
 
     // Enrich each user with their Discord username and filter to Member/Bee roles only
     const discordClient = req.app.get("client");
@@ -97,7 +97,7 @@ router.get("/admin/users", async (req, res) => {
         const avatarUrl = rawAvatar
           ? `https://cdn.discordapp.com/avatars/${u._id}/${rawAvatar}.webp?size=128`
           : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(String(u._id)) % 5n)}.png`;
-        return { _id: u._id, graphColor: u.graphColor, characters: u.characters, username, nickname, joinedAt, role, avatarUrl };
+        return { _id: u._id, graphColor: u.characters[0]?.graphColor ?? "255,189,213", characters: u.characters, username, nickname, joinedAt, role, avatarUrl };
       })
     )).filter(Boolean);
     res.json(results);
@@ -110,7 +110,8 @@ router.get("/admin/users", async (req, res) => {
 router.patch("/admin/users/:id", async (req, res) => {
   try {
     const { graphColor } = req.body;
-    await culvertSchema.findByIdAndUpdate(req.params.id, { $set: { graphColor } });
+    // Update graphColor on every character belonging to this user
+    await culvertSchema.findByIdAndUpdate(req.params.id, { $set: { "characters.$[].graphColor": graphColor } });
     res.json({ success: true });
   } catch (error) {
     console.error("Error updating user:", error);
@@ -168,7 +169,7 @@ router.post("/admin/characters", async (req, res) => {
   try {
     const { userId, name, memberSince, avatar } = req.body;
     await culvertSchema.findByIdAndUpdate(userId, {
-      $push: { characters: { name, memberSince, avatar: avatar || "", scores: [] } },
+      $push: { characters: { name, memberSince, avatar: avatar || "", graphColor: "255,189,213", scores: [] } },
     });
     res.json({ success: true });
   } catch (error) {

@@ -56,6 +56,7 @@ interface Character {
   name: string;
   avatar: string;
   memberSince: string;
+  graphColor: string;
   scores: ScoreEntry[];
 }
 
@@ -317,11 +318,10 @@ const AdminPanel = () => {
   const [prevContext, setPrevContext] = useState<{ type: "user"; userId: string; username: string | null } | null>(null);
 
   // Inline edits for detail pages
-  const [charEdits, setCharEdits] = useState({ memberSince: "", avatar: "" });
+  const [charEdits, setCharEdits] = useState({ memberSince: "", avatar: "", graphColor: "" });
   const [charEditsDirty, setCharEditsDirty] = useState(false);
   const [memberSinceDirty, setMemberSinceDirty] = useState(false);
-  const [userEdits, setUserEdits] = useState({ graphColor: "" });
-  const [userEditsDirty, setUserEditsDirty] = useState(false);
+  const [graphColorDirty, setGraphColorDirty] = useState(false);
 
   // Character detail — sort, date range filter, API data, score pagination, and owner
   const [detailScoreSort, setDetailScoreSort] = useState<SortState>({ field: "date", dir: "desc" });
@@ -445,17 +445,16 @@ const AdminPanel = () => {
   // Reset inline edits when switching to a different detail item
   useEffect(() => {
     if (charDetail) {
-      setCharEdits({ memberSince: toInputDate(charDetail.memberSince), avatar: charDetail.avatar ?? "" });
+      setCharEdits({ memberSince: toInputDate(charDetail.memberSince), avatar: charDetail.avatar ?? "", graphColor: charDetail.graphColor ?? "255,189,213" });
       setCharEditsDirty(false);
       setMemberSinceDirty(false);
+      setGraphColorDirty(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charDetail?.name, charDetail?.userId]);
 
   useEffect(() => {
     if (userDetail) {
-      setUserEdits({ graphColor: userDetail.graphColor });
-      setUserEditsDirty(false);
       setUserDetailCharSort(null);
       setSelUserDetailChars(new Set());
     }
@@ -495,10 +494,10 @@ const AdminPanel = () => {
     await refreshUsers();
   };
 
-  const saveUserEdits = async () => {
-    if (!userDetail || !userEditsDirty) return;
-    await axios.patch(`${BOT_API}/bot/api/admin/users/${userDetail._id}`, { graphColor: userEdits.graphColor });
-    setUserEditsDirty(false);
+  const saveGraphColor = async () => {
+    if (!charDetail) return;
+    await axios.patch(`${BOT_API}/bot/api/admin/users/${charDetail.userId}`, { graphColor: charEdits.graphColor });
+    setGraphColorDirty(false);
     await refreshUsers();
   };
 
@@ -576,6 +575,9 @@ const AdminPanel = () => {
     .sort((a, b) => b.date.localeCompare(a.date));
 
   // Sorting helper
+  // Fields that hold date strings which must be compared by value, not lexicographically
+  const DATE_SORT_FIELDS = new Set(["memberSince", "joinedAt"]);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applySortAndPage = <T extends Record<string, any>>(
     items: T[],
@@ -586,9 +588,11 @@ const AdminPanel = () => {
       ? [...items].sort((a, b) => {
           const av = a[sort.field] ?? "";
           const bv = b[sort.field] ?? "";
-          const cmp = typeof av === "number" && typeof bv === "number"
-            ? av - bv
-            : String(av).localeCompare(String(bv));
+          const cmp = DATE_SORT_FIELDS.has(sort.field)
+            ? dayjs(av as string).valueOf() - dayjs(bv as string).valueOf()
+            : typeof av === "number" && typeof bv === "number"
+              ? av - bv
+              : String(av).localeCompare(String(bv));
           return sort.dir === "asc" ? cmp : -cmp;
         })
       : items;
@@ -1188,6 +1192,33 @@ const AdminPanel = () => {
             )}
           </div>
 
+          {/* Graph Color */}
+          <div className="px-6 py-4 flex items-center gap-4">
+            <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Graph Color</span>
+            <div className="flex items-center gap-2.5">
+              <Select
+                variant="color"
+                options={GRAPH_COLORS.map((c) => ({ label: c.name, value: c.value, color: rgbCss(c.value) }))}
+                value={charEdits.graphColor}
+                onChange={(v) => { setCharEdits((p) => ({ ...p, graphColor: v })); setGraphColorDirty(true); }}
+              />
+              {graphColorDirty && (
+                <>
+                  <button onClick={saveGraphColor} title="Confirm" className="text-[#669A68] hover:text-white transition-colors">
+                    <FaCheck size={13} />
+                  </button>
+                  <button
+                    onClick={() => { setCharEdits((p) => ({ ...p, graphColor: charDetail!.graphColor ?? "255,189,213" })); setGraphColorDirty(false); }}
+                    title="Cancel"
+                    className="text-[#A46666] hover:text-white transition-colors"
+                  >
+                    <FaTimes size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Best Score */}
           <div className="px-6 py-4 flex items-center gap-4">
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Personal Best</span>
@@ -1380,7 +1411,7 @@ const AdminPanel = () => {
           const dir = userDetailCharSort.dir === "asc" ? 1 : -1;
           switch (userDetailCharSort.field) {
             case "name":        return dir * a.name.localeCompare(b.name);
-            case "memberSince": return dir * ((a.memberSince ?? "").localeCompare(b.memberSince ?? ""));
+            case "memberSince": return dir * (dayjs(a.memberSince).valueOf() - dayjs(b.memberSince).valueOf());
             case "scores":      return dir * (a.scores.length - b.scores.length);
             default:            return 0;
           }
@@ -1432,7 +1463,7 @@ const AdminPanel = () => {
           <div className="px-6 py-4 flex items-center gap-4">
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Role</span>
             <div className="flex items-center gap-1.5 text-sm text-tertiary">
-              {(userMemberData?.role ?? userDetail.role) === "bee" && <FaShieldAlt size={11} className="text-accent" />}
+              {(userMemberData?.role ?? userDetail.role) === "bee"}
               <span className="capitalize">{userMemberData?.role ?? userDetail.role ?? "—"}</span>
             </div>
           </div>
@@ -1443,35 +1474,6 @@ const AdminPanel = () => {
                 ? dayjs(userMemberData?.joinedAt ?? userDetail.joinedAt).format("MMM DD, YYYY")
                 : "—"}
             </span>
-          </div>
-          <div className="px-6 py-4 flex items-center gap-4">
-            <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Graph Color</span>
-            <div className="flex items-center gap-2.5">
-              <Select
-                variant="color"
-                options={GRAPH_COLORS.map((c) => ({ label: c.name, value: c.value, color: rgbCss(c.value) }))}
-                value={userEdits.graphColor}
-                onChange={(v) => { setUserEdits((p) => ({ ...p, graphColor: v })); setUserEditsDirty(true); }}
-              />
-              {userEditsDirty && (
-                <>
-                  <button
-                    onClick={saveUserEdits}
-                    title="Confirm"
-                    className="text-[#669A68] hover:text-white transition-colors"
-                  >
-                    <FaCheck size={13} />
-                  </button>
-                  <button
-                    onClick={() => { setUserEdits({ graphColor: userDetail.graphColor }); setUserEditsDirty(false); }}
-                    title="Cancel"
-                    className="text-[#A46666] hover:text-white transition-colors"
-                  >
-                    <FaTimes size={16} />
-                  </button>
-                </>
-              )}
-            </div>
           </div>
         </div>
 
@@ -1577,10 +1579,9 @@ const AdminPanel = () => {
                 <table className="w-full table-fixed">
                   <SortableHead
                     cols={[
-                      { label: "User",         field: "username",       className: "w-[22%]" },
-                      { label: "Discord ID",   field: "id",             className: "w-[30%]" },
-                      { label: "Graph Colour", field: "graphColor",     className: "w-[20%]" },
-                      { label: "Characters",   field: "characterCount", className: "w-[14%]" },
+                      { label: "User",       field: "username",       className: "w-[28%]" },
+                      { label: "Discord ID", field: "id",             className: "w-[38%]" },
+                      { label: "Characters", field: "characterCount", className: "w-[20%]" },
                     ]}
                     sort={userSort}
                     onSort={(f) => toggleSort(userSort, f, setUserSort)}
@@ -1612,17 +1613,6 @@ const AdminPanel = () => {
                         </td>
                         <td className="px-6 py-4 text-xs text-tertiary/50 font-mono">
                           <CopyId id={user.id} />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2.5">
-                            <span
-                              className="rounded-full w-3.5 h-3.5 flex-shrink-0 border border-white/10"
-                              style={{ backgroundColor: rgbCss(user.graphColor) }}
-                            />
-                            <span className="text-sm text-tertiary">
-                              {GRAPH_COLORS.find((c) => c.value === user.graphColor)?.name ?? user.graphColor}
-                            </span>
-                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <span className="text-accent">{user.characterCount}</span>

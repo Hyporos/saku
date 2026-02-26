@@ -78,13 +78,13 @@ module.exports = {
           },
           {
             _id: userOption.id,
-            graphColor: "255,189,213",
             $addToSet: {
               characters: {
                 name: overrideOption
                   ? characterOption
                   : res.data.ranks[0]?.characterName,
                 memberSince: joinDate,
+                graphColor: "255,189,213",
               },
             },
           },
