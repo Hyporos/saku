@@ -6,6 +6,8 @@ import WarningModal from "../components/WarningModal";
 import Checkbox from "../components/Checkbox";
 import DatePicker from "../components/DatePicker";
 import Select from "../components/Select";
+import CopyId from "../components/CopyId";
+import AutocompleteInput from "../components/AutocompleteInput";
 import {
   FaUsers,
   FaUserAlt,
@@ -16,15 +18,12 @@ import {
   FaPlus,
   FaTimes,
   FaSearch,
-  FaCopy,
   FaCheck,
   FaArrowLeft,
   FaExternalLinkAlt,
   FaChevronUp,
   FaChevronDown,
   FaHistory,
-  FaCalendarAlt,
-  FaTrophy,
   FaUnlink,
   FaShieldAlt,
 } from "react-icons/fa";
@@ -126,56 +125,6 @@ interface ExceptionDoc {
 type CharDetail = Character & { userId: string; scoreCount: number; participationRate: number };
 type UserDetail = UserDoc;
 
-// Inline copyable Discord ID cell — clicking anywhere copies; shows "Copied!" with a 200ms fade transition
-const CopyId = ({ id }: { id: string }) => {
-  const [copied, setCopied] = useState(false);
-  const [fading, setFading] = useState(false);
-  const [copyFadingIn, setCopyFadingIn] = useState(false);
-  const copy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id).then(() => {
-      setCopied(true);
-      setFading(false);
-      setTimeout(() => setFading(true), 900);
-      setTimeout(() => {
-        setCopied(false);
-        setFading(false);
-        setCopyFadingIn(true);
-        setTimeout(() => setCopyFadingIn(false), 16);
-      }, 1150);
-    });
-  };
-  return (
-    <span
-      onClick={copy}
-      title="Copy ID"
-      className={cn(
-        "group/copy inline-flex items-center gap-1.5 font-mono cursor-pointer transition-colors duration-200",
-        copied && !fading ? "text-white" : "hover:text-white"
-      )}
-    >
-      {id}
-      {copied ? (
-        <span className={cn(
-          "inline-flex items-center transition-opacity duration-200",
-          fading ? "opacity-0" : "opacity-100"
-        )}>
-          <FaCheck size={10} className="text-accent" />
-        </span>
-      ) : (
-        <FaCopy
-          size={10}
-          className={cn(
-            "transition-all duration-200",
-            copyFadingIn ? "opacity-0" : "opacity-100",
-            "text-tertiary/30 group-hover/copy:text-white"
-          )}
-        />
-      )}
-    </span>
-  );
-};
-
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Reusable labelled form field for the edit drawer
@@ -218,7 +167,7 @@ const Pagination = ({
 }) => (
   <div className="flex items-center justify-between px-6 py-3 border-t border-tertiary/[6%]">
     <span className="text-xs text-tertiary">
-      {total === 0 ? "No results" : `Page ${page} of ${pageCount} · ${total} total`}
+      {total === 0 ? "No results" : `Page ${page} of ${pageCount}`}
     </span>
     <div className="flex gap-2">
       <button
@@ -343,6 +292,11 @@ const AdminPanel = () => {
   const [userSort, setUserSort] = useState<SortState | null>(null);
   const [charSort, setCharSort] = useState<SortState | null>(null);
   const [userDetailCharSort, setUserDetailCharSort] = useState<SortState | null>(null);
+  const [excSort, setExcSort] = useState<SortState | null>(null);
+
+  // Exceptions pagination and inline editing
+  const [excPage, setExcPage] = useState(1);
+  const [excInlineEdit, setExcInlineEdit] = useState<{ id: string; name: string; exception: string } | null>(null);
 
   // Detail drill-down views
   const [charDetail, setCharDetail] = useState<CharDetail | null>(null);
@@ -623,14 +577,14 @@ const AdminPanel = () => {
 
   // Filtered + sorted + paginated views
   const filteredUsers = liveUsers.filter((u) =>
-    u.id.toLowerCase().includes(userSearch.toLowerCase()) ||
-    (u.username?.toLowerCase() ?? "").includes(userSearch.toLowerCase())
+    normalizeCharName(u.id).toLowerCase().includes(normalizeCharName(userSearch).toLowerCase()) ||
+    normalizeCharName(u.username ?? "").toLowerCase().includes(normalizeCharName(userSearch).toLowerCase())
   );
   const { pageCount: userPageCount, paged: pagedUsers } = applySortAndPage(filteredUsers, userSort, userPage);
 
   const filteredChars = liveCharacters.filter(
     (c) =>
-      c.name.toLowerCase().includes(charSearch.toLowerCase()) ||
+      normalizeCharName(c.name).toLowerCase().includes(normalizeCharName(charSearch).toLowerCase()) ||
       String(c.userId).toLowerCase().includes(charSearch.toLowerCase())
   );
   const { pageCount: charPageCount, paged: pagedChars } = applySortAndPage(filteredChars, charSort, charPage);
@@ -809,6 +763,17 @@ const AdminPanel = () => {
       },
     });
 
+  const inlineSaveException = async () => {
+    if (!excInlineEdit) return;
+    const { id, name, exception } = excInlineEdit;
+    if (!name.trim()) return;
+    try {
+      await axios.patch(`${BOT_API}/bot/api/admin/exceptions/${id}`, { name, exception });
+      setExcInlineEdit(null);
+      await refreshExceptions();
+    } catch (e) { console.error("Inline save failed:", e); }
+  };
+
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Batch selection helpers
 
@@ -902,17 +867,16 @@ const AdminPanel = () => {
   ];
 
   const filteredScores = liveScores.filter((s) =>
-    s.character.toLowerCase().includes(scoreSearch.toLowerCase())
+    normalizeCharName(s.character).toLowerCase().includes(normalizeCharName(scoreSearch).toLowerCase())
   );
   const { pageCount: scorePageCount, paged: pagedScores } = applySortAndPage(filteredScores, null, scorePage);
 
-  const filteredExceptions = [...exceptionsData]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .filter(
-      (e) =>
-        e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.exception.toLowerCase().includes(search.toLowerCase())
-    );
+  const filteredExceptions = [...exceptionsData].filter(
+    (e) =>
+      normalizeCharName(e.name).toLowerCase().includes(normalizeCharName(search).toLowerCase()) ||
+      normalizeCharName(e.exception).toLowerCase().includes(normalizeCharName(search).toLowerCase())
+  );
+  const { pageCount: excPageCount, paged: pagedExcs } = applySortAndPage(filteredExceptions, excSort, excPage);
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -939,7 +903,7 @@ const AdminPanel = () => {
           onClick={() => openCreate(createSection)}
           className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-4 py-2 transition-colors"
         >
-          <FaPlus size={11} />
+          <FaPlus size={11} style={{ marginBottom: "1px" }} />
           Add New
         </button>
       )}
@@ -1129,7 +1093,7 @@ const AdminPanel = () => {
         <div className="bg-panel rounded-xl divide-y divide-tertiary/[6%]">
           {/* Discord ID — clicking navigates to that user's detail page */}
           <div className="px-6 py-4 flex items-center gap-4">
-            <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Discord ID</span>
+            <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">User</span>
             <button
               onClick={() => {
                 const found = userData.find((u) => String(u._id) === String(charDetail.userId));
@@ -1236,8 +1200,8 @@ const AdminPanel = () => {
               <table className="w-full table-fixed">
                 <SortableHead
                   cols={[
-                    { label: <span className="inline-flex items-center gap-1.5"><FaCalendarAlt size={10} className="opacity-50" />Date</span>, field: "date" },
-                    { label: <span className="inline-flex items-center gap-1.5"><FaTrophy size={10} className="opacity-50" />Score</span>, field: "score" },
+                    { label: "Date", field: "date" },
+                    { label: "Score", field: "score" },
                   ]}
                   sort={detailScoreSort}
                   onSort={(f) => {
@@ -1395,7 +1359,10 @@ const AdminPanel = () => {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl">{userDetail.username ?? "Unknown User"}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl">{userDetail.username ?? "Unknown User"}</h2>
+              {userDetail.nickname && <span className="text-sm text-tertiary/60">({userDetail.nickname})</span>}
+            </div>
             <div className="mt-0.5 text-xs text-tertiary/50">
               <CopyId id={userDetail._id} />
             </div>
@@ -1573,7 +1540,7 @@ const AdminPanel = () => {
                             {user.nickname && <p className="text-xs text-tertiary/60">{user.nickname}</p>}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-tertiary/50">
+                        <td className="px-6 py-4 text-xs text-tertiary/50 font-mono">
                           <CopyId id={user.id} />
                         </td>
                         <td className="px-6 py-4">
@@ -1795,7 +1762,7 @@ const AdminPanel = () => {
                 type="text"
                 placeholder="Filter by character or exception..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setExcPage(1); }}
                 className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none w-full max-w-xs"
               />
             </div>
@@ -1808,33 +1775,100 @@ const AdminPanel = () => {
                   onDelete={batchDeleteExcs}
                   onClear={() => setSelExcs(new Set())}
                 />
-                <table className="w-full">
-                  <TableHead
-                    cols={["Character", "Exception (Mis-scanned As)"]}
-                    onSelectAll={() => toggleAll(filteredExceptions.map((e) => e._id), selExcs, setSelExcs)}
-                    allSelected={filteredExceptions.length > 0 && filteredExceptions.every((e) => selExcs.has(e._id))}
+                <table className="w-full table-fixed">
+                  <SortableHead
+                    cols={[
+                      { label: "Character", field: "name", className: "w-1/2" },
+                      { label: "Exception", field: "exception", className: "w-1/2" },
+                    ]}
+                    sort={excSort}
+                    onSort={(f) => { toggleSort(excSort, f, setExcSort); setExcPage(1); }}
+                    onSelectAll={() => toggleAll(pagedExcs.map((e) => e._id), selExcs, setSelExcs)}
+                    allSelected={pagedExcs.length > 0 && pagedExcs.every((e) => selExcs.has(e._id))}
+                    someSelected={pagedExcs.some((e) => selExcs.has(e._id))}
                   />
                   <tbody>
-                    {filteredExceptions.map((exc) => (
-                      <tr
-                        key={exc._id}
-                        className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors"
-                      >
-                        <td className="pl-5 pr-2 py-4">
-                          <Checkbox
-                            checked={selExcs.has(exc._id)}
-                            onChange={() => toggleSel(selExcs, exc._id, setSelExcs)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-sm text-accent whitespace-nowrap">{exc.name}</td>
-                        <td className="px-6 py-4 text-sm text-tertiary">{exc.exception}</td>
-                        <RowActions
-                          onEdit={() => openEdit("exceptions", exc)}
-                          onDelete={() => deleteException(exc._id, exc.name)}
-                        />
-                      </tr>
-                    ))}
-                    {filteredExceptions.length === 0 && (
+                    {pagedExcs.map((exc) => {
+                      const isEditing = excInlineEdit?.id === exc._id;
+                      return (
+                        <tr
+                          key={exc._id}
+                          className={cn("border-t border-tertiary/[6%] transition-colors", isEditing ? "bg-background/40" : "hover:bg-background/40")}
+                        >
+                          <td className="pl-5 pr-2 py-4 w-10">
+                            <Checkbox
+                              checked={selExcs.has(exc._id)}
+                              onChange={() => toggleSel(selExcs, exc._id, setSelExcs)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                            {isEditing ? (
+                              <input
+                                className="w-full bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                                value={excInlineEdit!.name}
+                                onChange={(e) => setExcInlineEdit((s) => s && { ...s, name: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") inlineSaveException(); if (e.key === "Escape") setExcInlineEdit(null); }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="text-accent">{exc.name}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                            {isEditing ? (
+                              <input
+                                className="w-full bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                                value={excInlineEdit!.exception}
+                                onChange={(e) => setExcInlineEdit((s) => s && { ...s, exception: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") inlineSaveException(); if (e.key === "Escape") setExcInlineEdit(null); }}
+                              />
+                            ) : (
+                              <span className="text-tertiary">{exc.exception}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-4">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={inlineSaveException}
+                                    title="Confirm"
+                                    className="text-[#669A68] hover:text-white transition-colors"
+                                  >
+                                    <FaCheck size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setExcInlineEdit(null)}
+                                    title="Cancel"
+                                    className="text-[#A46666] hover:text-white transition-colors"
+                                  >
+                                    <FaTimes size={16} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setExcInlineEdit({ id: exc._id, name: exc.name, exception: exc.exception }); }}
+                                    title="Edit"
+                                    className="text-tertiary hover:text-accent transition-colors"
+                                  >
+                                    <FaEdit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteException(exc._id, exc.name); }}
+                                    title="Delete"
+                                    className="text-tertiary hover:text-[#A46666] transition-colors"
+                                  >
+                                    <FaTrash size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {pagedExcs.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-6 py-8 text-sm text-tertiary/50 text-center">
                           {search ? `No exceptions matching "${search}"` : "No exceptions found"}
@@ -1843,6 +1877,13 @@ const AdminPanel = () => {
                     )}
                   </tbody>
                 </table>
+                <Pagination
+                  page={excPage}
+                  total={filteredExceptions.length}
+                  pageCount={excPageCount}
+                  onPrev={() => setExcPage((p) => p - 1)}
+                  onNext={() => setExcPage((p) => p + 1)}
+                />
               </>
             )}
           </div>
@@ -1975,15 +2016,16 @@ const AdminPanel = () => {
         return (
           <>
             <Field label="Character Name" hint="The real (correct) character name.">
-              <input
-                className={inputCls}
+              <AutocompleteInput
                 value={data.name ?? ""}
-                onChange={(e) => updateField("name", e.target.value)}
-                placeholder="e.g. Dánnis"
+                onChange={(v) => updateField("name", v)}
+                suggestions={liveCharacters.map((c) => c.name)}
+                placeholder="e.g. D\u00e1nnis"
+                inputClassName={inputCls}
               />
             </Field>
             <Field
-              label="Exception (Mis-scanned As)"
+              label="Exception"
               hint="The incorrect name that the scanner picked up instead of the real name."
             >
               <input
@@ -2078,7 +2120,9 @@ const AdminPanel = () => {
                 </h2>
                 <p className="text-tertiary text-sm mt-0.5">
                   {drawer.mode === "create"
-                    ? `Add a new record to the ${drawer.section} collection`
+                    ? drawer.section === "exceptions"
+                      ? "Add a new exception to the database"
+                      : `Add a new record to the ${drawer.section} collection`
                     : `Modify this record in the ${drawer.section} collection`}
                 </p>
               </div>
