@@ -128,15 +128,14 @@ const setAnniversaries = (client) => {
         const description = celebrants
           .map(
             ({ member, years }) =>
-              `${member.user} — **${years}** year${years !== 1 ? "s" : ""} in the guild!`
+              `${member.user} - **${years}** year${years !== 1 ? "s" : ""} in the guild!`
           )
           .join("\n");
 
         const embed = new EmbedBuilder()
-          .setColor(0xffd700)
+          .setColor(0xffc3c5)
           .setTitle("Happy Anniversary!")
           .setDescription(description)
-          .setTimestamp()
           .setFooter({
             text: "Thank you for being a part of Saku!",
             iconURL:
