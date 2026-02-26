@@ -70,13 +70,13 @@ const Select = ({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-2 bg-background border rounded-lg px-3 py-1.5 text-sm text-white transition-colors focus:outline-none cursor-pointer min-w-[120px]",
+          "inline-flex items-center gap-2.5 bg-background border rounded-lg px-3 py-1.5 text-sm text-white transition-colors focus:outline-none cursor-pointer min-w-[120px]",
           open ? "border-accent/40" : "border-tertiary/20 hover:border-tertiary/40"
         )}
       >
         {variant === "color" && selected?.color && (
           <span
-            className="w-3 h-3 rounded-full flex-shrink-0 border border-white/10"
+            className="w-3.5 h-3.5 mb-0.5 rounded-full flex-shrink-0 border border-white/10"
             style={{ backgroundColor: selected.color }}
           />
         )}
@@ -120,7 +120,7 @@ const Select = ({
             >
               {variant === "color" && opt.color && (
                 <span
-                  className="w-3 h-3 rounded-full flex-shrink-0 border border-white/10"
+                  className="w-3.5 h-3.5 mb-0.5 rounded-full flex-shrink-0 border border-white/10"
                   style={{ backgroundColor: opt.color }}
                 />
               )}

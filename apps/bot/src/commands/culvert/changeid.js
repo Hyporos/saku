@@ -55,7 +55,6 @@ module.exports = {
         characters: oldUserObject.characters.map((char) => {
           const newChar = {
             name: char.name,
-            class: char.class,
             memberSince: char.memberSince,
             scores: char.scores,
           };

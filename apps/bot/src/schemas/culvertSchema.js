@@ -20,10 +20,6 @@ const culvertSchema = new Schema(
           type: String,
           required: true,
         },
-        class: {
-          type: String,
-          required: true,
-        },
         memberSince: {
           type: String,
           required: true,

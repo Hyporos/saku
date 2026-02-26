@@ -55,7 +55,6 @@ interface ScoreEntry {
 interface Character {
   name: string;
   avatar: string;
-  class: string;
   memberSince: string;
   scores: ScoreEntry[];
 }
@@ -146,7 +145,7 @@ const Field = ({
   </div>
 );
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const SCORE_DETAIL_PAGE_SIZE = 10;
 
 const inputCls =
@@ -283,20 +282,33 @@ const AdminPanel = () => {
   // Search + pagination state
   const [charSearch, setCharSearch] = useState("");
   const [charPage, setCharPage] = useState(1);
+  const [charDateFrom, setCharDateFrom] = useState("");
+  const [charDateTo, setCharDateTo] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [userPage, setUserPage] = useState(1);
   const [scoreSearch, setScoreSearch] = useState("");
+  const [scoreDateFilter, setScoreDateFilter] = useState("");
   const [scorePage, setScorePage] = useState(1);
 
   // Sort state
   const [userSort, setUserSort] = useState<SortState | null>(null);
   const [charSort, setCharSort] = useState<SortState | null>(null);
+  const [scoreSort, setScoreSort] = useState<SortState | null>(null);
   const [userDetailCharSort, setUserDetailCharSort] = useState<SortState | null>(null);
   const [excSort, setExcSort] = useState<SortState | null>(null);
 
   // Exceptions pagination and inline editing
   const [excPage, setExcPage] = useState(1);
   const [excInlineEdit, setExcInlineEdit] = useState<{ id: string; name: string; exception: string } | null>(null);
+
+  // Scores tab inline editing
+  const [scoreTabInlineEdit, setScoreTabInlineEdit] = useState<{ origCharacter: string; origDate: string; dateValue: string; scoreValue: string } | null>(null);
+
+  // User detail — fresh member data fetched from Discord via bot API
+  const [userMemberData, setUserMemberData] = useState<{ _id: string; username: string | null; nickname: string | null; role: string | null; joinedAt: string | null; avatarUrl: string | null } | null>(null);
+
+  // User detail — batch selection for linked characters
+  const [selUserDetailChars, setSelUserDetailChars] = useState<Set<string>>(new Set());
 
   // Detail drill-down views
   const [charDetail, setCharDetail] = useState<CharDetail | null>(null);
@@ -306,7 +318,7 @@ const AdminPanel = () => {
   const [prevContext, setPrevContext] = useState<{ type: "user"; userId: string; username: string | null } | null>(null);
 
   // Inline edits for detail pages
-  const [charEdits, setCharEdits] = useState({ class: "", memberSince: "", avatar: "" });
+  const [charEdits, setCharEdits] = useState({ memberSince: "", avatar: "" });
   const [charEditsDirty, setCharEditsDirty] = useState(false);
   const [memberSinceDirty, setMemberSinceDirty] = useState(false);
   const [userEdits, setUserEdits] = useState({ graphColor: "" });
@@ -434,7 +446,7 @@ const AdminPanel = () => {
   // Reset inline edits when switching to a different detail item
   useEffect(() => {
     if (charDetail) {
-      setCharEdits({ class: charDetail.class, memberSince: toInputDate(charDetail.memberSince), avatar: charDetail.avatar ?? "" });
+      setCharEdits({ memberSince: toInputDate(charDetail.memberSince), avatar: charDetail.avatar ?? "" });
       setCharEditsDirty(false);
       setMemberSinceDirty(false);
     }
@@ -446,7 +458,18 @@ const AdminPanel = () => {
       setUserEdits({ graphColor: userDetail.graphColor });
       setUserEditsDirty(false);
       setUserDetailCharSort(null);
+      setSelUserDetailChars(new Set());
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userDetail?._id]);
+
+  // Fetch fresh Discord member data for the user detail view
+  useEffect(() => {
+    if (!userDetail) { setUserMemberData(null); return; }
+    axios
+      .get(`${BOT_API}/bot/api/admin/member/${encodeURIComponent(userDetail._id)}`)
+      .then((res) => setUserMemberData(res.data))
+      .catch(() => setUserMemberData(null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userDetail?._id]);
 
@@ -455,7 +478,7 @@ const AdminPanel = () => {
     const memberSince = toStoredDate(charEdits.memberSince);
     await axios.patch(
       `${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${charDetail.name}`,
-      { name: charDetail.name, class: charEdits.class, memberSince, avatar: charEdits.avatar }
+      { name: charDetail.name, memberSince, avatar: charEdits.avatar }
     );
     setCharEditsDirty(false);
     setMemberSinceDirty(false);
@@ -467,7 +490,7 @@ const AdminPanel = () => {
     const memberSince = toStoredDate(charEdits.memberSince);
     await axios.patch(
       `${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${charDetail.name}`,
-      { name: charDetail.name, class: charEdits.class, memberSince, avatar: charEdits.avatar }
+      { name: charDetail.name, memberSince, avatar: charEdits.avatar }
     );
     setMemberSinceDirty(false);
     await refreshUsers();
@@ -584,8 +607,9 @@ const AdminPanel = () => {
 
   const filteredChars = liveCharacters.filter(
     (c) =>
-      normalizeCharName(c.name).toLowerCase().includes(normalizeCharName(charSearch).toLowerCase()) ||
-      String(c.userId).toLowerCase().includes(charSearch.toLowerCase())
+      (normalizeCharName(c.name).toLowerCase().includes(normalizeCharName(charSearch).toLowerCase()) ||
+      String(c.userId).toLowerCase().includes(charSearch.toLowerCase())) &&
+      (!charDateFrom || !charDateTo || (c.memberSince >= charDateFrom && c.memberSince <= charDateTo))
   );
   const { pageCount: charPageCount, paged: pagedChars } = applySortAndPage(filteredChars, charSort, charPage);
 
@@ -595,14 +619,6 @@ const AdminPanel = () => {
     } else {
       setter({ field, dir: "asc" });
     }
-  };
-
-  const openEdit = (section: Section, data: Record<string, unknown>) => {
-    // Pre-convert memberSince to YYYY-MM-DD format for <input type="date">
-    const converted = data.memberSince
-      ? { ...data, memberSince: toInputDate(String(data.memberSince)), _originalName: data.name }
-      : { ...data, _originalName: data.name };
-    setDrawer({ isOpen: true, mode: "edit", section, data: converted });
   };
 
   const openCreate = (section: Section) => {
@@ -625,11 +641,11 @@ const AdminPanel = () => {
           const originalName = data._originalName ?? data.name;
           await axios.patch(
             `${BOT_API}/bot/api/admin/characters/${data.userId}/${originalName}`,
-            { name: data.name, class: data.class, memberSince, avatar: data.avatar }
+            { name: data.name, memberSince, avatar: data.avatar }
           );
         } else {
           await axios.post(`${BOT_API}/bot/api/admin/characters`, {
-            userId: data.userId, name: data.name, class: data.class,
+            userId: data.userId, name: data.name,
             memberSince, avatar: data.avatar ?? "",
           });
         }
@@ -668,8 +684,11 @@ const AdminPanel = () => {
         try {
           await axios.delete(`${BOT_API}/bot/api/admin/characters/${userId}/${name}`);
           await refreshUsers();
-          setCharDetail(null);
-          navigate("/admin");
+          // Only leave the char detail view if we're currently in it
+          if (charDetail?.name === name && charDetail?.userId === userId) {
+            setCharDetail(null);
+            navigate(prevContext?.type === "user" ? `/admin/users/${prevContext.userId}` : "/admin/characters");
+          }
         } catch (e) { console.error("Delete failed:", e); }
         closeModal();
       },
@@ -774,6 +793,44 @@ const AdminPanel = () => {
     } catch (e) { console.error("Inline save failed:", e); }
   };
 
+  // Save an inline-edited score row in the main scores tab
+  const inlineSaveScoreTab = async () => {
+    if (!scoreTabInlineEdit) return;
+    const { origCharacter, origDate, dateValue, scoreValue } = scoreTabInlineEdit;
+    if (!dateValue.trim() || !scoreValue.trim()) return;
+    try {
+      const dateChanged = dateValue !== origDate;
+      if (dateChanged) {
+        await axios.delete(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(origCharacter)}/${origDate}`);
+        await axios.post(`${BOT_API}/bot/api/admin/scores`, { character: origCharacter, date: dateValue, score: Number(scoreValue) });
+      } else {
+        await axios.patch(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(origCharacter)}/${origDate}`, { score: Number(scoreValue) });
+      }
+      setScoreTabInlineEdit(null);
+      await refreshUsers();
+    } catch (e) { console.error("Inline save failed:", e); }
+  };
+
+  const batchDeleteUserDetailChars = () =>
+    confirm({
+      variant: "sensitive",
+      confirmWord: "unlink",
+      title: `Unlink ${selUserDetailChars.size} character${selUserDetailChars.size > 1 ? "s" : ""}`,
+      description: "This will permanently remove the selected characters and all of their scores. This action cannot be undone.",
+      onConfirm: async () => {
+        try {
+          await Promise.all(
+            [...selUserDetailChars].map((name) =>
+              axios.delete(`${BOT_API}/bot/api/admin/characters/${userDetail!._id}/${name}`)
+            )
+          );
+          setSelUserDetailChars(new Set());
+          await refreshUsers();
+        } catch (e) { console.error("Batch delete failed:", e); }
+        closeModal();
+      },
+    });
+
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Batch selection helpers
 
@@ -867,9 +924,10 @@ const AdminPanel = () => {
   ];
 
   const filteredScores = liveScores.filter((s) =>
-    normalizeCharName(s.character).toLowerCase().includes(normalizeCharName(scoreSearch).toLowerCase())
+    normalizeCharName(s.character).toLowerCase().includes(normalizeCharName(scoreSearch).toLowerCase()) &&
+    (!scoreDateFilter || s.date === scoreDateFilter)
   );
-  const { pageCount: scorePageCount, paged: pagedScores } = applySortAndPage(filteredScores, null, scorePage);
+  const { pageCount: scorePageCount, paged: pagedScores } = applySortAndPage(filteredScores, scoreSort, scorePage);
 
   const filteredExceptions = [...exceptionsData].filter(
     (e) =>
@@ -885,50 +943,34 @@ const AdminPanel = () => {
     count,
     canCreate = true,
     createSection,
+    extra,
   }: {
     title: string;
     count: number;
     canCreate?: boolean;
     createSection: Section;
+    extra?: ReactNode;
   }) => (
     <div className="flex justify-between items-center px-6 py-5">
       <div className="flex items-center gap-3">
         <h2 className="text-xl">{title}</h2>
-        <span className="bg-background text-tertiary text-xs rounded-full px-2.5 py-0.5">
+        <span className="bg-background text-tertiary text-xs rounded-full px-2.5 py-0.5 border border-tertiary/20">
           {count}
         </span>
       </div>
-      {canCreate && (
-        <button
-          onClick={() => openCreate(createSection)}
-          className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-4 py-2 transition-colors"
-        >
-          <FaPlus size={11} style={{ marginBottom: "1px" }} />
-          Add New
-        </button>
-      )}
-    </div>
-  );
-
-  const TableHead = ({ cols, onSelectAll, allSelected }: { cols: string[]; onSelectAll?: () => void; allSelected?: boolean }) => (
-    <thead>
-      <tr className="border-t border-tertiary/[6%]">
-        {onSelectAll !== undefined && (
-          <th className="pl-5 pr-2 py-3 w-10">
-            <Checkbox checked={!!allSelected} onChange={onSelectAll} />
-          </th>
-        )}
-        {cols.map((col) => (
-          <th
-            key={col}
-            className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-6 py-3"
+      <div className="flex items-center gap-2">
+        {extra}
+        {canCreate && (
+          <button
+            onClick={() => openCreate(createSection)}
+            className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-4 py-2 transition-colors"
           >
-            {col}
-          </th>
-        ))}
-        <th className="px-6 py-3" />
-      </tr>
-    </thead>
+            <FaPlus size={11} style={{ marginBottom: "1px" }} />
+            Add New
+          </button>
+        )}
+      </div>
+    </div>
   );
 
   const BatchBar = ({ count, onDelete, onClear }: { count: number; onDelete: () => void; onClear: () => void }) =>
@@ -1014,8 +1056,8 @@ const AdminPanel = () => {
     const levelLine = !apiReady && charApiLoading
       ? "…"
       : apiReady
-        ? `Level ${charApiData!.level} ${charApiData!.characterClassName ?? charEdits.class}`
-        : charEdits.class;
+        ? `Level ${charApiData!.level} ${charApiData!.characterClassName ?? ""}`
+        : "";
 
     // Avatar source — prefer live MapleStory API image once confirmed for this character
     const avatarSrc = apiReady ? charApiData!.characterImgURL : (charDetail.avatar || null);
@@ -1158,31 +1200,40 @@ const AdminPanel = () => {
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Participation</span>
             <span className="text-sm">
               {participated}/{total}
-              <span className={cn("ml-1.5", participationRate === 100 ? "text-[#C9A227]" : "text-tertiary")}>({participationRate}%)</span>
+              <span className={cn("ml-1.5", participationRate === 100 ? "text-accent" : "text-tertiary")}>({participationRate}%)</span>
             </span>
           </div>
         </div>
 
         {/* Score history */}
         <div className="bg-panel rounded-xl overflow-hidden flex-shrink-0">
-          {/* Header — simple entry count + date range filter */}
+          {/* Header — entry count + date range filter + add score */}
           <div className="px-6 py-5 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h3 className="text-lg">Score History</h3>
               <span className="text-tertiary/60 text-sm mt-1">{total} entries</span>
             </div>
-            {charDetail.scores.length > 0 && (
-              <DatePicker
-                mode="range"
-                from={detailDateFrom}
-                to={detailDateTo}
-                onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
-                placeholder="All dates"
-                align="right"
-                subtle
-                compact
-              />
-            )}
+            <div className="flex items-center gap-3">
+              {charDetail.scores.length > 0 && (
+                <DatePicker
+                  mode="range"
+                  from={detailDateFrom}
+                  to={detailDateTo}
+                  onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
+                  placeholder="All dates"
+                  align="right"
+                  subtle
+                  compact
+                />
+              )}
+              <button
+                onClick={() => setDrawer({ isOpen: true, mode: "create", section: "scores", data: { character: charDetail.name, _fromCharDetail: true } })}
+                className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-3 py-1 transition-colors"
+              >
+                <FaPlus size={12} style={{ marginBottom: "1px" }} />
+                Add Score
+              </button>
+            </div>
           </div>
           <div className="bg-tertiary/20 h-px" />
           {charDetail.scores.length === 0 ? (
@@ -1328,7 +1379,6 @@ const AdminPanel = () => {
           const dir = userDetailCharSort.dir === "asc" ? 1 : -1;
           switch (userDetailCharSort.field) {
             case "name":        return dir * a.name.localeCompare(b.name);
-            case "class":       return dir * ((a.class ?? "").localeCompare(b.class ?? ""));
             case "memberSince": return dir * ((a.memberSince ?? "").localeCompare(b.memberSince ?? ""));
             case "scores":      return dir * (a.scores.length - b.scores.length);
             default:            return 0;
@@ -1361,7 +1411,7 @@ const AdminPanel = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl">{userDetail.username ?? "Unknown User"}</h2>
-              {userDetail.nickname && <span className="text-sm text-tertiary/60">({userDetail.nickname})</span>}
+              {userDetail.nickname && <span className="text-sm text-tertiary/60">{userDetail.nickname}</span>}
             </div>
             <div className="mt-0.5 text-xs text-tertiary/50">
               <CopyId id={userDetail._id} />
@@ -1372,7 +1422,7 @@ const AdminPanel = () => {
             title="Delete user"
             className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
           >
-            <FaTrash size={11} /> Delete User
+            <FaTrash size={11} className="mb-0.5"/> Delete User
           </button>
         </div>
 
@@ -1381,14 +1431,16 @@ const AdminPanel = () => {
           <div className="px-6 py-4 flex items-center gap-4">
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Role</span>
             <div className="flex items-center gap-1.5 text-sm text-tertiary">
-              {userDetail.role === "bee" && <FaShieldAlt size={11} className="text-accent" />}
-              <span className="capitalize">{userDetail.role ?? "—"}</span>
+              {(userMemberData?.role ?? userDetail.role) === "bee" && <FaShieldAlt size={11} className="text-accent" />}
+              <span className="capitalize">{userMemberData?.role ?? userDetail.role ?? "—"}</span>
             </div>
           </div>
           <div className="px-6 py-4 flex items-center gap-4">
             <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Member Since</span>
             <span className="text-sm text-tertiary">
-              {userDetail.joinedAt ? dayjs(userDetail.joinedAt).format("MMM DD, YYYY") : "—"}
+              {(userMemberData?.joinedAt ?? userDetail.joinedAt)
+                ? dayjs(userMemberData?.joinedAt ?? userDetail.joinedAt).format("MMM DD, YYYY")
+                : "—"}
             </span>
           </div>
           <div className="px-6 py-4 flex items-center gap-4">
@@ -1429,16 +1481,24 @@ const AdminPanel = () => {
             <span className="text-tertiary/60 text-sm mt-1">{rawUserChars.length} linked</span>
           </div>
           <div className="bg-tertiary/20 h-px" />
+          <BatchBar
+            count={selUserDetailChars.size}
+            onDelete={batchDeleteUserDetailChars}
+            onClear={() => setSelUserDetailChars(new Set())}
+          />
           <table className="w-full table-fixed">
             <SortableHead
               cols={[
                 { label: "Name",         field: "name"        },
-                { label: "Class",        field: "class"       },
                 { label: "Member Since", field: "memberSince" },
+                { label: "Level",        field: "level"       },
                 { label: "Scores",       field: "scores"      },
               ]}
               sort={userDetailCharSort}
               onSort={(f) => toggleSort(userDetailCharSort, f, setUserDetailCharSort)}
+              onSelectAll={() => toggleAll(userChars.map((c) => c.name), selUserDetailChars, setSelUserDetailChars)}
+              allSelected={userChars.length > 0 && userChars.every((c) => selUserDetailChars.has(c.name))}
+              someSelected={userChars.some((c) => selUserDetailChars.has(c.name))}
             />
             <tbody>
               {userChars.map((char) => (
@@ -1451,14 +1511,23 @@ const AdminPanel = () => {
                   }}
                   className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors cursor-pointer"
                 >
+                  <td className="pl-5 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selUserDetailChars.has(char.name)}
+                      onChange={() => toggleSel(selUserDetailChars, char.name, setSelUserDetailChars)}
+                    />
+                  </td>
                   <td className="px-6 py-4 text-sm text-accent">{char.name}</td>
-                  <td className="px-6 py-4 text-sm text-tertiary">{char.class}</td>
                   <td className="px-6 py-4 text-sm text-tertiary">{char.memberSince}</td>
+                  <td className="px-6 py-4 text-sm text-tertiary">{(char as { level?: number }).level ?? "—"}</td>
                   <td className="px-6 py-4 text-sm">{char.scores.length}</td>
+                  <RowActions
+                    onDelete={() => { deleteCharacter(userDetail._id, char.name); }}
+                  />
                 </tr>
               ))}
               {userChars.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-8 text-sm text-tertiary/50 text-center">No characters linked</td></tr>
+                <tr><td colSpan={6} className="px-6 py-8 text-sm text-tertiary/50 text-center">No characters linked</td></tr>
               )}
             </tbody>
           </table>
@@ -1504,13 +1573,13 @@ const AdminPanel = () => {
                   onDelete={batchDeleteUsers}
                   onClear={() => setSelUsers(new Set())}
                 />
-                <table className="w-full">
+                <table className="w-full table-fixed">
                   <SortableHead
                     cols={[
-                      { label: "User",         field: "username" },
-                      { label: "Discord ID",   field: "id" },
-                      { label: "Graph Colour", field: "graphColor" },
-                      { label: "Characters",   field: "characterCount" },
+                      { label: "User",         field: "username",       className: "w-[22%]" },
+                      { label: "Discord ID",   field: "id",             className: "w-[30%]" },
+                      { label: "Graph Colour", field: "graphColor",     className: "w-[20%]" },
+                      { label: "Characters",   field: "characterCount", className: "w-[14%]" },
                     ]}
                     sort={userSort}
                     onSort={(f) => toggleSort(userSort, f, setUserSort)}
@@ -1597,7 +1666,19 @@ const AdminPanel = () => {
                 placeholder="Filter by name or Discord ID..."
                 value={charSearch}
                 onChange={(e) => { setCharSearch(e.target.value); setCharPage(1); }}
-                className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none w-full max-w-xs"
+                className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-0"
+              />
+              <DatePicker
+                mode="range"
+                from={charDateFrom}
+                to={charDateTo}
+                onRangeChange={(f, t) => { setCharDateFrom(f); setCharDateTo(t); setCharPage(1); }}
+                wednesdayOnly
+                subtle
+                compact
+                placeholder="All Dates"
+                align="right"
+                dropUp
               />
             </div>
             {usersLoading ? (
@@ -1612,10 +1693,10 @@ const AdminPanel = () => {
                 <table className="w-full table-fixed">
                   <SortableHead
                     cols={[
-                      { label: "Name",          field: "name"              },
-                      { label: "Discord ID",    field: "userId"            },
-                      { label: "Member Since",  field: "memberSince"       },
-                      { label: "Participation", field: "participationRate" },
+                      { label: "Name",          field: "name",              className: "w-[22%]" },
+                      { label: "Discord ID",    field: "userId",            className: "w-[28%]" },
+                      { label: "Member Since",  field: "memberSince",       className: "w-[20%]" },
+                      { label: "Participation", field: "participationRate", className: "w-[20%]" },
                     ]}
                     sort={charSort}
                     onSort={(f) => toggleSort(charSort, f, setCharSort)}
@@ -1642,7 +1723,7 @@ const AdminPanel = () => {
                         </td>
                         <td className="px-6 py-4 text-sm text-tertiary">{char.memberSince}</td>
                         <td className="px-6 py-4 text-sm">
-                          <span className={cn(char.participationRate === 100 && "text-[#C9A227]")}>{char.participationRate}%</span>
+                          <span className={cn(char.participationRate === 100 && "text-accent")}>{char.participationRate}%</span>
                           <span className="text-tertiary/50 ml-1 text-xs">({char.scores.filter(s => s.score > 0).length}/{char.scores.length})</span>
                         </td>
                         <RowActions
@@ -1678,6 +1759,18 @@ const AdminPanel = () => {
               title="Scores"
               count={filteredScores.length}
               createSection="scores"
+              extra={
+                <DatePicker
+                  mode="single"
+                  value={scoreDateFilter}
+                  onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
+                  wednesdayOnly
+                  subtle
+                  compact
+                  placeholder="All Dates"
+                  align="right"
+                />
+              }
             />
             <div className="bg-tertiary/20 h-px" />
             <div className="flex items-center gap-3 px-6 py-4 border-b border-tertiary/[6%]">
@@ -1699,33 +1792,97 @@ const AdminPanel = () => {
                   onDelete={batchDeleteScores}
                   onClear={() => setSelScores(new Set())}
                 />
-                <table className="w-full">
-                  <TableHead
-                    cols={["Character", "Date", "Score"]}
+                <table className="w-full table-fixed">
+                  <SortableHead
+                    cols={[
+                      { label: "Character", field: "character", className: "w-[38%]" },
+                      { label: "Date",      field: "date",      className: "w-[30%]" },
+                      { label: "Score",     field: "score",     className: "w-[22%]" },
+                    ]}
+                    sort={scoreSort}
+                    onSort={(f) => { toggleSort(scoreSort, f, setScoreSort); setScorePage(1); }}
                     onSelectAll={() => toggleAll(pagedScores.map((s) => `${s.character}|${s.date}`), selScores, setSelScores)}
                     allSelected={pagedScores.length > 0 && pagedScores.every((s) => selScores.has(`${s.character}|${s.date}`))}
+                    someSelected={pagedScores.some((s) => selScores.has(`${s.character}|${s.date}`))}
                   />
                   <tbody>
-                    {pagedScores.map((score, i) => (
-                      <tr
-                        key={`${score.character}-${score.date}-${i}`}
-                        className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors"
-                      >
-                        <td className="pl-5 pr-2 py-4">
-                          <Checkbox
-                            checked={selScores.has(`${score.character}|${score.date}`)}
-                            onChange={() => toggleSel(selScores, `${score.character}|${score.date}`, setSelScores)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-sm text-accent">{score.character}</td>
-                        <td className="px-6 py-4 text-sm text-tertiary">{score.date}</td>
-                        <td className="px-6 py-4 text-sm">{score.score.toLocaleString()}</td>
-                        <RowActions
-                          onEdit={() => openEdit("scores", score)}
-                          onDelete={() => deleteScore(score.character, score.date)}
-                        />
-                      </tr>
-                    ))}
+                    {pagedScores.map((score, i) => {
+                      const isEditing = scoreTabInlineEdit?.origCharacter === score.character && scoreTabInlineEdit?.origDate === score.date;
+                      return (
+                        <tr
+                          key={`${score.character}-${score.date}-${i}`}
+                          className={cn("border-t border-tertiary/[6%] transition-colors", isEditing ? "bg-background/40" : "hover:bg-background/40")}
+                        >
+                          <td className="pl-5 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selScores.has(`${score.character}|${score.date}`)}
+                              onChange={() => toggleSel(selScores, `${score.character}|${score.date}`, setSelScores)}
+                            />
+                          </td>
+                          {/* Character — always read-only, clickable to open char detail */}
+                          <td className="px-6 py-4 text-sm">
+                            <button
+                              className="text-accent hover:underline text-left"
+                              onClick={() => { const c = liveCharacters.find((x) => x.name === score.character); if (c) openCharDetail(c); }}
+                            >{score.character}</button>
+                          </td>
+                          {/* Date — editable when in edit mode */}
+                          <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1">
+                                <DatePicker
+                                  subtle compact wednesdayOnly
+                                  value={scoreTabInlineEdit!.dateValue}
+                                  onChange={(v) => setScoreTabInlineEdit((s) => s && { ...s, dateValue: v })}
+                                />
+                                {scoreTabInlineEdit!.dateValue &&
+                                  scoreTabInlineEdit!.dateValue !== scoreTabInlineEdit!.origDate &&
+                                  liveScores.some(
+                                    (s) => s.character === scoreTabInlineEdit!.origCharacter && s.date === scoreTabInlineEdit!.dateValue
+                                  ) && (
+                                    <p className="text-[#A46666] text-xs">Warning - Score exists for selected date</p>
+                                  )}
+                              </div>
+                            ) : (
+                              <span className="text-tertiary">{score.date}</span>
+                            )}
+                          </td>
+                          {/* Score — editable when in edit mode */}
+                          <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={scoreTabInlineEdit!.scoreValue}
+                                onChange={(e) => setScoreTabInlineEdit((s) => s && { ...s, scoreValue: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") inlineSaveScoreTab(); if (e.key === "Escape") setScoreTabInlineEdit(null); }}
+                                className="w-[74px] bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className={cn(score.score === 0 && "text-[#A46666]")}>{score.score.toLocaleString()}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-4">
+                              {isEditing ? (
+                                <>
+                                  <button onClick={inlineSaveScoreTab} title="Confirm" className="text-[#669A68] hover:text-white transition-colors"><FaCheck size={14} /></button>
+                                  <button onClick={() => setScoreTabInlineEdit(null)} title="Cancel" className="text-[#A46666] hover:text-white transition-colors"><FaTimes size={16} /></button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setScoreTabInlineEdit({ origCharacter: score.character, origDate: score.date, dateValue: score.date, scoreValue: String(score.score) }); }}
+                                    title="Edit" className="text-tertiary hover:text-accent transition-colors"
+                                  ><FaEdit size={14} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); deleteScore(score.character, score.date); }} title="Delete" className="text-tertiary hover:text-[#A46666] transition-colors"><FaTrash size={14} /></button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {pagedScores.length === 0 && (
                       <tr>
                         <td colSpan={5} className="px-6 py-8 text-sm text-tertiary/50 text-center">
@@ -1778,8 +1935,8 @@ const AdminPanel = () => {
                 <table className="w-full table-fixed">
                   <SortableHead
                     cols={[
-                      { label: "Character", field: "name", className: "w-1/2" },
-                      { label: "Exception", field: "exception", className: "w-1/2" },
+                      { label: "Character", field: "name", className: "w-[42%]" },
+                      { label: "Exception", field: "exception", className: "w-[42%]" },
                     ]}
                     sort={excSort}
                     onSort={(f) => { toggleSort(excSort, f, setExcSort); setExcPage(1); }}
@@ -1803,21 +1960,25 @@ const AdminPanel = () => {
                           </td>
                           <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
                             {isEditing ? (
-                              <input
-                                className="w-full bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                              <AutocompleteInput
                                 value={excInlineEdit!.name}
-                                onChange={(e) => setExcInlineEdit((s) => s && { ...s, name: e.target.value })}
+                                onChange={(v) => setExcInlineEdit((s) => s && { ...s, name: v })}
                                 onKeyDown={(e) => { if (e.key === "Enter") inlineSaveException(); if (e.key === "Escape") setExcInlineEdit(null); }}
+                                suggestions={liveCharacters.map((c) => c.name)}
+                                inputClassName="w-[175px] bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
                                 autoFocus
                               />
                             ) : (
-                              <span className="text-accent">{exc.name}</span>
+                              <button
+                                className="text-accent hover:underline text-left"
+                                onClick={() => { const c = liveCharacters.find((x) => x.name === exc.name); if (c) openCharDetail(c); }}
+                              >{exc.name}</button>
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
                             {isEditing ? (
                               <input
-                                className="w-full bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                                className="w-[175px] bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
                                 value={excInlineEdit!.exception}
                                 onChange={(e) => setExcInlineEdit((s) => s && { ...s, exception: e.target.value })}
                                 onKeyDown={(e) => { if (e.key === "Enter") inlineSaveException(); if (e.key === "Escape") setExcInlineEdit(null); }}
@@ -1947,14 +2108,6 @@ const AdminPanel = () => {
                 disabled={!isCreate}
               />
             </Field>
-            <Field label="Class">
-              <input
-                className={inputCls}
-                value={data.class ?? ""}
-                onChange={(e) => updateField("class", e.target.value)}
-                placeholder="e.g. Arch Mage (F/P)"
-              />
-            </Field>
             <Field label="Member Since">
               <DatePicker
                 value={data.memberSince ?? ""}
@@ -1987,24 +2140,59 @@ const AdminPanel = () => {
       case "scores":
         return (
           <>
-            <Field label="Character" hint="Changing the owner requires re-linking manually.">
-              <input
-                className={inputCls}
-                defaultValue={data.character ?? ""}
-                disabled={!isCreate}
-              />
+            <Field label="Character">
+              {isCreate && !data._fromCharDetail ? (
+                <AutocompleteInput
+                  value={data.character ?? ""}
+                  onChange={(v) => updateField("character", v)}
+                  suggestions={liveCharacters.map((c) => c.name)}
+                  placeholder="e.g. Dánnis"
+                  inputClassName={inputCls}
+                />
+              ) : (
+                <input
+                  className={cn(inputCls, "text-tertiary/60")}
+                  value={data.character ?? ""}
+                  disabled
+                  readOnly
+                />
+              )}
             </Field>
             <Field label="Date">
               <DatePicker
+                mode="single"
                 value={data.date ?? ""}
                 onChange={(v) => updateField("date", v)}
+                wednesdayOnly
+                disabledDates={
+                  liveScores
+                    .filter((s) =>
+                      s.character === (data.character ?? "") &&
+                      (!isCreate ? s.date !== data.date : true)
+                    )
+                    .map((s) => s.date)
+                }
+                placeholder="Select Date"
+                align="right"
+                subtle
               />
             </Field>
+            {isCreate &&
+              data.character &&
+              data.date &&
+              liveScores.some(
+                (s) => s.character === data.character && s.date === data.date
+              ) && (
+                <p className="text-[#A46666] text-xs px-0.5 -mt-1">
+                  A score for this character on this date already exists.
+                </p>
+              )}
             <Field label="Score">
               <input
                 type="number"
-                className={inputCls}
-                defaultValue={data.score ?? ""}
+                className={`${inputCls} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                value={data.score ?? ""}
+                onChange={(e) => updateField("score", e.target.value)}
                 placeholder="0"
                 min={0}
               />
@@ -2020,19 +2208,19 @@ const AdminPanel = () => {
                 value={data.name ?? ""}
                 onChange={(v) => updateField("name", v)}
                 suggestions={liveCharacters.map((c) => c.name)}
-                placeholder="e.g. D\u00e1nnis"
+                placeholder="e.g. Dánnis"
                 inputClassName={inputCls}
               />
             </Field>
             <Field
               label="Exception"
-              hint="The incorrect name that the scanner picked up instead of the real name."
+              hint="The incorrect name that the scanner picked up."
             >
               <input
                 className={inputCls}
                 value={data.exception ?? ""}
                 onChange={(e) => updateField("exception", e.target.value)}
-                placeholder="e.g. Dannis"
+                placeholder="e.g. Danniz"
               />
             </Field>
           </>
@@ -2061,9 +2249,12 @@ const AdminPanel = () => {
               };
               setActiveSection(id);
               navigate(sectionPaths[id]);
-              setSearch("");
-              setScoreSearch("");
-              setScorePage(1);
+              // Reset all search, sort, page, and inline-edit state when switching tabs
+              setSearch(""); setCharSearch(""); setUserSearch(""); setScoreSearch("");
+              setCharPage(1); setUserPage(1); setScorePage(1); setExcPage(1);
+              setCharSort(null); setUserSort(null); setScoreSort(null); setExcSort(null);
+              setCharDateFrom(""); setCharDateTo(""); setScoreDateFilter("");
+              setExcInlineEdit(null); setScoreTabInlineEdit(null);
               setCharDetail(null);
               setUserDetail(null);
               setPrevContext(null);
@@ -2120,7 +2311,9 @@ const AdminPanel = () => {
                 </h2>
                 <p className="text-tertiary text-sm mt-0.5">
                   {drawer.mode === "create"
-                    ? drawer.section === "exceptions"
+                    ? drawer.section === "scores"
+                      ? "Add a new score to the database"
+                      : drawer.section === "exceptions"
                       ? "Add a new exception to the database"
                       : `Add a new record to the ${drawer.section} collection`
                     : `Modify this record in the ${drawer.section} collection`}
@@ -2141,12 +2334,31 @@ const AdminPanel = () => {
 
             {/* Actions */}
             <div className="flex gap-3 px-8 py-6 border-t border-tertiary/[8%]">
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-accent/15 hover:bg-accent/20 text-accent rounded-lg py-2.5 text-sm transition-colors"
-              >
-                {drawer.mode === "create" ? "Create" : "Save Changes"}
-              </button>
+              {(() => {
+                const d = drawer.data;
+                const submitDisabled =
+                  drawer.mode === "create" && (
+                    drawer.section === "scores"
+                      ? !d.character || !d.date || d.score === "" || d.score === undefined || d.score === null || liveScores.some((s) => s.character === d.character && s.date === d.date)
+                      : drawer.section === "exceptions"
+                      ? !d.name || !d.exception
+                      : false
+                  );
+                return (
+                  <button
+                    onClick={handleSave}
+                    disabled={submitDisabled}
+                    className={cn(
+                      "flex-1 rounded-lg py-2.5 text-sm transition-colors",
+                      submitDisabled
+                        ? "bg-tertiary/10 text-tertiary/40 cursor-not-allowed"
+                        : "bg-accent/15 hover:bg-accent/20 text-accent"
+                    )}
+                  >
+                    {drawer.mode === "create" ? "Create" : "Save Changes"}
+                  </button>
+                );
+              })()}
               <button
                 onClick={closeDrawer}
                 className="flex-1 bg-background hover:bg-background/60 text-tertiary rounded-lg py-2.5 text-sm transition-colors"

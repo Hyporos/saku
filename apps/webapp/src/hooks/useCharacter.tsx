@@ -7,14 +7,14 @@ const BOT_API = import.meta.env.VITE_BOT_API_URL ?? "http://localhost:8000";
 const useCharacter = (characterName: string) => {
   const [characterData, setCharacterData] = useState<{
     name: string;
-    class: string;
+    characterClassName: string;
     level?: number;
     characterImgURL?: string;
     memberSince: string;
     scores: { score: number; date: string }[];
   }>({
     name: "",
-    class: "",
+    characterClassName: "",
     level: NaN,
     characterImgURL: "",
     memberSince: "",
@@ -29,7 +29,6 @@ const useCharacter = (characterName: string) => {
         setCharacterData((prevData) => ({
           ...prevData,
           name: res.data.name,
-          class: res.data.class,
           memberSince: res.data.memberSince,
           scores: res.data.scores,
         }));
@@ -46,6 +45,7 @@ const useCharacter = (characterName: string) => {
           ...prevData,
           characterImgURL: res.data.characterImgURL,
           level: res.data.level,
+          characterClassName: res.data.characterClassName ?? "",
         }));
       })
       .catch((error) => {

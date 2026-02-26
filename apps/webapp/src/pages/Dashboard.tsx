@@ -119,7 +119,7 @@ const Dashboard = () => {
             </h1>
             <div className="flex justify-center">
               <h2>
-                Level {characterData.level} {characterData.class}
+                Level {characterData.level} {characterData.characterClassName}
               </h2>
             </div>
             <h2 className="flex justify-between gap-2">

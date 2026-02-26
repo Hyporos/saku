@@ -14,6 +14,8 @@ interface AutocompleteInputProps {
   placeholder?: string;
   className?: string;
   inputClassName?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  autoFocus?: boolean;
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -25,6 +27,8 @@ const AutocompleteInput = ({
   placeholder,
   className,
   inputClassName,
+  onKeyDown,
+  autoFocus,
 }: AutocompleteInputProps) => {
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -70,19 +74,20 @@ const AutocompleteInput = ({
     setHighlighted(-1);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!shouldOpen && !visible) return;
-    if (e.key === "ArrowDown") {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown" && shouldOpen) {
       e.preventDefault();
       setHighlighted((h) => Math.min(h + 1, matches.length - 1));
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" && shouldOpen) {
       e.preventDefault();
       setHighlighted((h) => Math.max(h - 1, 0));
-    } else if (e.key === "Enter" && highlighted >= 0) {
+    } else if (e.key === "Enter" && shouldOpen && highlighted >= 0) {
       e.preventDefault();
       pick(matches[highlighted]);
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" && shouldOpen) {
       setOpen(false);
+    } else {
+      onKeyDown?.(e);
     }
   };
 
@@ -111,6 +116,7 @@ const AutocompleteInput = ({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
+        autoFocus={autoFocus}
         className={inputClassName}
       />
       {visible && (

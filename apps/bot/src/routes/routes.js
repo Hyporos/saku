@@ -166,9 +166,9 @@ router.get("/admin/member/:id", async (req, res) => {
 
 router.post("/admin/characters", async (req, res) => {
   try {
-    const { userId, name, class: charClass, memberSince, avatar } = req.body;
+    const { userId, name, memberSince, avatar } = req.body;
     await culvertSchema.findByIdAndUpdate(userId, {
-      $push: { characters: { name, class: charClass, memberSince, avatar: avatar || "", scores: [] } },
+      $push: { characters: { name, memberSince, avatar: avatar || "", scores: [] } },
     });
     res.json({ success: true });
   } catch (error) {
@@ -179,13 +179,12 @@ router.post("/admin/characters", async (req, res) => {
 
 router.patch("/admin/characters/:userId/:name", async (req, res) => {
   try {
-    const { name, class: charClass, memberSince, avatar } = req.body;
+    const { name, memberSince, avatar } = req.body;
     await culvertSchema.findOneAndUpdate(
       { _id: req.params.userId, "characters.name": { $regex: `^${req.params.name}$`, $options: "i" } },
       {
         $set: {
           "characters.$.name": name,
-          "characters.$.class": charClass,
           "characters.$.memberSince": memberSince,
           "characters.$.avatar": avatar,
         },

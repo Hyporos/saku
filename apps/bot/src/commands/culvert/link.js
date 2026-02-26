@@ -65,43 +65,6 @@ module.exports = {
       );
     }
 
-    // Determine explorer class name based on JobDetail
-    function getClassName(res) {
-      const jobMap = {
-        Warrior: {
-          12: "Hero",
-          22: "Paladin",
-          32: "Dark Knight",
-        },
-        Magician: {
-          12: "Arch Mage (F/P)",
-          22: "Arch Mage (I/L)",
-          32: "Bishop",
-        },
-        Bowman: {
-          12: "Bowmaster",
-          22: "Marksman",
-        },
-        Thief: {
-          12: "Night Lord",
-          22: "Shadower",
-        },
-        Pirate: {
-          12: "Buccaneer",
-          22: "Corsair",
-          32: "Cannoneer",
-        },
-      };
-
-      const jobID = res.data.ranks[0]?.jobID;
-      const jobDetail = res.data.ranks[0]?.jobDetail;
-
-      return (
-        (jobMap[jobID] && jobMap[jobID][jobDetail]) ||
-        res.data.ranks[0]?.jobName
-      );
-    }
-
     // Fetch Maplestory ranking data
     const url = `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${characterOption}`;
 
@@ -121,7 +84,6 @@ module.exports = {
                 name: overrideOption
                   ? characterOption
                   : res.data.ranks[0]?.characterName,
-                class: overrideOption ? "?" : getClassName(res),
                 memberSince: joinDate,
               },
             },

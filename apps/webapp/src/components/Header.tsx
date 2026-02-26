@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import useAuth from "../hooks/useAuth";
+import logo from "../assets/logo.webp";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -39,7 +40,7 @@ const Header = () => {
             className="flex items-center gap-9"
             onClick={() => navigate("/")}
           >
-            <img src="src/assets/logo.webp" width={48} height={48} />
+            <img src={logo} width={48} height={48} />
             <h1 className="text-4xl">Saku</h1>
           </button>
 

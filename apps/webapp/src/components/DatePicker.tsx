@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import dayjs from "dayjs";
 import { cn } from "../lib/utils";
-import { FaChevronLeft, FaChevronRight, FaRegCalendarAlt } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaRegCalendarAlt, FaArrowRight } from "react-icons/fa";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -20,6 +20,10 @@ interface DatePickerSingleProps {
   compact?: boolean;
   // "wednesdayOnly" disables all non-Wednesday days — for culvert score dates
   wednesdayOnly?: boolean;
+  // "disabledDates" grays out specific ISO dates (e.g. dates that already have a score)
+  disabledDates?: string[];
+  // "dropUp" opens the calendar above the trigger instead of below — use when near bottom of viewport
+  dropUp?: boolean;
 }
 
 // Range mode — supply from/to and an onRangeChange handler
@@ -34,6 +38,8 @@ interface DatePickerRangeProps {
   subtle?: boolean;
   compact?: boolean;
   wednesdayOnly?: boolean;
+  disabledDates?: string[];
+  dropUp?: boolean;
 }
 
 type DatePickerProps = DatePickerSingleProps | DatePickerRangeProps;
@@ -183,13 +189,13 @@ const DatePicker = (props: DatePickerProps) => {
             : props.subtle
               ? "border-tertiary/20 hover:border-tertiary/40"
               : "border-accent/30 hover:border-accent/60",
-          // Text color: subtle mode — white when a date is already selected, faded otherwise
+          // Text color: subtle mode — white when a date is already selected, tertiary otherwise (matches open state)
           props.subtle
             ? open
               ? "text-tertiary"
               : activeValue
                 ? "text-white"
-                : "text-tertiary/50 hover:text-tertiary"
+                : "text-tertiary"
             : "text-accent"
         )}
       >
@@ -198,19 +204,21 @@ const DatePicker = (props: DatePickerProps) => {
           className={cn(
             "flex-shrink-0 leading-none transition-colors mb-[2px]",
             props.subtle
-              ? (open ? "text-tertiary" : "text-tertiary/30 group-hover:text-tertiary")
+              ? "text-tertiary"
               : (open ? "text-accent" : "text-tertiary/50 group-hover:text-accent")
           )}
         />
-        <span className={cn(!activeValue && !open && "opacity-50")}>{displayValue}</span>
+        <span className={cn(!props.subtle && !activeValue && !open && "opacity-50")}>{displayValue}</span>
       </button>
 
       {/* Calendar dropdown */}
       {visible && (
         <div
           className={cn(
-            "absolute top-full mt-1.5 z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-4 w-[264px] transition-all duration-[180ms]",
-            props.align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left",
+            "absolute z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-4 w-[264px] transition-all duration-[180ms]",
+            props.dropUp
+              ? props.align === "right" ? "bottom-full mb-1.5 right-0 origin-bottom-right" : "bottom-full mb-1.5 left-0 origin-bottom-left"
+              : props.align === "right" ? "top-full mt-1.5 right-0 origin-top-right" : "top-full mt-1.5 left-0 origin-top-left",
             animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1"
           )}
         >
@@ -219,16 +227,16 @@ const DatePicker = (props: DatePickerProps) => {
             <div className="flex items-center gap-1 mb-3">
               <span className={cn(
                 "flex-1 text-center text-xs rounded-md py-1 transition-colors",
-                picking === "from" ? "bg-accent/15 text-accent" : "text-tertiary"
+                picking === "from" ? "bg-accent/15 text-accent" : "border border-tertiary/20 text-tertiary"
               )}>
                 {(props as DatePickerRangeProps).from
                   ? dayjs((props as DatePickerRangeProps).from).format("MMM DD")
                   : "Start"}
               </span>
-              <span className="text-tertiary/30 py-1">→</span>
+              <FaArrowRight size={9} className="text-tertiary/40 flex-shrink-0" />
               <span className={cn(
                 "flex-1 text-center text-xs rounded-md py-1 transition-colors",
-                picking === "to" ? "bg-accent/15 text-accent" : "text-tertiary"
+                picking === "to" ? "bg-accent/15 text-accent" : "border border-tertiary/20 text-tertiary"
               )}>
                 {(props as DatePickerRangeProps).to
                   ? dayjs((props as DatePickerRangeProps).to).format("MMM DD")
@@ -287,7 +295,7 @@ const DatePicker = (props: DatePickerProps) => {
               const { isSelected, isInRange, isRangeStart, isRangeEnd, isToday } = getDayState(iso);
               // Wednesday-only mode — disable all non-Wednesday days
               const isWednesday = dayjs(iso).day() === 3;
-              const disabled = !!props.wednesdayOnly && !isWednesday;
+              const disabled = (!!props.wednesdayOnly && !isWednesday) || (props.disabledDates?.includes(iso) ?? false);
               return (
                 <button
                   key={day}

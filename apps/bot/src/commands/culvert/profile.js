@@ -211,7 +211,7 @@ module.exports = {
           .addFields(
             {
               name: "Class",
-              value: character.class || "Unknown",
+              value: res.data.ranks[0]?.jobName || "Unknown",
               inline: true,
             },
             {
