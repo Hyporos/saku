@@ -1,4 +1,5 @@
 import { AdminProvider, useAdminContext } from "../features/admin/context";
+import { useMatch } from "react-router-dom";
 import { AdminSidebar } from "../features/admin/components/AdminSidebar";
 import { DrawerPanel } from "../features/admin/components/DrawerPanel";
 import { TransferModal } from "../features/admin/components/TransferModal";
@@ -15,10 +16,12 @@ import WarningModal from "../components/WarningModal";
 // Inner layout — consumes context, must be rendered inside AdminProvider
 const AdminPanelLayout = () => {
   const { activeSection, charDetail, userDetail, modal, closeModal } = useAdminContext();
+  const isCharDetailRoute = !!useMatch("/admin/characters/:charName");
+  const isUserDetailRoute = !!useMatch("/admin/users/:userId");
 
   const renderMain = () => {
-    if (charDetail) return <CharacterDetail />;
-    if (userDetail) return <UserDetail />;
+    if (charDetail || isCharDetailRoute) return <CharacterDetail />;
+    if (userDetail || isUserDetailRoute) return <UserDetail />;
 
     switch (activeSection) {
       case "users":      return <UsersTab />;

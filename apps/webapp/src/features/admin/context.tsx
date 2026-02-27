@@ -3,7 +3,6 @@ import {
   useContext,
   useState,
   useEffect,
-  useRef,
   type ReactNode,
 } from "react";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
@@ -195,8 +194,8 @@ interface AdminContextValue {
   transferCharacter: () => Promise<void>;
 
   // Data refresh
-  refreshUsers: () => Promise<void>;
-  refreshExceptions: () => Promise<void>;
+  refreshUsers: (force?: boolean) => Promise<void>;
+  refreshExceptions: (force?: boolean) => Promise<void>;
 
   // Save actions
   saveCharEdits: () => Promise<void>;
@@ -247,8 +246,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const userMatch = useMatch("/admin/users/:userId");
   const urlCharName = charMatch?.params.charName;
   const urlUserId = userMatch?.params.userId;
-  const initializedCharFromUrl = useRef(false);
-  const initializedUserFromUrl = useRef(false);
   const [backTrail, setBackTrail] = useState<BackTrailEntry[]>([]);
 
   // ⎯⎯ Section ⎯⎯ //
@@ -308,17 +305,25 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   // Load data when active section changes
   useEffect(() => {
     if (activeSection === "users" || activeSection === "characters" || activeSection === "scores") {
-      refreshUsers();
+      refreshUsers(false);
     }
-    if (activeSection === "exceptions") refreshExceptions();
+    if (activeSection === "exceptions") refreshExceptions(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
-  // Restore character detail from URL slug on initial load
+  // Warm caches on initial mount so tab switches feel instant
   useEffect(() => {
-    if (!urlCharName || initializedCharFromUrl.current || usersLoading || userData.length === 0) return;
+    refreshUsers(false);
+    refreshExceptions(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep character detail in sync with route slug
+  useEffect(() => {
+    if (!urlCharName || usersLoading || userData.length === 0) return;
     const decoded = decodeURIComponent(urlCharName);
     const allFlat = userData.flatMap((u) => u.characters.map((c) => ({ name: c.name, userId: String(u._id) })));
+    let matched = false;
     for (const u of userData) {
       for (const c of u.characters) {
         if (charSlug(c.name, allFlat) === decoded) {
@@ -330,23 +335,27 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             scoreCount: total,
             participationRate: total > 0 ? Math.round((participated / total) * 100) : 0,
           });
+          setUserDetail(null);
           setActiveSection("characters");
-          initializedCharFromUrl.current = true;
+          matched = true;
           return;
         }
       }
     }
+    if (!matched) setCharDetail(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData, usersLoading, urlCharName]);
 
-  // Restore user detail from URL on initial load
+  // Keep user detail in sync with route id
   useEffect(() => {
-    if (!urlUserId || initializedUserFromUrl.current || usersLoading || userData.length === 0) return;
+    if (!urlUserId || usersLoading || userData.length === 0) return;
     const found = userData.find((u) => String(u._id) === urlUserId);
     if (found) {
       setUserDetail(found);
+      setCharDetail(null);
       setActiveSection("users");
-      initializedUserFromUrl.current = true;
+    } else {
+      setUserDetail(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData, usersLoading, urlUserId]);
@@ -420,17 +429,61 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
 
   const backTargetLabel = backTrail.length > 0 ? backTrail[backTrail.length - 1].label : "Characters";
 
+  const hydrateDetailFromPath = (path: string): boolean => {
+    const userMatch = path.match(/^\/admin\/users\/([^/]+)$/);
+    if (userMatch) {
+      const userId = decodeURIComponent(userMatch[1]);
+      const foundUser = userData.find((u) => String(u._id) === userId);
+      if (foundUser) {
+        setUserDetail(foundUser);
+        setCharDetail(null);
+        return true;
+      }
+      return false;
+    }
+
+    const charMatch = path.match(/^\/admin\/characters\/([^/]+)$/);
+    if (charMatch) {
+      const slug = decodeURIComponent(charMatch[1]);
+      const allFlat = userData.flatMap((u) => u.characters.map((c) => ({ name: c.name, userId: String(u._id) })));
+      for (const u of userData) {
+        for (const c of u.characters) {
+          if (charSlug(c.name, allFlat) === slug) {
+            const participated = c.scores.filter((s) => s.score > 0).length;
+            const total = c.scores.length;
+            setCharDetail({
+              ...c,
+              userId: String(u._id),
+              scoreCount: total,
+              participationRate: total > 0 ? Math.round((participated / total) * 100) : 0,
+            });
+            setUserDetail(null);
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    return false;
+  };
+
   const goBackFromTrail = () => {
     const target = backTrail[backTrail.length - 1];
-    setCharDetail(null);
-    setUserDetail(null);
     setPrevContext(null);
     if (target) {
       setBackTrail((prev) => prev.slice(0, -1));
       setActiveSection(sectionForPath(target.path));
+      const hydrated = hydrateDetailFromPath(target.path);
+      if (!hydrated) {
+        setCharDetail(null);
+        setUserDetail(null);
+      }
       navigate(target.path);
       return;
     }
+    setCharDetail(null);
+    setUserDetail(null);
     setActiveSection("characters");
     navigate("/admin/characters");
   };

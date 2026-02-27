@@ -102,7 +102,7 @@ export const CharacterDetail = () => {
 
       {/* Header — avatar panel */}
       <div className="bg-panel rounded-xl flex overflow-hidden" style={{ minHeight: "110px" }}>
-        <div className="w-28 bg-panel flex items-end justify-center shrink-0 p-3">
+        <div className="w-28 bg-panel flex items-center justify-center shrink-0 p-3">
           {avatarSrc ? (
             <img
               src={avatarSrc}
@@ -111,7 +111,7 @@ export const CharacterDetail = () => {
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
           ) : (
-            <FaUserAlt size={22} className="text-tertiary/30 mb-4" />
+            <FaUserAlt size={36} className="text-tertiary/30" />
           )}
         </div>
         <div className="flex-1 px-6 py-5 flex items-center justify-between min-w-0">
@@ -136,7 +136,7 @@ export const CharacterDetail = () => {
               Save
             </button>
           )}
-          <div className="flex items-center gap-2 ml-2">
+          <div className="flex items-center gap-3 ml-2">
             <button
               onClick={(e) => { e.stopPropagation(); setTransferModal({ isOpen: true, char: charDetail }); }}
               title="Transfer character to another user"

@@ -11,25 +11,56 @@ import type { UserDoc, ExceptionDoc, CharDetail, LiveUser, LiveScore } from "../
  * every other tab.
  */
 export function useDataFetching() {
-  const [userData, setUserData] = useState<UserDoc[]>([]);
+  const usersCacheKey = "admin_users_cache_v1";
+  const exceptionsCacheKey = "admin_exceptions_cache_v1";
+
+  const readCache = <T,>(key: string): T | null => {
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeCache = <T,>(key: string, value: T) => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // ignore cache write failures
+    }
+  };
+
+  const [userData, setUserData] = useState<UserDoc[]>(() => readCache<UserDoc[]>(usersCacheKey) ?? []);
   const [usersLoading, setUsersLoading] = useState(false);
-  const [exceptionsData, setExceptionsData] = useState<ExceptionDoc[]>([]);
+  const [exceptionsData, setExceptionsData] = useState<ExceptionDoc[]>(() => readCache<ExceptionDoc[]>(exceptionsCacheKey) ?? []);
   const [exceptionsLoading, setExceptionsLoading] = useState(false);
 
-  const refreshUsers = (): Promise<void> => {
+  const refreshUsers = (force = true): Promise<void> => {
+    if (!force && userData.length > 0) return Promise.resolve();
     setUsersLoading(true);
     return axios
       .get<UserDoc[]>(`${BOT_API}/bot/api/admin/users`)
-      .then((res) => setUserData(Array.isArray(res.data) ? res.data : []))
+      .then((res) => {
+        const next = Array.isArray(res.data) ? res.data : [];
+        setUserData(next);
+        writeCache(usersCacheKey, next);
+      })
       .catch(console.error)
       .finally(() => setUsersLoading(false)) as Promise<void>;
   };
 
-  const refreshExceptions = (): Promise<void> => {
+  const refreshExceptions = (force = true): Promise<void> => {
+    if (!force && exceptionsData.length > 0) return Promise.resolve();
     setExceptionsLoading(true);
     return axios
       .get<ExceptionDoc[]>(`${BOT_API}/bot/api/admin/exceptions`)
-      .then((res) => setExceptionsData(Array.isArray(res.data) ? res.data : []))
+      .then((res) => {
+        const next = Array.isArray(res.data) ? res.data : [];
+        setExceptionsData(next);
+        writeCache(exceptionsCacheKey, next);
+      })
       .catch(console.error)
       .finally(() => setExceptionsLoading(false)) as Promise<void>;
   };
