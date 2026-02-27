@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
+const actionLogSchema = require("../../schemas/actionLogSchema.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -48,6 +49,20 @@ module.exports = {
       name: nameOption,
       exception: exceptionOption,
     });
+
+    // Log the exception
+    try {
+      await actionLogSchema.create({
+        action: "Create Exception",
+        target: String(nameOption),
+        details: `Character: ${nameOption} | Exception: ${exceptionOption}`,
+        category: "create",
+        actorId: String(interaction.user.id),
+        timestamp: new Date(),
+      });
+    } catch {
+      // Non-critical
+    }
 
     // Handle responses
     interaction.reply(

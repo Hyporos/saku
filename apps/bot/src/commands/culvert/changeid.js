@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const actionLogSchema = require("../../schemas/actionLogSchema.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -75,6 +76,22 @@ module.exports = {
       const characterNames = oldUserObject.characters
         .map((char) => char.name)
         .join(", ");
+
+      // Log one transfer entry per character
+      try {
+        for (const char of oldUserObject.characters) {
+          await actionLogSchema.create({
+            action: "Transfer Character",
+            target: String(char.name),
+            details: `Owner updated from ${oldUser.username} to ${newUser.username}`,
+            category: "transfer",
+            actorId: String(interaction.user.id),
+            timestamp: new Date(),
+          });
+        }
+      } catch {
+        // Non-critical — never block the transfer on log failure
+      }
 
       return interaction.reply(
         `Successfully transferred culvert data from **${oldUser.tag}** to **${newUser.tag}**\n` +

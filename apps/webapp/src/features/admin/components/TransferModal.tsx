@@ -88,7 +88,7 @@ export const TransferModal = () => {
                 "flex-1 rounded-lg py-2.5 text-sm transition-colors",
                 canTransfer
                   ? "bg-accent/15 hover:bg-accent/20 text-accent"
-                  : "bg-background/60 text-tertiary/30 cursor-not-allowed"
+                  : "bg-background/60 text-tertiary/30 cursor-default"
               )}
             >
               Transfer

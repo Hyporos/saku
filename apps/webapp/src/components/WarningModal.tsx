@@ -125,7 +125,7 @@ const WarningModal = ({
                   ? useDangerStyle
                     ? "bg-[#A46666]/10 hover:bg-[#A46666]/20 text-[#A46666]"
                     : "bg-accent/15 hover:bg-accent/20 text-accent"
-                  : "bg-background/60 text-tertiary/30 cursor-not-allowed"
+                  : "bg-background/60 text-tertiary/30 cursor-default"
               )}
             >
               {confirmLabel}

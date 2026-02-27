@@ -17,9 +17,12 @@ export const toStoredDate = (input: string) => {
   return d.isValid() ? d.format("MMM DD, YYYY") : input;
 };
 
-/** Strip diacritics/accents for URL slugs — e.g. Dánnis → Dannis */
+/** Normalize character name for URL slug while preserving accent distinctions */
 export const normalizeCharName = (name: string) =>
-  name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 
 /**
  * Build a collision-free URL slug for a character name.

@@ -1,5 +1,5 @@
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaEdit, FaCheck, FaTimes, FaExclamationCircle } from "react-icons/fa";
+import { FaSearch, FaEdit, FaCheck, FaTimes, FaTrash, FaExclamationCircle } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import AutocompleteInput from "../../../components/AutocompleteInput";
 import { SortableHead } from "../components/SortableHead";
@@ -70,6 +70,9 @@ export const ExceptionsTab = () => {
               <tbody>
                 {pagedExcs.map((exc) => {
                 const isEditing = excInlineEdit?.id === exc._id;
+                const canConfirm =
+                  isEditing &&
+                  (excInlineEdit!.name.trim() !== exc.name || excInlineEdit!.exception !== exc.exception);
                 return (
                   <tr
                     key={exc._id}
@@ -96,6 +99,7 @@ export const ExceptionsTab = () => {
                           suggestions={liveCharacters.map((c) => c.name)}
                           className="w-[175px]"
                           inputClassName="w-full bg-background border border-tertiary/20 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-accent/40 transition-colors"
+                          requireSelection
                         />
                       ) : (
                         <button
@@ -130,8 +134,12 @@ export const ExceptionsTab = () => {
                           <>
                             <button
                               onClick={inlineSaveException}
+                              disabled={!canConfirm}
                               title="Confirm"
-                              className="text-[#669A68] hover:text-white transition-colors"
+                              className={cn(
+                                "transition-colors",
+                                canConfirm ? "text-[#669A68] hover:text-white" : "text-[#669A68]/35 cursor-default"
+                              )}
                             >
                               <FaCheck size={14} />
                             </button>
@@ -160,7 +168,7 @@ export const ExceptionsTab = () => {
                               title="Delete"
                               className="text-tertiary hover:text-[#A46666] transition-colors"
                             >
-                              <FaTimes size={16} />
+                              <FaTrash size={14} />
                             </button>
                           </>
                         )}

@@ -16,6 +16,7 @@ interface AutocompleteInputProps {
   inputClassName?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   autoFocus?: boolean;
+  requireSelection?: boolean;
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -29,6 +30,7 @@ const AutocompleteInput = ({
   inputClassName,
   onKeyDown,
   autoFocus,
+  requireSelection = false,
 }: AutocompleteInputProps) => {
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -74,6 +76,9 @@ const AutocompleteInput = ({
     setHighlighted(-1);
   };
 
+  const isExactSuggestion = (candidate: string) =>
+    suggestions.some((s) => stripAccents(s).toLowerCase() === stripAccents(candidate).toLowerCase());
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown" && shouldOpen) {
       e.preventDefault();
@@ -81,9 +86,15 @@ const AutocompleteInput = ({
     } else if (e.key === "ArrowUp" && shouldOpen) {
       e.preventDefault();
       setHighlighted((h) => Math.max(h - 1, 0));
-    } else if (e.key === "Enter" && shouldOpen && highlighted >= 0) {
-      e.preventDefault();
-      pick(matches[highlighted]);
+    } else if (e.key === "Enter") {
+      if (shouldOpen && highlighted >= 0) {
+        e.preventDefault();
+        pick(matches[highlighted]);
+      } else if (requireSelection && value.trim() && !isExactSuggestion(value.trim())) {
+        e.preventDefault();
+        if (matches[0]) pick(matches[0]);
+        else onChange("");
+      }
     } else if (e.key === "Escape" && shouldOpen) {
       setOpen(false);
     } else {
@@ -112,6 +123,12 @@ const AutocompleteInput = ({
         type="text"
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlighted(-1); }}
+        onBlur={() => {
+          if (requireSelection && value.trim() && !isExactSuggestion(value.trim())) {
+            setOpen(false);
+            return;
+          }
+        }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}

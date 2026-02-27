@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findCharacter } = require("../../utility/culvertUtils.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const axios = require("axios");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -72,6 +73,20 @@ module.exports = {
             }
           );
 
+          // Log the rename
+          try {
+            await actionLogSchema.create({
+              action: "Rename Character",
+              target: String(oldNameOption),
+              details: `Renamed from ${oldNameOption} to ${res.data.ranks[0]?.characterName}`,
+              category: "rename",
+              actorId: String(interaction.user.id),
+              timestamp: new Date(),
+            });
+          } catch {
+            // Non-critical
+          }
+
           interaction.reply(
             `${oldNameOption}'s name has been changed to **${res.data.ranks[0]?.characterName}**`
           );
@@ -95,6 +110,20 @@ module.exports = {
           $set: { "characters.$.name": newNameOption },
         }
       );
+
+      // Log the rename (override)
+      try {
+        await actionLogSchema.create({
+          action: "Rename Character",
+          target: String(oldNameOption),
+          details: `Renamed from ${oldNameOption} to ${newNameOption}`,
+          category: "rename",
+          actorId: String(interaction.user.id),
+          timestamp: new Date(),
+        });
+      } catch {
+        // Non-critical
+      }
 
       interaction.reply(
         `${oldNameOption}'s name has been changed to **${newNameOption}** (override)`

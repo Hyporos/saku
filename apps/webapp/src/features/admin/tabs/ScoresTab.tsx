@@ -1,5 +1,5 @@
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaEdit, FaCheck, FaTimes, FaHistory } from "react-icons/fa";
+import { FaSearch, FaEdit, FaCheck, FaTimes, FaHistory, FaTrash } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import DatePicker from "../../../components/DatePicker";
 import { SortableHead } from "../components/SortableHead";
@@ -84,6 +84,15 @@ export const ScoresTab = () => {
                 const isEditing =
                   scoreTabInlineEdit?.origCharacter === score.character &&
                   scoreTabInlineEdit?.origDate === score.date;
+                const hasScoreChange =
+                  isEditing && Number(scoreTabInlineEdit!.scoreValue) !== score.score;
+                const hasDateChange =
+                  isEditing && scoreTabInlineEdit!.dateValue !== score.date;
+                const canConfirm =
+                  isEditing &&
+                  !!scoreTabInlineEdit!.dateValue.trim() &&
+                  !!scoreTabInlineEdit!.scoreValue.trim() &&
+                  (hasScoreChange || hasDateChange);
                 return (
                   <tr
                     key={`${score.character}-${score.date}-${i}`}
@@ -157,7 +166,15 @@ export const ScoresTab = () => {
                       <div className="flex items-center justify-end gap-4">
                         {isEditing ? (
                           <>
-                            <button onClick={inlineSaveScoreTab} title="Confirm" className="text-[#669A68] hover:text-white transition-colors">
+                            <button
+                              onClick={inlineSaveScoreTab}
+                              disabled={!canConfirm}
+                              title="Confirm"
+                              className={cn(
+                                "transition-colors",
+                                canConfirm ? "text-[#669A68] hover:text-white" : "text-[#669A68]/35 cursor-default"
+                              )}
+                            >
                               <FaCheck size={14} />
                             </button>
                             <button onClick={() => setScoreTabInlineEdit(null)} title="Cancel" className="text-[#A46666] hover:text-white transition-colors">
@@ -187,7 +204,7 @@ export const ScoresTab = () => {
                               title="Delete"
                               className="text-tertiary hover:text-[#A46666] transition-colors"
                             >
-                              <FaTimes size={16} />
+                              <FaTrash size={14} />
                             </button>
                           </>
                         )}

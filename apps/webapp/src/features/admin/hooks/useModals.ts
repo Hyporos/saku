@@ -27,6 +27,26 @@ export function useModals() {
   const [transferToInput, setTransferToInput] = useState("");
   const [transferDeleteSource, setTransferDeleteSource] = useState(false);
 
+  // ⎯⎯ Rename modal ⎯⎯ //
+  const [renameModal, setRenameModal] = useState<{ isOpen: boolean; char: CharDetail | null }>({
+    isOpen: false,
+    char: null,
+  });
+
+  // ⎯⎯ Unlink modal ⎯⎯ //
+  const [unlinkModal, setUnlinkModal] = useState<{ isOpen: boolean; char: CharDetail | null }>({
+    isOpen: false,
+    char: null,
+  });
+  const [unlinkDeleteSource, setUnlinkDeleteSource] = useState(false);
+
+  // ⎯⎯ Batch unlink modal ⎯⎯ //
+  const [batchUnlinkModal, setBatchUnlinkModal] = useState<{
+    isOpen: boolean;
+    target: "user-detail" | "characters-tab";
+  }>({ isOpen: false, target: "user-detail" });
+  const [batchUnlinkDeleteSource, setBatchUnlinkDeleteSource] = useState(false);
+
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Helpers
 
@@ -51,6 +71,23 @@ export function useModals() {
     setTransferDeleteSource(false);
   };
 
+  const closeRenameModal = () => setRenameModal({ isOpen: false, char: null });
+
+  const closeUnlinkModal = () => {
+    setUnlinkModal({ isOpen: false, char: null });
+    setUnlinkDeleteSource(false);
+  };
+
+  const openBatchUnlinkModal = (target: "user-detail" | "characters-tab") => {
+    setBatchUnlinkDeleteSource(false);
+    setBatchUnlinkModal({ isOpen: true, target });
+  };
+
+  const closeBatchUnlinkModal = () => {
+    setBatchUnlinkModal((prev) => ({ ...prev, isOpen: false }));
+    setBatchUnlinkDeleteSource(false);
+  };
+
   return {
     drawer, setDrawer,
     modal, closeModal, confirm,
@@ -59,5 +96,11 @@ export function useModals() {
     transferToInput, setTransferToInput,
     transferDeleteSource, setTransferDeleteSource,
     closeTransferModal,
+    renameModal, setRenameModal, closeRenameModal,
+    unlinkModal, setUnlinkModal,
+    unlinkDeleteSource, setUnlinkDeleteSource,
+    closeUnlinkModal,
+    batchUnlinkModal, batchUnlinkDeleteSource, setBatchUnlinkDeleteSource,
+    openBatchUnlinkModal, closeBatchUnlinkModal,
   };
 }

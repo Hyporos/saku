@@ -37,7 +37,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -165,6 +165,9 @@ app.all("/bot/*", async (req, res) => {
   const extraHeaders = {};
   if (targetPath.startsWith("/api/admin/")) {
     extraHeaders["x-admin-secret"] = process.env.ADMIN_API_SECRET ?? "";
+    extraHeaders["x-admin-user-id"] = req.session.user?.id ?? "";
+    extraHeaders["x-admin-username"] = req.session.user?.username ?? "";
+    extraHeaders["x-admin-is-owner"] = String(req.session.user?.id === process.env.OWNER_ID);
   }
 
   try {

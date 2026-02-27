@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import axios from "axios";
 import { BOT_API } from "../constants";
 import type { UserDoc, ExceptionDoc, CharDetail, LiveUser, LiveScore } from "../types";
@@ -37,7 +37,7 @@ export function useDataFetching() {
   const [exceptionsData, setExceptionsData] = useState<ExceptionDoc[]>(() => readCache<ExceptionDoc[]>(exceptionsCacheKey) ?? []);
   const [exceptionsLoading, setExceptionsLoading] = useState(false);
 
-  const refreshUsers = (force = true): Promise<void> => {
+  const refreshUsers = useCallback((force = true): Promise<void> => {
     if (!force && userData.length > 0) return Promise.resolve();
     setUsersLoading(true);
     return axios
@@ -49,9 +49,9 @@ export function useDataFetching() {
       })
       .catch(console.error)
       .finally(() => setUsersLoading(false)) as Promise<void>;
-  };
+  }, [userData]);
 
-  const refreshExceptions = (force = true): Promise<void> => {
+  const refreshExceptions = useCallback((force = true): Promise<void> => {
     if (!force && exceptionsData.length > 0) return Promise.resolve();
     setExceptionsLoading(true);
     return axios
@@ -63,7 +63,7 @@ export function useDataFetching() {
       })
       .catch(console.error)
       .finally(() => setExceptionsLoading(false)) as Promise<void>;
-  };
+  }, [exceptionsData]);
 
   // ⎯⎯ Derived flat views ⎯⎯ //
 

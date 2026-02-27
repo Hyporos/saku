@@ -8,9 +8,8 @@ import logo from "../assets/logo.webp";
 
 const navLinks = [
   { label: "Dashboard", path: "/" },
-  { label: "Rankings", path: "/rankings" },
-  { label: "Documentation", path: "/docs" },
 ];
+const OWNER_ID = import.meta.env.VITE_OWNER_ID as string | undefined;
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -64,7 +63,7 @@ const Header = () => {
 
         <div className="flex items-center gap-8">
           {/* Admin Panel link — visible to bees and the server owner */}
-          {(user?.isBee || user?.id === "631337640754675725") && (
+          {(user?.isBee || user?.id === OWNER_ID) && (
             <button
               onClick={() => navigate("/admin")}
               className={cn(

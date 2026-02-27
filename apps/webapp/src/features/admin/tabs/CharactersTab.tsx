@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaUserAlt } from "react-icons/fa";
+import { FaSearch, FaUserAlt, FaPlus } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import CopyId from "../../../components/CopyId";
 import { SortableHead } from "../components/SortableHead";
@@ -7,6 +8,7 @@ import { BatchBar } from "../components/BatchBar";
 import { Pagination } from "../components/Pagination";
 import { SectionHeader } from "../components/SectionHeader";
 import { RowActions } from "../components/RowActions";
+import { LinkCharacterModal } from "../components/LinkCharacterModal";
 import { useAdminContext } from "../context";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -16,17 +18,29 @@ export const CharactersTab = () => {
     usersLoading, filteredChars, pagedChars, charPageCount,
     charSearch, setCharSearch, charPage, setCharPage,
     charSort, setCharSort, selChars, setSelChars,
-    batchDeleteChars, deleteCharacter, openCharDetail,
+    batchDeleteChars, setUnlinkModal, openCharDetail,
     toggleSort, toggleSel, toggleAll,
   } = useAdminContext();
 
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+
   return (
+    <>
     <div className="bg-panel rounded-xl overflow-hidden flex-shrink-0">
       <SectionHeader
         title="Characters"
         count={filteredChars.length}
         canCreate={false}
         createSection="characters"
+        extra={
+          <button
+            onClick={() => setLinkModalOpen(true)}
+            className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent text-sm rounded-lg px-3 py-1 transition-colors"
+          >
+            <FaPlus size={11} style={{ marginBottom: "1px" }} />
+            Add New
+          </button>
+        }
       />
       <div className="bg-tertiary/20 h-px" />
       <div className="flex items-center gap-3 px-6 py-4 border-b border-tertiary/[6%]">
@@ -95,7 +109,7 @@ export const CharactersTab = () => {
                     </span>
                   </td>
                   <RowActions
-                    onDelete={() => deleteCharacter(char.userId, char.name)}
+                    onDelete={() => setUnlinkModal({ isOpen: true, char })}
                   />
                 </tr>
                 ))}
@@ -112,5 +126,8 @@ export const CharactersTab = () => {
         </>
       )}
     </div>
+
+    <LinkCharacterModal isOpen={linkModalOpen} onClose={() => setLinkModalOpen(false)} />
+  </>
   );
 };

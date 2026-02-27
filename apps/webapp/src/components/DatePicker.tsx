@@ -70,7 +70,39 @@ const DatePicker = (props: DatePickerProps) => {
   // In range mode, track which end is being picked next
   const [picking, setPicking] = useState<"from" | "to">("from");
   const [hoverDate, setHoverDate] = useState("");
+  const [popupSideX, setPopupSideX] = useState<"left" | "right">(props.align ?? "left");
+  const [popupSideY, setPopupSideY] = useState<"down" | "up">(props.dropUp ? "up" : "down");
   const ref = useRef<HTMLDivElement>(null);
+
+  const adjustPopupPlacement = () => {
+    if (!ref.current) return;
+    const trigger = ref.current.querySelector("button");
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+    const popupW = Math.min(264, viewportW - 16);
+    const popupH = 330;
+
+    const rightOverflow = rect.left + popupW > viewportW - 8;
+    const leftFits = rect.right - popupW >= 8;
+    const leftOverflow = rect.right - popupW < 8;
+    const rightFits = rect.left + popupW <= viewportW - 8;
+
+    let nextX: "left" | "right" = props.align ?? "left";
+    if (nextX === "left" && rightOverflow && leftFits) nextX = "right";
+    if (nextX === "right" && leftOverflow && rightFits) nextX = "left";
+
+    const below = viewportH - rect.bottom;
+    const above = rect.top;
+    let nextY: "down" | "up" = props.dropUp ? "up" : "down";
+    if (nextY === "down" && below < popupH && above > below) nextY = "up";
+    if (nextY === "up" && above < popupH && below > above) nextY = "down";
+
+    setPopupSideX(nextX);
+    setPopupSideY(nextY);
+  };
 
   // Sync viewing month when the controlled value changes externally
   useEffect(() => {
@@ -85,13 +117,27 @@ const DatePicker = (props: DatePickerProps) => {
   useEffect(() => {
     if (open) {
       setVisible(true);
+      adjustPopupPlacement();
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimating(true)));
     } else {
       setAnimating(false);
       const t = setTimeout(() => setVisible(false), 180);
       return () => clearTimeout(t);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => adjustPopupPlacement();
+    window.addEventListener("resize", handler);
+    window.addEventListener("scroll", handler, true);
+    return () => {
+      window.removeEventListener("resize", handler);
+      window.removeEventListener("scroll", handler, true);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, props.align, props.dropUp]);
 
   // Reset picking side when calendar opens
   useEffect(() => {
@@ -254,18 +300,21 @@ const DatePicker = (props: DatePickerProps) => {
         <div
           className={cn(
             "absolute z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-4 w-[264px] transition-all duration-[180ms]",
-            props.dropUp
-              ? props.align === "right" ? "bottom-full mb-1.5 right-0 origin-bottom-right" : "bottom-full mb-1.5 left-0 origin-bottom-left"
-              : props.align === "right" ? "top-full mt-1.5 right-0 origin-top-right" : "top-full mt-1.5 left-0 origin-top-left",
+            popupSideY === "up"
+              ? popupSideX === "right" ? "bottom-full mb-1.5 right-0 origin-bottom-right" : "bottom-full mb-1.5 left-0 origin-bottom-left"
+              : popupSideX === "right" ? "top-full mt-1.5 right-0 origin-top-right" : "top-full mt-1.5 left-0 origin-top-left",
             animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1"
           )}
+          style={{ width: Math.min(264, window.innerWidth - 16) }}
         >
           {/* Range mode — picking indicator */}
           {isRange && (
             <div className="flex items-center gap-2 mb-3">
               <span className={cn(
-                "flex-1 text-center text-xs rounded-md py-1 transition-colors",
-                picking === "from" ? "bg-accent/15 text-accent" : "border border-tertiary/20 text-tertiary"
+                "flex-1 text-center text-xs rounded-md py-1 border transition-colors",
+                picking === "from"
+                  ? "bg-accent/15 text-accent border-accent/30"
+                  : "bg-transparent border-tertiary/20 text-tertiary"
               )}>
                 {(props as DatePickerRangeProps).from
                   ? dayjs((props as DatePickerRangeProps).from).format("MMM DD")
@@ -273,8 +322,10 @@ const DatePicker = (props: DatePickerProps) => {
               </span>
               <FaArrowRight size={11} className="text-tertiary/40 flex-shrink-0 self-center" />
               <span className={cn(
-                "flex-1 text-center text-xs rounded-md py-1 transition-colors",
-                picking === "to" ? "bg-accent/15 text-accent" : "border border-tertiary/20 text-tertiary"
+                "flex-1 text-center text-xs rounded-md py-1 border transition-colors",
+                picking === "to"
+                  ? "bg-accent/15 text-accent border-accent/30"
+                  : "bg-transparent border-tertiary/20 text-tertiary"
               )}>
                 {(props as DatePickerRangeProps).to
                   ? dayjs((props as DatePickerRangeProps).to).format("MMM DD")
@@ -331,8 +382,8 @@ const DatePicker = (props: DatePickerProps) => {
                   onMouseEnter={() => !disabled && isRange && setHoverDate(iso)}
                   onMouseLeave={() => isRange && setHoverDate("")}
                   className={cn(
-                    "aspect-square text-xs flex items-center justify-center transition-colors",
-                    disabled && "opacity-20 cursor-not-allowed",
+                    "aspect-square text-xs flex items-center justify-center border border-transparent transition-colors",
+                    disabled && "opacity-20 cursor-default",
                     isRangeStart || isRangeEnd ? "rounded-lg" : isInRange ? "rounded-none" : "rounded-lg",
                     !disabled && (
                       isSelected

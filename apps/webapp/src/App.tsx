@@ -1,5 +1,7 @@
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { NotificationProvider } from "./context/NotificationContext";
+import Notifications from "./components/Notifications";
 import useAuth from "./hooks/useAuth";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
@@ -62,8 +64,10 @@ const AdminRoute = () => (
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <NotificationProvider>
+      <Notifications />
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
 
@@ -85,12 +89,15 @@ function App() {
           <Route path="/admin/characters/:charName" element={<AdminRoute />} />
           <Route path="/admin/scores"             element={<AdminRoute />} />
           <Route path="/admin/exceptions"         element={<AdminRoute />} />
+          <Route path="/admin/action-log"         element={<AdminRoute />} />
+          <Route path="/admin/scanner"            element={<AdminRoute />} />
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+        </BrowserRouter>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }
 

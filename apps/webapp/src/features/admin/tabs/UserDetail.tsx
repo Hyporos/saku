@@ -18,7 +18,7 @@ export const UserDetail = () => {
     backTargetLabel, goBackFromTrail,
     userMemberData, userDetailCharSort, setUserDetailCharSort,
     selUserDetailChars, setSelUserDetailChars,
-    deleteUser, deleteCharacter, batchDeleteUserDetailChars,
+    deleteUser, setUnlinkModal, batchDeleteUserDetailChars,
     openCharDetail,
     toggleSort, toggleSel, toggleAll,
   } = useAdminContext();
@@ -83,7 +83,7 @@ export const UserDetail = () => {
           title="Delete user"
           className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
         >
-          <FaTrash size={11} className="mb-0.5" /> Delete User
+          <FaTrash size={11} className="mb-0.5" /> Delete
         </button>
       </div>
 
@@ -181,7 +181,17 @@ export const UserDetail = () => {
                 </td>
                 <td className="px-6 py-4 text-sm">{char.scores.length}</td>
                 <RowActions
-                  onDelete={() => { deleteCharacter(userDetail._id, char.name, "delete"); }}
+                  onDelete={() => {
+                    setUnlinkModal({
+                      isOpen: true,
+                      char: {
+                        ...char,
+                        userId: userDetail._id,
+                        scoreCount: char.scores.length,
+                        participationRate: char.participationRate,
+                      },
+                    });
+                  }}
                 />
               </tr>
               ))}

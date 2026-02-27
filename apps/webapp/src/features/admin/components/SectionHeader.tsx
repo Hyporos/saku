@@ -33,7 +33,7 @@ export const SectionHeader = ({
         {canCreate && (
           <button
             onClick={() => openCreate(createSection)}
-            className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-4 py-1.5 transition-colors"
+            className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent text-sm rounded-lg px-3 py-1 transition-colors"
           >
             <FaPlus size={11} style={{ marginBottom: "1px" }} />
             Add New

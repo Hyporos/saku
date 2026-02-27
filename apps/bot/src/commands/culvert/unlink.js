@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
+const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const {
   isCharacterLinked,
   getCasedName,
@@ -43,8 +44,8 @@ module.exports = {
     const userId = userDoc?._id;
 
     // Remove the character from the database
-    await culvertSchema.findOneAndUpdate(
-      { "characters.name": { $regex: `^${characterOption}$`, $options: "i" } },
+    const updatedUser = await culvertSchema.findByIdAndUpdate(
+      userId,
       {
         $pull: {
           characters: {
@@ -54,14 +55,30 @@ module.exports = {
             },
           },
         },
-      }
+      },
+      { new: true }
     );
 
     // Delete the user document entirely if they have no more characters
-    await culvertSchema.deleteOne({ _id: userId, characters: { $size: 0 } });
+    if (updatedUser && updatedUser.characters.length === 0) {
+      await culvertSchema.deleteOne({ _id: userId });
+    }
 
     // Remove any exceptions tied to this character name
     await exceptionSchema.deleteMany({ name: { $regex: `^${characterNameCased}$`, $options: "i" } });
+
+    // Log the unlink
+    try {
+      await actionLogSchema.create({
+        action: "Unlink Character",
+        target: String(characterNameCased),
+        category: "delete",
+        actorId: String(interaction.user.id),
+        timestamp: new Date(),
+      });
+    } catch {
+      // Non-critical
+    }
 
     // Handle responses
     interaction.reply(

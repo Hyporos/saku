@@ -104,6 +104,7 @@ const DrawerFields = () => {
                 suggestions={liveCharacters.map((c) => c.name)}
                 placeholder="e.g. Dánnis"
                 inputClassName={inputCls}
+                requireSelection
               />
             ) : (
               <input
@@ -166,6 +167,7 @@ const DrawerFields = () => {
               suggestions={liveCharacters.map((c) => c.name)}
               placeholder="e.g. Dánnis"
               inputClassName={inputCls}
+              requireSelection
             />
           </Field>
           <Field
@@ -255,7 +257,7 @@ export const DrawerPanel = () => {
             className={cn(
               "flex-1 rounded-lg py-2.5 text-sm transition-colors",
               submitDisabled
-                ? "bg-tertiary/10 text-tertiary/40 cursor-not-allowed"
+                ? "bg-tertiary/10 text-tertiary/40 cursor-default"
                 : "bg-accent/15 hover:bg-accent/20 text-accent"
             )}
           >

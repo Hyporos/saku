@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useCallback,
   useState,
   useEffect,
   type ReactNode,
@@ -12,6 +13,8 @@ import {
   FaUserAlt,
   FaChartBar,
   FaExclamationCircle,
+  FaHistory,
+  FaCamera,
 } from "react-icons/fa";
 import {
   BOT_API,
@@ -21,6 +24,8 @@ import { useDataFetching } from "./hooks/useDataFetching";
 import { useTabState } from "./hooks/useTabState";
 import { useDetailState } from "./hooks/useDetailState";
 import { useModals } from "./hooks/useModals";
+import { useActionLog } from "./hooks/useActionLog";
+import { useNotifications } from "../../context/NotificationContext";
 import type {
   Section,
   DrawerState,
@@ -40,6 +45,8 @@ import type {
   ScoreInlineEditState,
   ScoreTabInlineEditState,
   ExcInlineEditState,
+  ToolSection,
+  ActionLogEntry,
 } from "./types";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -193,9 +200,33 @@ interface AdminContextValue {
   closeTransferModal: () => void;
   transferCharacter: () => Promise<void>;
 
+  // Rename modal
+  renameModal: { isOpen: boolean; char: CharDetail | null };
+  setRenameModal: SetState<{ isOpen: boolean; char: CharDetail | null }>;
+  closeRenameModal: () => void;
+  renameCharacter: (newName: string) => Promise<void>;
+
+  // Unlink modal
+  unlinkModal: { isOpen: boolean; char: CharDetail | null };
+  setUnlinkModal: SetState<{ isOpen: boolean; char: CharDetail | null }>;
+  unlinkDeleteSource: boolean;
+  setUnlinkDeleteSource: SetState<boolean>;
+  closeUnlinkModal: () => void;
+  unlinkCharacter: () => Promise<void>;
+
+  // Batch unlink modal
+  batchUnlinkModal: { isOpen: boolean; target: "user-detail" | "characters-tab" };
+  batchUnlinkDeleteSource: boolean;
+  setBatchUnlinkDeleteSource: SetState<boolean>;
+  openBatchUnlinkModal: (target: "user-detail" | "characters-tab") => void;
+  closeBatchUnlinkModal: () => void;
+  confirmBatchUnlink: () => Promise<void>;
+
   // Data refresh
   refreshUsers: (force?: boolean) => Promise<void>;
   refreshExceptions: (force?: boolean) => Promise<void>;
+  refreshActionLog: () => Promise<void>;
+  refreshAllData: () => Promise<void>;
 
   // Save actions
   saveCharEdits: () => Promise<void>;
@@ -224,6 +255,14 @@ interface AdminContextValue {
 
   // Sidebar nav items
   navItems: Array<{ id: Section; label: string; icon: React.ElementType }>;
+  monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }>;
+  toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }>;
+  activeToolSection: ToolSection | null;
+  navigateToToolSection: (id: ToolSection) => void;
+
+  // Action log
+  actionLog: ActionLogEntry[];
+  clearActionLog: () => void;
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -297,7 +336,32 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     openCreate, closeDrawer, updateField,
     transferModal, setTransferModal, transferToInput, setTransferToInput,
     transferDeleteSource, setTransferDeleteSource, closeTransferModal,
+    renameModal, setRenameModal, closeRenameModal,
+    unlinkModal, setUnlinkModal, unlinkDeleteSource, setUnlinkDeleteSource, closeUnlinkModal,
+    batchUnlinkModal, batchUnlinkDeleteSource, setBatchUnlinkDeleteSource,
+    openBatchUnlinkModal, closeBatchUnlinkModal,
   } = useModals();
+
+  const { actionLog, clearActionLog, refreshActionLog } = useActionLog();
+  const { notify } = useNotifications();
+
+  // Extracts a user-friendly error message from an Axios error response
+  const notifyError = useCallback((e: unknown, fallback = "Something went wrong") => {
+    const ax = e as import("axios").AxiosError<{ error?: string }>;
+    const status = ax?.response?.status;
+    if (status === 409) notify("error", ax?.response?.data?.error ?? "Name already in use");
+    else if (status === 429) notify("error", "Rate limited — wait a moment and try again");
+    else if (status === 400) notify("error", ax?.response?.data?.error ?? "Invalid input");
+    else if (status === 403) notify("error", "Not authorized");
+    else if (status === 404) notify("error", ax?.response?.data?.error ?? "Not found");
+    else notify("error", ax?.response?.data?.error ?? fallback);
+  }, [notify]);
+
+  const [activeToolSection, setActiveToolSection] = useState<ToolSection | null>(() => {
+    if (location.pathname.startsWith("/admin/action-log")) return "action-log";
+    if (location.pathname.startsWith("/admin/scanner")) return "scanner";
+    return null;
+  });
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Effects
@@ -359,6 +423,32 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData, usersLoading, urlUserId]);
+
+  // Keep tool section in sync with URL for direct loads and browser navigation
+  useEffect(() => {
+    if (location.pathname.startsWith("/admin/action-log")) {
+      setActiveToolSection("action-log");
+      setCharDetail(null);
+      setUserDetail(null);
+      refreshActionLog();
+      return;
+    }
+    if (location.pathname.startsWith("/admin/scanner")) {
+      setActiveToolSection("scanner");
+      setCharDetail(null);
+      setUserDetail(null);
+      return;
+    }
+    setActiveToolSection(null);
+  }, [location.pathname, refreshActionLog, setCharDetail, setUserDetail]);
+
+  const refreshAllData = useCallback(async () => {
+    await Promise.all([
+      refreshUsers(),
+      refreshExceptions(),
+      refreshActionLog(),
+    ]);
+  }, [refreshUsers, refreshExceptions, refreshActionLog]);
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Selection / sort helpers — shared across all tabs
@@ -499,6 +589,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       exceptions: "/admin/exceptions",
     };
     setActiveSection(id);
+    setActiveToolSection(null);
     navigate(paths[id]);
     setUserSearch(""); setCharSearch(""); setScoreSearch(""); setExcSearch("");
     setUserPage(1); setCharPage(1); setScorePage(1); setExcPage(1);
@@ -513,6 +604,19 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     setBackTrail([]);
     setSelUsers(new Set()); setSelChars(new Set()); setSelScores(new Set()); setSelExcs(new Set());
     setDrawer((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const navigateToToolSection = (id: ToolSection) => {
+    setActiveToolSection(id);
+    setCharDetail(null);
+    setUserDetail(null);
+    setBackTrail([]);
+    if (id === "action-log") {
+      refreshActionLog();
+      navigate("/admin/action-log");
+    } else if (id === "scanner") {
+      navigate("/admin/scanner");
+    }
   };
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -548,36 +652,42 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const handleSave = async () => {
     const { section, mode, data } = drawer;
     try {
-      if (section === "characters") {
+      if (section === "characters" && mode === "edit") {
         const memberSince = toStoredDate(String(data.memberSince ?? ""));
-        if (mode === "edit") {
-          const originalName = data._originalName ?? data.name;
-          await axios.patch(`${BOT_API}/bot/api/admin/characters/${data.userId}/${originalName}`, { name: data.name, memberSince, avatar: data.avatar });
-        } else {
-          await axios.post(`${BOT_API}/bot/api/admin/characters`, { userId: data.userId, name: data.name, memberSince, avatar: data.avatar ?? "" });
-        }
+        const originalName = data._originalName ?? data.name;
+        await axios.patch(`${BOT_API}/bot/api/admin/characters/${data.userId}/${originalName}`, { name: data.name, memberSince, avatar: data.avatar });
         await refreshUsers();
+        notify("success", "Character updated");
       } else if (section === "users" && mode === "edit") {
         await axios.patch(`${BOT_API}/bot/api/admin/users/${data.id}`, { graphColor: data.graphColor });
         await refreshUsers();
+        notify("success", "Graph color updated");
       } else if (section === "scores") {
+        const validCharacter = liveCharacters.some((c) => c.name === String(data.character));
+        if (!validCharacter) return;
         if (mode === "edit") {
           await axios.patch(`${BOT_API}/bot/api/admin/scores/${data.character}/${data.date}`, { score: Number(data.score) });
+          notify("success", "Score updated");
         } else {
           await axios.post(`${BOT_API}/bot/api/admin/scores`, { character: data.character, date: data.date, score: Number(data.score) });
+          notify("success", "Score created");
         }
         await refreshUsers();
       } else if (section === "exceptions") {
+        const validCharacter = liveCharacters.some((c) => c.name === String(data.name));
+        if (!validCharacter) return;
         if (mode === "edit") {
           await axios.patch(`${BOT_API}/bot/api/admin/exceptions/${data._id}`, { name: data.name, exception: data.exception });
+          notify("success", "Exception updated");
         } else {
           await axios.post(`${BOT_API}/bot/api/admin/exceptions`, { name: data.name, exception: data.exception });
+          notify("success", "Exception created");
         }
         await refreshExceptions();
       }
       closeDrawer();
     } catch (e) {
-      console.error("Save failed:", e);
+      notifyError(e, "Save failed");
     }
   };
 
@@ -586,42 +696,124 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
 
   const saveCharEdits = async () => {
     if (!charDetail || !charEditsDirty) return;
-    const memberSince = toStoredDate(charEdits.memberSince);
-    await axios.patch(`${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${charDetail.name}`, { name: charDetail.name, memberSince, avatar: charEdits.avatar });
-    setCharEditsDirty(false);
-    setMemberSinceDirty(false);
-    await refreshUsers();
+    try {
+      const memberSince = toStoredDate(charEdits.memberSince);
+      await axios.patch(`${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${charDetail.name}`, { name: charDetail.name, memberSince, avatar: charEdits.avatar });
+      setCharEditsDirty(false);
+      setMemberSinceDirty(false);
+      await refreshUsers();
+      notify("success", "Profile saved");
+    } catch (e) { notifyError(e, "Failed to save profile"); }
   };
 
   const saveMemberSince = async () => {
     if (!charDetail) return;
-    const memberSince = toStoredDate(charEdits.memberSince);
-    await axios.patch(`${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${charDetail.name}`, { name: charDetail.name, memberSince, avatar: charEdits.avatar });
-    setMemberSinceDirty(false);
-    await refreshUsers();
+    try {
+      const memberSince = toStoredDate(charEdits.memberSince);
+      await axios.patch(`${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${charDetail.name}`, { name: charDetail.name, memberSince, avatar: charEdits.avatar });
+      setMemberSinceDirty(false);
+      await refreshUsers();
+      notify("success", "Member Since saved");
+    } catch (e) { notifyError(e, "Failed to update Member Since"); }
   };
 
   const saveGraphColor = async () => {
     if (!charDetail) return;
-    await axios.patch(`${BOT_API}/bot/api/admin/users/${charDetail.userId}`, { graphColor: charEdits.graphColor });
-    setGraphColorDirty(false);
-    await refreshUsers();
+    try {
+      const memberSince = toStoredDate(charEdits.memberSince);
+      await axios.patch(`${BOT_API}/bot/api/admin/characters/${charDetail.userId}/${encodeURIComponent(charDetail.name)}`, {
+        name: charDetail.name,
+        memberSince,
+        avatar: charEdits.avatar,
+        graphColor: charEdits.graphColor,
+      });
+      setGraphColorDirty(false);
+      await refreshUsers();
+      notify("success", "Graph Color saved");
+    } catch (e) { notifyError(e, "Failed to save graph color"); }
+  };
+
+  const renameCharacter = async (newName: string) => {
+    if (!renameModal.char) return;
+    const { name: oldName, userId } = renameModal.char;
+    try {
+      const wasViewingRenamedChar = charDetail?.name === oldName && charDetail?.userId === userId;
+      await axios.patch(`${BOT_API}/bot/api/admin/characters/${userId}/${encodeURIComponent(oldName)}`, {
+        name: newName,
+      });
+      closeRenameModal();
+      await refreshUsers(true);
+      notify("success", `Renamed to ${newName}`);
+
+      if (wasViewingRenamedChar) {
+        setCharDetail((prev) =>
+          prev
+            ? { ...prev, name: newName }
+            : { ...renameModal.char!, name: newName }
+        );
+        navigate(buildCharPath(newName), { replace: true });
+      }
+    } catch (e) { notifyError(e, "Rename failed"); }
+  };
+
+  const unlinkCharacter = async () => {
+    if (!unlinkModal.char) return;
+    const { userId, name } = unlinkModal.char;
+    try {
+      const liveUser = liveUsers.find((u) => u.id === userId);
+      const unlinkUsername = liveUser?.username ?? userId;
+      const unlinkParams = new URLSearchParams();
+      if (unlinkDeleteSource) {
+        unlinkParams.set("deleteSource", "true");
+        unlinkParams.set("username", unlinkUsername);
+      }
+      const unlinkQuery = unlinkParams.toString() ? `?${unlinkParams.toString()}` : "";
+      await axios.delete(
+        `${BOT_API}/bot/api/admin/characters/${encodeURIComponent(userId)}/${encodeURIComponent(name)}${unlinkQuery}`
+      );
+      closeUnlinkModal();
+      if (charDetail?.name === name && charDetail?.userId === userId) {
+        setCharDetail(null);
+        navigate(prevContext?.type === "user" ? `/admin/users/${prevContext.userId}` : "/admin/characters");
+      }
+      await refreshUsers();
+      notify("success", `${name} unlinked`);
+    } catch (e) { notifyError(e, "Unlink failed"); }
   };
 
   const transferCharacter = async () => {
     if (!transferModal.char) return;
+    const fromUser = liveUsers.find((u) => u.id === transferModal.char?.userId);
     const toUser = liveUsers.find((u) => u.username === transferToInput);
     if (!toUser) return;
-    await axios.post(`${BOT_API}/bot/api/admin/characters/transfer`, {
-      fromUserId: transferModal.char.userId,
-      characterName: transferModal.char.name,
-      toUserId: toUser.id,
-      deleteSource: transferDeleteSource,
-    });
-    closeTransferModal();
-    setCharDetail(null);
-    navigate("/admin/characters");
-    await refreshUsers();
+    try {
+      const transferredName = transferModal.char.name;
+      const transferredFromUserId = transferModal.char.userId;
+      const wasViewingTransferredChar =
+        charDetail?.name === transferredName &&
+        charDetail?.userId === transferredFromUserId;
+
+      await axios.post(`${BOT_API}/bot/api/admin/characters/transfer`, {
+        fromUserId: transferModal.char.userId,
+        fromUsername: fromUser?.username ?? transferModal.char.userId,
+        characterName: transferModal.char.name,
+        toUserId: toUser.id,
+        toUsername: toUser.username ?? toUser.id,
+        deleteSource: transferDeleteSource,
+      });
+      closeTransferModal();
+      await refreshUsers(true);
+
+      if (wasViewingTransferredChar) {
+        setCharDetail((prev) =>
+          prev && prev.name === transferredName
+            ? { ...prev, userId: toUser.id }
+            : prev
+        );
+      }
+
+      notify("success", `${transferModal.char.name} transferred to ${toUser.username ?? toUser.id}`);
+    } catch (e) { notifyError(e, "Transfer failed"); }
   };
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -631,55 +823,78 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     if (!scoreInlineEdit || !charDetail) return;
     const { scoreId, origDate, dateValue, scoreValue } = scoreInlineEdit;
     if (!dateValue.trim() || !scoreValue.trim()) return;
+    if (dateValue === origDate && Number(scoreValue) === Number(charDetail.scores.find((s) => s.date === origDate)?.score ?? scoreValue)) {
+      return;
+    }
     try {
-      if (dateValue !== origDate) {
-        if (scoreId) {
-          await axios.delete(`${BOT_API}/bot/api/admin/scores/by-id/${scoreId}`);
-        } else {
-          await axios.delete(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(charDetail.name)}/${origDate}`);
-        }
-        await axios.post(`${BOT_API}/bot/api/admin/scores`, { character: charDetail.name, date: dateValue, score: Number(scoreValue) });
-      } else if (scoreId) {
-        await axios.patch(`${BOT_API}/bot/api/admin/scores/by-id/${scoreId}`, { score: Number(scoreValue) });
+      if (scoreId) {
+        await axios.patch(`${BOT_API}/bot/api/admin/scores/by-id/${scoreId}`, {
+          score: Number(scoreValue),
+          ...(dateValue !== origDate ? { date: dateValue } : {}),
+        });
       } else {
-        await axios.patch(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(charDetail.name)}/${origDate}`, { score: Number(scoreValue) });
+        if (dateValue !== origDate) {
+          await axios.delete(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(charDetail.name)}/${origDate}`);
+          await axios.post(`${BOT_API}/bot/api/admin/scores`, { character: charDetail.name, date: dateValue, score: Number(scoreValue) });
+        } else {
+          await axios.patch(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(charDetail.name)}/${origDate}`, { score: Number(scoreValue) });
+        }
       }
       setScoreInlineEdit(null);
       await refreshUsers();
-    } catch (e) { console.error("Inline save failed:", e); }
+      notify("success", "Score updated");
+    } catch (e) { notifyError(e, "Failed to update score"); }
   };
 
   const inlineSaveScoreTab = async () => {
     if (!scoreTabInlineEdit) return;
     const { scoreId, origCharacter, origDate, dateValue, scoreValue } = scoreTabInlineEdit;
     if (!dateValue.trim() || !scoreValue.trim()) return;
+    const existing = liveScores.find((s) => s.character === origCharacter && s.date === origDate);
+    if (dateValue === origDate && Number(scoreValue) === Number(existing?.score ?? scoreValue)) {
+      return;
+    }
     try {
-      if (dateValue !== origDate) {
-        if (scoreId) {
-          await axios.delete(`${BOT_API}/bot/api/admin/scores/by-id/${scoreId}`);
-        } else {
-          await axios.delete(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(origCharacter)}/${origDate}`);
-        }
-        await axios.post(`${BOT_API}/bot/api/admin/scores`, { character: origCharacter, date: dateValue, score: Number(scoreValue) });
-      } else if (scoreId) {
-        await axios.patch(`${BOT_API}/bot/api/admin/scores/by-id/${scoreId}`, { score: Number(scoreValue) });
+      if (scoreId) {
+        await axios.patch(`${BOT_API}/bot/api/admin/scores/by-id/${scoreId}`, {
+          score: Number(scoreValue),
+          ...(dateValue !== origDate ? { date: dateValue } : {}),
+        });
       } else {
-        await axios.patch(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(origCharacter)}/${origDate}`, { score: Number(scoreValue) });
+        if (dateValue !== origDate) {
+          await axios.delete(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(origCharacter)}/${origDate}`);
+          await axios.post(`${BOT_API}/bot/api/admin/scores`, { character: origCharacter, date: dateValue, score: Number(scoreValue) });
+        } else {
+          await axios.patch(`${BOT_API}/bot/api/admin/scores/${encodeURIComponent(origCharacter)}/${origDate}`, { score: Number(scoreValue) });
+        }
       }
       setScoreTabInlineEdit(null);
       await refreshUsers();
-    } catch (e) { console.error("Inline save failed:", e); }
+      notify("success", "Score updated");
+    } catch (e) { notifyError(e, "Failed to update score"); }
   };
 
   const inlineSaveException = async () => {
     if (!excInlineEdit) return;
     const { id, name, exception } = excInlineEdit;
-    if (!name.trim()) return;
+    const existing = exceptionsData.find((e) => e._id === id);
+    if (!name.trim()) {
+      notify("error", "Character name is required");
+      return;
+    }
+    if (!liveCharacters.some((c) => c.name === name.trim())) {
+      notify("error", "Select a valid character name");
+      return;
+    }
+    if (existing && existing.name === name.trim() && existing.exception === exception) {
+      return;
+    }
     try {
       await axios.patch(`${BOT_API}/bot/api/admin/exceptions/${id}`, { name, exception });
       setExcInlineEdit(null);
       await refreshExceptions();
-    } catch (e) { console.error("Inline save failed:", e); }
+      notify("success", "Exception updated");
+    } catch (e) { notifyError(e, "Failed to update exception"); }
   };
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -699,7 +914,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             setCharDetail(null);
             navigate(prevContext?.type === "user" ? `/admin/users/${prevContext.userId}` : "/admin/characters");
           }
-        } catch (e) { console.error("Delete failed:", e); }
+          notify("success", `${name} ${label === "delete" ? "deleted" : "unlinked"}`);
+        } catch (e) { notifyError(e, "Delete failed"); }
         closeModal();
       },
     });
@@ -711,12 +927,15 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       description: "This will permanently remove the user and all of their linked characters and scores. This action cannot be undone.",
       onConfirm: async () => {
         try {
-          await axios.delete(`${BOT_API}/bot/api/admin/users/${userId}`);
+          await axios.delete(`${BOT_API}/bot/api/admin/users/${userId}`, {
+            params: { username: username ?? undefined },
+          });
           await refreshUsers();
           setUserDetail(null);
           setCharDetail(null);
           navigate("/admin/users");
-        } catch (e) { console.error("Delete failed:", e); }
+          notify("success", `${username ?? "User"} deleted`);
+        } catch (e) { notifyError(e, "Delete failed"); }
         closeModal();
       },
     });
@@ -735,7 +954,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             await axios.delete(`${BOT_API}/bot/api/admin/scores/${character}/${date}`);
           }
           await refreshUsers();
-        } catch (e) { console.error("Delete failed:", e); }
+          notify("success", "Score deleted");
+        } catch (e) { notifyError(e, "Delete failed"); }
         closeModal();
       },
     });
@@ -750,7 +970,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         try {
           await axios.delete(`${BOT_API}/bot/api/admin/exceptions/${id}`);
           await refreshExceptions();
-        } catch (e) { console.error("Delete failed:", e); }
+          notify("success", `Exception for ${name} deleted`);
+        } catch (e) { notifyError(e, "Delete failed"); }
         closeModal();
       },
     });
@@ -773,30 +994,13 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           );
           setSelDetailScores(new Set());
           await refreshUsers();
-        } catch (e) { console.error("Batch delete failed:", e); }
+          notify("success", `${selDetailScores.size} score${selDetailScores.size !== 1 ? "s" : ""} deleted`);
+        } catch (e) { notifyError(e, "Batch delete failed"); }
         closeModal();
       },
     });
 
-  const batchDeleteUserDetailChars = () =>
-    confirm({
-      variant: "sensitive",
-      confirmWord: "unlink",
-      title: `Unlink ${selUserDetailChars.size} character${selUserDetailChars.size > 1 ? "s" : ""}`,
-      description: "This will permanently remove the selected characters and all of their scores. This action cannot be undone.",
-      onConfirm: async () => {
-        try {
-          await Promise.all(
-            [...selUserDetailChars].map((name) =>
-              axios.delete(`${BOT_API}/bot/api/admin/characters/${userDetail!._id}/${name}`)
-            )
-          );
-          setSelUserDetailChars(new Set());
-          await refreshUsers();
-        } catch (e) { console.error("Batch delete failed:", e); }
-        closeModal();
-      },
-    });
+  const batchDeleteUserDetailChars = () => openBatchUnlinkModal("user-detail");
 
   const batchDeleteUsers = () =>
     confirm({
@@ -805,33 +1009,76 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       description: "This will permanently remove the selected users and all of their linked characters and scores.",
       onConfirm: async () => {
         try {
-          await Promise.all([...selUsers].map((id) => axios.delete(`${BOT_API}/bot/api/admin/users/${id}`)));
+          await Promise.all(
+            [...selUsers].map((id) => {
+              const selectedUser = liveUsers.find((u) => u.id === id);
+              return axios.delete(`${BOT_API}/bot/api/admin/users/${id}`, {
+                params: { username: selectedUser?.username ?? undefined },
+              });
+            })
+          );
           setSelUsers(new Set());
           await refreshUsers();
-        } catch (e) { console.error("Batch delete failed:", e); }
+          notify("success", `${selUsers.size} user${selUsers.size !== 1 ? "s" : ""} deleted`);
+        } catch (e) { notifyError(e, "Batch delete failed"); }
         closeModal();
       },
     });
 
-  const batchDeleteChars = () =>
-    confirm({
-      variant: "sensitive",
-      title: `Delete ${selChars.size} character${selChars.size > 1 ? "s" : ""}`,
-      description: "This will permanently remove the selected characters and all of their scores.",
-      onConfirm: async () => {
-        try {
-          await Promise.all(
-            [...selChars].map((key) => {
-              const [userId, ...nameParts] = key.split("|");
-              return axios.delete(`${BOT_API}/bot/api/admin/characters/${userId}/${nameParts.join("|")}`);
-            })
-          );
-          setSelChars(new Set());
-          await refreshUsers();
-        } catch (e) { console.error("Batch delete failed:", e); }
-        closeModal();
-      },
-    });
+  const batchDeleteChars = () => openBatchUnlinkModal("characters-tab");
+
+  const confirmBatchUnlink = async () => {
+    try {
+      if (batchUnlinkModal.target === "user-detail") {
+        const uid = userDetail!._id;
+        const liveUser = liveUsers.find((u) => u.id === uid);
+        await axios.delete(`${BOT_API}/bot/api/admin/characters/batch`, {
+          data: {
+            userId: uid,
+            names: [...selUserDetailChars],
+            deleteSource: batchUnlinkDeleteSource,
+            username: liveUser?.username ?? uid,
+          },
+        });
+        setSelUserDetailChars(new Set());
+        if (batchUnlinkDeleteSource) {
+          setUserDetail(null);
+          navigate("/admin/users");
+        }
+        await refreshUsers();
+        notify("success", `${selUserDetailChars.size} character${selUserDetailChars.size !== 1 ? "s" : ""} unlinked`);
+      } else {
+        // Group selected chars by userId (key format: "userId|charName")
+        const byUser = new Map<string, string[]>();
+        for (const key of selChars) {
+          const idx = key.indexOf("|");
+          if (idx === -1) continue;
+          const uid = key.slice(0, idx);
+          const name = key.slice(idx + 1);
+          if (!byUser.has(uid)) byUser.set(uid, []);
+          byUser.get(uid)!.push(name);
+        }
+        const totalCount = selChars.size;
+        await Promise.all(
+          [...byUser.entries()].map(([uid, names]) => {
+            const liveUser = liveUsers.find((u) => u.id === uid);
+            return axios.delete(`${BOT_API}/bot/api/admin/characters/batch`, {
+              data: {
+                userId: uid,
+                names,
+                deleteSource: batchUnlinkDeleteSource,
+                username: liveUser?.username ?? uid,
+              },
+            });
+          })
+        );
+        setSelChars(new Set());
+        await refreshUsers();
+        notify("success", `${totalCount} character${totalCount !== 1 ? "s" : ""} unlinked`);
+      }
+    } catch (e) { notifyError(e, "Batch unlink failed"); }
+    closeBatchUnlinkModal();
+  };
 
   const batchDeleteScores = () =>
     confirm({
@@ -851,7 +1098,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           );
           setSelScores(new Set());
           await refreshUsers();
-        } catch (e) { console.error("Batch delete failed:", e); }
+          notify("success", `${selScores.size} score${selScores.size !== 1 ? "s" : ""} deleted`);
+        } catch (e) { notifyError(e, "Batch delete failed"); }
         closeModal();
       },
     });
@@ -867,7 +1115,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           await Promise.all([...selExcs].map((id) => axios.delete(`${BOT_API}/bot/api/admin/exceptions/${id}`)));
           setSelExcs(new Set());
           await refreshExceptions();
-        } catch (e) { console.error("Batch delete failed:", e); }
+          notify("success", `${selExcs.size} exception${selExcs.size !== 1 ? "s" : ""} deleted`);
+        } catch (e) { notifyError(e, "Batch delete failed"); }
         closeModal();
       },
     });
@@ -879,6 +1128,14 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     { id: "characters", label: "Characters", icon: FaUserAlt },
     { id: "scores",     label: "Scores",     icon: FaChartBar },
     { id: "exceptions", label: "Exceptions", icon: FaExclamationCircle },
+  ];
+
+  const monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
+    { id: "action-log", label: "Action Log", icon: FaHistory },
+  ];
+
+  const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
+    { id: "scanner", label: "Scanner", icon: FaCamera },
   ];
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -912,14 +1169,19 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     modal, closeModal, confirm,
     transferModal, setTransferModal, transferToInput, setTransferToInput,
     transferDeleteSource, setTransferDeleteSource, closeTransferModal, transferCharacter,
-    refreshUsers, refreshExceptions,
+    renameModal, setRenameModal, closeRenameModal, renameCharacter,
+    unlinkModal, setUnlinkModal, unlinkDeleteSource, setUnlinkDeleteSource, closeUnlinkModal, unlinkCharacter,
+    batchUnlinkModal, batchUnlinkDeleteSource, setBatchUnlinkDeleteSource,
+    openBatchUnlinkModal, closeBatchUnlinkModal, confirmBatchUnlink,
+    refreshUsers, refreshExceptions, refreshActionLog, refreshAllData,
     saveCharEdits, saveMemberSince, saveGraphColor,
     deleteCharacter, deleteUser, deleteScore, deleteException,
     inlineSaveScore, inlineSaveScoreTab, inlineSaveException,
     batchDeleteDetailScores, batchDeleteUserDetailChars,
     batchDeleteUsers, batchDeleteChars, batchDeleteScores, batchDeleteExcs,
     toggleSel, toggleAll, toggleSort,
-    navItems,
+    navItems, monitoringItems, toolItems, activeToolSection, navigateToToolSection,
+    actionLog, clearActionLog,
   };
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;

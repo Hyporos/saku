@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const dayjs = require("dayjs");
 const {
   findCharacter,
@@ -130,6 +131,22 @@ module.exports = {
       content = `${characterNameCased}'s score has been updated to **${scoreOption}** for the week of ${dateOption}`;
     } else {
       content = `${characterNameCased}'s score of **${scoreOption}** has been created for the week of ${dateOption}`;
+    }
+
+    // Log the correction
+    try {
+      await actionLogSchema.create({
+        action: scoreExists ? "Edit Score" : "Create Score",
+        target: String(characterNameCased),
+        details: scoreExists
+          ? `Score updated from ${Number(scoreExists.score)} to ${scoreOption}`
+          : `Date: ${dateOption} | Score: ${scoreOption}`,
+        category: scoreExists ? "edit" : "create",
+        actorId: String(interaction.user.id),
+        timestamp: new Date(),
+      });
+    } catch {
+      // Non-critical
     }
 
     interaction.reply(content);

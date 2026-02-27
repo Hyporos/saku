@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const { isCharacterLinked } = require("../../utility/culvertUtils.js");
 const axios = require("axios");
 const dayjs = require("dayjs");
@@ -92,6 +93,22 @@ module.exports = {
             upsert: true,
           }
         );
+
+        const charName = overrideOption ? characterOption : res.data.ranks[0]?.characterName;
+
+        // Log the link action
+        try {
+          await actionLogSchema.create({
+            action: "Link Character",
+            target: userOption.username,
+            details: `Linked character ${charName} to user ${userOption.username} | User: ${userOption.username} | Character: ${charName}`,
+            category: "create",
+            actorId: String(interaction.user.id),
+            timestamp: new Date(),
+          });
+        } catch {
+          // Non-critical — never block the link on log failure
+        }
 
         interaction.reply(
           `Linked **${

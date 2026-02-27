@@ -2,7 +2,7 @@ import { cn } from "../../../lib/utils";
 import {
   FaArrowLeft, FaCheck, FaTimes, FaEdit, FaTrash,
   FaExternalLinkAlt, FaHistory, FaPlus, FaUserAlt,
-  FaExchangeAlt, FaUnlink,
+  FaExchangeAlt, FaUnlink, FaPencilAlt,
 } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import DatePicker from "../../../components/DatePicker";
@@ -27,11 +27,11 @@ export const CharacterDetail = () => {
     detailScoreSort, setDetailScoreSort, detailScorePage, setDetailScorePage,
     detailDateFrom, setDetailDateFrom, detailDateTo, setDetailDateTo,
     scoreInlineEdit, setScoreInlineEdit, selDetailScores, setSelDetailScores,
-    setDrawer, setTransferModal,
+    setDrawer, setTransferModal, setRenameModal, setUnlinkModal,
     liveScores,
     openUserDetail, goBackFromTrail, backTargetLabel,
     saveCharEdits, saveMemberSince, saveGraphColor,
-    deleteCharacter, deleteScore, batchDeleteDetailScores,
+    deleteScore, batchDeleteDetailScores,
     inlineSaveScore, toggleSel, toggleAll, toggleSort,
   } = useAdminContext();
 
@@ -138,18 +138,25 @@ export const CharacterDetail = () => {
           )}
           <div className="flex items-center gap-3 ml-2">
             <button
+              onClick={(e) => { e.stopPropagation(); setRenameModal({ isOpen: true, char: charDetail }); }}
+              title="Rename character"
+              className="flex items-center gap-1.5 text-xs text-tertiary border border-tertiary/20 hover:border-tertiary/40 hover:text-white rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
+            >
+              <FaPencilAlt size={11} /> Rename
+            </button>
+            <button
               onClick={(e) => { e.stopPropagation(); setTransferModal({ isOpen: true, char: charDetail }); }}
               title="Transfer character to another user"
               className="flex items-center gap-1.5 text-xs text-tertiary border border-tertiary/20 hover:border-tertiary/40 hover:text-white rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
             >
-              <FaExchangeAlt size={11} /> Transfer Character
+              <FaExchangeAlt size={11} /> Transfer
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); deleteCharacter(charDetail.userId, charDetail.name); }}
+              onClick={(e) => { e.stopPropagation(); setUnlinkModal({ isOpen: true, char: charDetail }); }}
               title="Unlink character"
               className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
             >
-              <FaUnlink size={11} /> Unlink Character
+              <FaUnlink size={11} /> Unlink
             </button>
           </div>
         </div>
@@ -302,9 +309,9 @@ export const CharacterDetail = () => {
                   data: { character: charDetail.name, _fromCharDetail: true },
                 })
               }
-              className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 text-accent text-sm rounded-lg px-3 py-1 transition-colors"
+              className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent text-sm rounded-lg px-3 py-1 transition-colors"
             >
-              <FaPlus size={12} style={{ marginBottom: "1px" }} />
+              <FaPlus size={11} style={{ marginBottom: "1px" }} />
               Add Score
             </button>
           </div>
@@ -352,6 +359,15 @@ export const CharacterDetail = () => {
                 ) : (
                   pagedDetailScores.map((entry, i) => {
                   const isEditing = scoreInlineEdit?.origDate === entry.date;
+                  const hasScoreChange =
+                    isEditing && Number(scoreInlineEdit!.scoreValue) !== entry.score;
+                  const hasDateChange =
+                    isEditing && scoreInlineEdit!.dateValue !== entry.date;
+                  const canConfirm =
+                    isEditing &&
+                    !!scoreInlineEdit!.dateValue.trim() &&
+                    !!scoreInlineEdit!.scoreValue.trim() &&
+                    (hasScoreChange || hasDateChange);
                   return (
                     <tr
                       key={`${entry.date}-${i}`}
@@ -416,8 +432,12 @@ export const CharacterDetail = () => {
                             <>
                               <button
                                 onClick={inlineSaveScore}
+                                disabled={!canConfirm}
                                 title="Confirm"
-                                className="text-[#669A68] hover:text-white transition-colors"
+                                className={cn(
+                                  "transition-colors",
+                                  canConfirm ? "text-[#669A68] hover:text-white" : "text-[#669A68]/35 cursor-default"
+                                )}
                               >
                                 <FaCheck size={14} />
                               </button>

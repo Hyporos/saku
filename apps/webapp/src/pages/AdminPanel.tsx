@@ -3,23 +3,31 @@ import { useMatch } from "react-router-dom";
 import { AdminSidebar } from "../features/admin/components/AdminSidebar";
 import { DrawerPanel } from "../features/admin/components/DrawerPanel";
 import { TransferModal } from "../features/admin/components/TransferModal";
+import { RenameModal } from "../features/admin/components/RenameModal";
+import { UnlinkModal } from "../features/admin/components/UnlinkModal";
+import { BatchUnlinkModal } from "../features/admin/components/BatchUnlinkModal";
 import { UsersTab } from "../features/admin/tabs/UsersTab";
 import { CharactersTab } from "../features/admin/tabs/CharactersTab";
 import { ScoresTab } from "../features/admin/tabs/ScoresTab";
 import { ExceptionsTab } from "../features/admin/tabs/ExceptionsTab";
 import { CharacterDetail } from "../features/admin/tabs/CharacterDetail";
 import { UserDetail } from "../features/admin/tabs/UserDetail";
+import { ActionLogTab } from "../features/admin/tabs/ActionLogTab";
+import { ScannerTab } from "../features/admin/tabs/ScannerTab";
 import WarningModal from "../components/WarningModal";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Inner layout — consumes context, must be rendered inside AdminProvider
 const AdminPanelLayout = () => {
-  const { activeSection, charDetail, userDetail, modal, closeModal } = useAdminContext();
+  const { activeSection, charDetail, userDetail, modal, closeModal, activeToolSection } = useAdminContext();
   const isCharDetailRoute = !!useMatch("/admin/characters/:charName");
   const isUserDetailRoute = !!useMatch("/admin/users/:userId");
 
   const renderMain = () => {
+    if (activeToolSection === "action-log") return <ActionLogTab />;
+    if (activeToolSection === "scanner") return <ScannerTab />;
+
     if (charDetail || isCharDetailRoute) return <CharacterDetail />;
     if (userDetail || isUserDetailRoute) return <UserDetail />;
 
@@ -56,6 +64,9 @@ const AdminPanelLayout = () => {
       )}
 
       <TransferModal />
+      <RenameModal />
+      <UnlinkModal />
+      <BatchUnlinkModal />
     </section>
   );
 };

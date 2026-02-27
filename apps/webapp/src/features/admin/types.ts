@@ -155,3 +155,50 @@ export type ExcInlineEditState = {
   name: string;
   exception: string;
 };
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+export type ToolSection = "action-log" | "scanner";
+
+export type ActionLogCategory = "create" | "edit" | "delete" | "transfer" | "rename";
+
+export type ActionLogEntry = {
+  id: string;
+  timestamp: string;
+  action: string;
+  target: string;
+  details?: string;
+  category: ActionLogCategory;
+  actorId?: string | null;
+};
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Scanner
+
+export type ScanResultEntry = {
+  name: string;
+  score: number;
+  sandbag: boolean;
+  isNaN: boolean;
+};
+
+export type ScanImageResult = {
+  week: string;
+  success: ScanResultEntry[];
+  notFound: { name: string }[];
+  nanScores: { name: string }[];
+  zeroScores: { name: string }[];
+  totalSuccess: number;
+  totalFailure: number;
+  totalScanned: number;
+};
+
+export type FinalizeResult = {
+  success: boolean;
+  missedCharacters: string[];
+  total: number;
+  submitted: number;
+  week: string;
+  backup?: string;
+  backupFilename?: string;
+};
