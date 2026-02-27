@@ -1,5 +1,5 @@
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaEdit, FaCheck, FaTimes } from "react-icons/fa";
+import { FaSearch, FaEdit, FaCheck, FaTimes, FaExclamationCircle } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import AutocompleteInput from "../../../components/AutocompleteInput";
 import { SortableHead } from "../components/SortableHead";
@@ -17,7 +17,7 @@ export const ExceptionsTab = () => {
     excSort, setExcSort, selExcs, setSelExcs,
     excInlineEdit, setExcInlineEdit,
     batchDeleteExcs, deleteException, openCharDetail,
-    liveCharacters, charDetail,
+    liveCharacters,
     toggleSort, toggleSel, toggleAll,
     inlineSaveException,
   } = useAdminContext();
@@ -49,20 +49,26 @@ export const ExceptionsTab = () => {
             onDelete={batchDeleteExcs}
             onClear={() => setSelExcs(new Set())}
           />
-          <table className="w-full table-fixed">
-            <SortableHead
-              cols={[
-                { label: "Character", field: "name",      className: "w-[42%]" },
-                { label: "Exception", field: "exception", className: "w-[42%]" },
-              ]}
-              sort={excSort}
-              onSort={(f) => { toggleSort(excSort, f, setExcSort); setExcPage(1); }}
-              onSelectAll={() => toggleAll(pagedExcs.map((e) => e._id), selExcs, setSelExcs)}
-              allSelected={pagedExcs.length > 0 && pagedExcs.every((e) => selExcs.has(e._id))}
-              someSelected={pagedExcs.some((e) => selExcs.has(e._id))}
-            />
-            <tbody>
-              {pagedExcs.map((exc) => {
+          {pagedExcs.length === 0 ? (
+            <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
+              <FaExclamationCircle size={24} />
+              <p className="text-sm">{excSearch ? `No exceptions matching "${excSearch}"` : "No exceptions found"}</p>
+            </div>
+          ) : (
+            <table className="w-full table-fixed">
+              <SortableHead
+                cols={[
+                  { label: "Character", field: "name",      className: "w-[42%]" },
+                  { label: "Exception", field: "exception", className: "w-[42%]" },
+                ]}
+                sort={excSort}
+                onSort={(f) => { toggleSort(excSort, f, setExcSort); setExcPage(1); }}
+                onSelectAll={() => toggleAll(pagedExcs.map((e) => e._id), selExcs, setSelExcs)}
+                allSelected={pagedExcs.length > 0 && pagedExcs.every((e) => selExcs.has(e._id))}
+                someSelected={pagedExcs.some((e) => selExcs.has(e._id))}
+              />
+              <tbody>
+                {pagedExcs.map((exc) => {
                 const isEditing = excInlineEdit?.id === exc._id;
                 return (
                   <tr
@@ -96,7 +102,7 @@ export const ExceptionsTab = () => {
                           className="text-accent hover:text-white transition-colors text-left"
                           onClick={() => {
                             const c = liveCharacters.find((x) => x.name === exc.name);
-                            if (c) openCharDetail(c, undefined, charDetail ?? undefined);
+                            if (c) openCharDetail(c, undefined, undefined, "exceptions");
                           }}
                         >
                           {exc.name}
@@ -162,16 +168,10 @@ export const ExceptionsTab = () => {
                     </td>
                   </tr>
                 );
-              })}
-              {pagedExcs.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-sm text-tertiary/50 text-center">
-                    {excSearch ? `No exceptions matching "${excSearch}"` : "No exceptions found"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          )}
           <Pagination
             page={excPage}
             total={filteredExceptions.length}

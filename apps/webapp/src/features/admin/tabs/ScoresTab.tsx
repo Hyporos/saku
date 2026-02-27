@@ -1,5 +1,5 @@
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaEdit, FaCheck, FaTimes } from "react-icons/fa";
+import { FaSearch, FaEdit, FaCheck, FaTimes, FaHistory } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import DatePicker from "../../../components/DatePicker";
 import { SortableHead } from "../components/SortableHead";
@@ -17,7 +17,7 @@ export const ScoresTab = () => {
     scorePage, setScorePage, scoreSort, setScoreSort,
     selScores, setSelScores, scoreTabInlineEdit, setScoreTabInlineEdit,
     batchDeleteScores, deleteScore, openCharDetail,
-    liveCharacters, liveScores, charDetail,
+    liveCharacters, liveScores,
     toggleSort, toggleSel, toggleAll,
     inlineSaveScoreTab,
   } = useAdminContext();
@@ -43,6 +43,7 @@ export const ScoresTab = () => {
           mode="single"
           value={scoreDateFilter}
           onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
+          clearable
           wednesdayOnly
           subtle
           compact
@@ -59,21 +60,27 @@ export const ScoresTab = () => {
             onDelete={batchDeleteScores}
             onClear={() => setSelScores(new Set())}
           />
-          <table className="w-full table-fixed">
-            <SortableHead
-              cols={[
-                { label: "Character", field: "character", className: "w-[38%]" },
-                { label: "Date",      field: "date",      className: "w-[30%]" },
-                { label: "Score",     field: "score",     className: "w-[22%]" },
-              ]}
-              sort={scoreSort}
-              onSort={(f) => { toggleSort(scoreSort, f, setScoreSort); setScorePage(1); }}
-              onSelectAll={() => toggleAll(pagedScores.map((s) => `${s.character}|${s.date}`), selScores, setSelScores)}
-              allSelected={pagedScores.length > 0 && pagedScores.every((s) => selScores.has(`${s.character}|${s.date}`))}
-              someSelected={pagedScores.some((s) => selScores.has(`${s.character}|${s.date}`))}
-            />
-            <tbody>
-              {pagedScores.map((score, i) => {
+          {pagedScores.length === 0 ? (
+            <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
+              <FaHistory size={24} />
+              <p className="text-sm">{scoreSearch ? `No scores matching "${scoreSearch}"` : "No scores found"}</p>
+            </div>
+          ) : (
+            <table className="w-full table-fixed">
+              <SortableHead
+                cols={[
+                  { label: "Character", field: "character", className: "w-[38%]" },
+                  { label: "Date",      field: "date",      className: "w-[30%]" },
+                  { label: "Score",     field: "score",     className: "w-[22%]" },
+                ]}
+                sort={scoreSort}
+                onSort={(f) => { toggleSort(scoreSort, f, setScoreSort); setScorePage(1); }}
+                onSelectAll={() => toggleAll(pagedScores.map((s) => `${s.character}|${s.date}`), selScores, setSelScores)}
+                allSelected={pagedScores.length > 0 && pagedScores.every((s) => selScores.has(`${s.character}|${s.date}`))}
+                someSelected={pagedScores.some((s) => selScores.has(`${s.character}|${s.date}`))}
+              />
+              <tbody>
+                {pagedScores.map((score, i) => {
                 const isEditing =
                   scoreTabInlineEdit?.origCharacter === score.character &&
                   scoreTabInlineEdit?.origDate === score.date;
@@ -97,7 +104,7 @@ export const ScoresTab = () => {
                         className="text-accent hover:text-white transition-colors text-left"
                         onClick={() => {
                           const c = liveCharacters.find((x) => x.name === score.character);
-                          if (c) openCharDetail(c, undefined, charDetail ?? undefined);
+                          if (c) openCharDetail(c, undefined, undefined, "scores");
                         }}
                       >
                         {score.character}
@@ -188,16 +195,10 @@ export const ScoresTab = () => {
                     </td>
                   </tr>
                 );
-              })}
-              {pagedScores.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-sm text-tertiary/50 text-center">
-                    {scoreSearch ? `No scores matching "${scoreSearch}"` : "No scores found"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          )}
           <Pagination
             page={scorePage}
             total={filteredScores.length}

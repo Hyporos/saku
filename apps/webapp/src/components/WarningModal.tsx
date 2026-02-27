@@ -60,6 +60,7 @@ const WarningModal = ({
   const word = confirmWord ?? "delete";
   const canConfirm =
     variant === "confirm" || confirmInput.toLowerCase() === word.toLowerCase();
+  const useDangerStyle = confirmDanger || variant === "sensitive";
 
   return (
     <>
@@ -84,9 +85,9 @@ const WarningModal = ({
           <div className="flex items-start gap-4">
             <div className={cn(
               "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mt-0.5",
-              confirmDanger ? "bg-[#A46666]/10" : "bg-[#A46666]/10"
+              "bg-[#A46666]/10"
             )}>
-              <FaExclamationTriangle size={16} className={confirmDanger ? "text-[#A46666]" : "text-[#A46666]"} />
+              <FaExclamationTriangle size={16} className="text-[#A46666]" />
             </div>
             <div>
               <h3 className="text-lg">{title}</h3>
@@ -121,7 +122,7 @@ const WarningModal = ({
               className={cn(
                 "flex-1 rounded-lg py-2.5 text-sm transition-colors",
                 canConfirm
-                  ? confirmDanger
+                  ? useDangerStyle
                     ? "bg-[#A46666]/10 hover:bg-[#A46666]/20 text-[#A46666]"
                     : "bg-accent/15 hover:bg-accent/20 text-accent"
                   : "bg-background/60 text-tertiary/30 cursor-not-allowed"

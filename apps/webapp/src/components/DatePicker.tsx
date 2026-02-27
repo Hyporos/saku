@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import dayjs from "dayjs";
 import { cn } from "../lib/utils";
-import { FaChevronLeft, FaChevronRight, FaRegCalendarAlt, FaArrowRight } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaRegCalendarAlt, FaArrowRight, FaTimes } from "react-icons/fa";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -24,6 +24,8 @@ interface DatePickerSingleProps {
   disabledDates?: string[];
   // "dropUp" opens the calendar above the trigger instead of below — use when near bottom of viewport
   dropUp?: boolean;
+  // show clear X inside trigger (intended for filter usage)
+  clearable?: boolean;
 }
 
 // Range mode — supply from/to and an onRangeChange handler
@@ -40,6 +42,7 @@ interface DatePickerRangeProps {
   wednesdayOnly?: boolean;
   disabledDates?: string[];
   dropUp?: boolean;
+  clearable?: boolean;
 }
 
 type DatePickerProps = DatePickerSingleProps | DatePickerRangeProps;
@@ -126,6 +129,10 @@ const DatePicker = (props: DatePickerProps) => {
     }
   })();
 
+  const hasValue = isRange
+    ? !!((props as DatePickerRangeProps).from || (props as DatePickerRangeProps).to)
+    : !!(props as DatePickerSingleProps).value;
+
   const handleDayClick = (iso: string) => {
     // Wednesday-only mode — silently ignore non-Wednesday picks
     if (props.wednesdayOnly && dayjs(iso).day() !== 3) return;
@@ -209,6 +216,37 @@ const DatePicker = (props: DatePickerProps) => {
           )}
         />
         <span className={cn(!props.subtle && !activeValue && !open && "opacity-50")}>{displayValue}</span>
+        {props.clearable && hasValue && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isRange) {
+                (props as DatePickerRangeProps).onRangeChange("", "");
+                setPicking("from");
+              } else {
+                (props as DatePickerSingleProps).onChange("");
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isRange) {
+                  (props as DatePickerRangeProps).onRangeChange("", "");
+                  setPicking("from");
+                } else {
+                  (props as DatePickerSingleProps).onChange("");
+                }
+              }
+            }}
+            className="ml-0.5 inline-flex items-center justify-center text-[#A46666] hover:text-white transition-colors"
+            aria-label="Clear date"
+          >
+            <FaTimes size={12} className="text-current transition-colors" />
+          </span>
+        )}
       </button>
 
       {/* Calendar dropdown */}
@@ -242,18 +280,6 @@ const DatePicker = (props: DatePickerProps) => {
                   ? dayjs((props as DatePickerRangeProps).to).format("MMM DD")
                   : "End"}
               </span>
-              {((props as DatePickerRangeProps).from || (props as DatePickerRangeProps).to) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    (props as DatePickerRangeProps).onRangeChange("", "");
-                    setPicking("from");
-                  }}
-                  className="text-tertiary/40 hover:text-tertiary text-xs px-1 transition-colors"
-                >
-                  ✕
-                </button>
-              )}
             </div>
           )}
 

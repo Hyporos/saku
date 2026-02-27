@@ -46,11 +46,15 @@ import type {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
+type BackTrailEntry = { label: string; path: string };
 
 interface AdminContextValue {
   // Navigation
   activeSection: Section;
   navigateToSection: (id: Section) => void;
+  backTrail: BackTrailEntry[];
+  backTargetLabel: string;
+  goBackFromTrail: () => void;
 
   // Raw data from API
   userData: UserDoc[];
@@ -128,7 +132,8 @@ interface AdminContextValue {
   setUserDetail: SetState<UserDetail | null>;
   prevContext: PrevContext | null;
   setPrevContext: SetState<PrevContext | null>;
-  openCharDetail: (char: CharDetail, fromUser?: UserDetail, fromChar?: CharDetail) => void;
+  openCharDetail: (char: CharDetail, fromUser?: UserDetail, fromChar?: CharDetail, fromSection?: "scores" | "exceptions") => void;
+  openUserDetail: (user: UserDetail) => void;
 
   // User detail
   userMemberData: UserMemberData | null;
@@ -148,8 +153,8 @@ interface AdminContextValue {
   setGraphColorDirty: SetState<boolean>;
 
   // Character detail — score view
-  detailScoreSort: SortState;
-  setDetailScoreSort: SetState<SortState>;
+  detailScoreSort: SortState | null;
+  setDetailScoreSort: SetState<SortState | null>;
   detailScorePage: number;
   setDetailScorePage: SetState<number>;
   detailDateFrom: string;
@@ -199,7 +204,7 @@ interface AdminContextValue {
   saveGraphColor: () => Promise<void>;
 
   // Delete / mutation actions
-  deleteCharacter: (userId: string, name: string) => void;
+  deleteCharacter: (userId: string, name: string, label?: "unlink" | "delete") => void;
   deleteUser: (userId: string, username?: string | null) => void;
   deleteScore: (character: string, date: string, scoreId?: string) => void;
   deleteException: (id: string, name: string) => void;
@@ -244,6 +249,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const urlUserId = userMatch?.params.userId;
   const initializedCharFromUrl = useRef(false);
   const initializedUserFromUrl = useRef(false);
+  const [backTrail, setBackTrail] = useState<BackTrailEntry[]>([]);
 
   // ⎯⎯ Section ⎯⎯ //
   const [activeSection, setActiveSection] = useState<Section>(() => {
@@ -371,6 +377,64 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     setter(keys.every((k) => set.has(k)) && keys.length > 0 ? new Set() : new Set(keys));
   };
 
+  const sectionForPath = (path: string): Section => {
+    if (path.startsWith("/admin/users")) return "users";
+    if (path.startsWith("/admin/characters")) return "characters";
+    if (path.startsWith("/admin/scores")) return "scores";
+    if (path.startsWith("/admin/exceptions")) return "exceptions";
+    return "users";
+  };
+
+  const sectionLabel = (section: Section) =>
+    section === "users"
+      ? "Users"
+      : section === "characters"
+        ? "Characters"
+        : section === "scores"
+          ? "Scores"
+          : "Exceptions";
+
+  const buildCharPath = (charName: string) => {
+    const allFlat = userData.flatMap((u) => u.characters.map((c) => ({ name: c.name, userId: String(u._id) })));
+    return `/admin/characters/${encodeURIComponent(charSlug(charName, allFlat))}`;
+  };
+
+  const pushBackEntry = (entry: BackTrailEntry) => {
+    setBackTrail((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].path === entry.path) return prev;
+      return [...prev, entry];
+    });
+  };
+
+  const pushCurrentToBackTrail = () => {
+    if (charDetail) {
+      pushBackEntry({ label: charDetail.name, path: buildCharPath(charDetail.name) });
+      return;
+    }
+    if (userDetail) {
+      pushBackEntry({ label: userDetail.username ?? "User", path: `/admin/users/${userDetail._id}` });
+      return;
+    }
+    pushBackEntry({ label: sectionLabel(activeSection), path: location.pathname });
+  };
+
+  const backTargetLabel = backTrail.length > 0 ? backTrail[backTrail.length - 1].label : "Characters";
+
+  const goBackFromTrail = () => {
+    const target = backTrail[backTrail.length - 1];
+    setCharDetail(null);
+    setUserDetail(null);
+    setPrevContext(null);
+    if (target) {
+      setBackTrail((prev) => prev.slice(0, -1));
+      setActiveSection(sectionForPath(target.path));
+      navigate(target.path);
+      return;
+    }
+    setActiveSection("characters");
+    navigate("/admin/characters");
+  };
+
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Navigation
 
@@ -385,10 +449,15 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     navigate(paths[id]);
     setUserSearch(""); setCharSearch(""); setScoreSearch(""); setExcSearch("");
     setUserPage(1); setCharPage(1); setScorePage(1); setExcPage(1);
-    setUserSort(null); setCharSort(null); setScoreSort(null); setExcSort(null);
+    setUserSort(null);
+    setCharSort(null);
+    setScoreSort(null);
+    // defaults: exceptions should start sorted by character descending
+    setExcSort(id === "exceptions" ? { field: "name", dir: "desc" } : null);
     setScoreDateFilter("");
     setExcInlineEdit(null); setScoreTabInlineEdit(null);
     setCharDetail(null); setUserDetail(null); setPrevContext(null);
+    setBackTrail([]);
     setSelUsers(new Set()); setSelChars(new Set()); setSelScores(new Set()); setSelExcs(new Set());
     setDrawer((prev) => ({ ...prev, isOpen: false }));
   };
@@ -396,17 +465,28 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Character detail navigation
 
-  const openCharDetail = (char: CharDetail, fromUser?: UserDetail, fromChar?: CharDetail) => {
+  const openCharDetail = (char: CharDetail, fromUser?: UserDetail, fromChar?: CharDetail, fromSection?: "scores" | "exceptions") => {
+    pushCurrentToBackTrail();
     if (fromUser) {
       setPrevContext({ type: "user", userId: String(fromUser._id), username: fromUser.username ?? null });
     } else if (fromChar) {
       setPrevContext({ type: "char", charName: fromChar.name });
+    } else if (fromSection) {
+      setPrevContext({ type: "section", section: fromSection });
     } else {
       setPrevContext(null);
     }
     setCharDetail(char);
-    const allFlat = userData.flatMap((u) => u.characters.map((c) => ({ name: c.name, userId: String(u._id) })));
-    navigate(`/admin/characters/${encodeURIComponent(charSlug(char.name, allFlat))}`);
+    navigate(buildCharPath(char.name));
+  };
+
+  const openUserDetail = (user: UserDetail) => {
+    pushCurrentToBackTrail();
+    setCharDetail(null);
+    setPrevContext(null);
+    setUserDetail(user);
+    setActiveSection("users");
+    navigate(`/admin/users/${user._id}`);
   };
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -552,11 +632,11 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Delete actions
 
-  const deleteCharacter = (userId: string, name: string) =>
+  const deleteCharacter = (userId: string, name: string, label: "unlink" | "delete" = "unlink") =>
     confirm({
       variant: "sensitive",
-      confirmWord: "unlink",
-      title: <span>Unlink <span className="text-[#A46666]">{name}</span>?</span>,
+      confirmWord: label,
+      title: <span>{label === "delete" ? "Delete" : "Unlink"} <span className="text-[#A46666]">{name}</span>?</span>,
       description: "This will permanently remove the character and all of their scores. This action cannot be undone.",
       onConfirm: async () => {
         try {
@@ -574,7 +654,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const deleteUser = (userId: string, username?: string | null) =>
     confirm({
       variant: "sensitive",
-      title: `Delete ${username ?? userId}`,
+      title: <span>Delete <span className="text-[#A46666]">{username ?? userId}</span>?</span>,
       description: "This will permanently remove the user and all of their linked characters and scores. This action cannot be undone.",
       onConfirm: async () => {
         try {
@@ -591,6 +671,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const deleteScore = (character: string, date: string, scoreId?: string) =>
     confirm({
       variant: "confirm",
+      confirmDanger: true,
       title: "Delete score",
       description: `Delete the score for ${character} on ${date}? This cannot be undone.`,
       onConfirm: async () => {
@@ -609,6 +690,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const deleteException = (id: string, name: string) =>
     confirm({
       variant: "confirm",
+      confirmDanger: true,
       title: "Delete exception",
       description: `Delete the exception for ${name}?`,
       onConfirm: async () => {
@@ -626,6 +708,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const batchDeleteDetailScores = () =>
     confirm({
       variant: "confirm",
+      confirmDanger: true,
       title: `Delete ${selDetailScores.size} score${selDetailScores.size > 1 ? "s" : ""}`,
       description: "This will permanently remove the selected scores.",
       onConfirm: async () => {
@@ -700,6 +783,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const batchDeleteScores = () =>
     confirm({
       variant: "confirm",
+      confirmDanger: true,
       title: `Delete ${selScores.size} score${selScores.size > 1 ? "s" : ""}`,
       description: "This will permanently remove the selected scores.",
       onConfirm: async () => {
@@ -722,6 +806,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const batchDeleteExcs = () =>
     confirm({
       variant: "confirm",
+      confirmDanger: true,
       title: `Delete ${selExcs.size} exception${selExcs.size > 1 ? "s" : ""}`,
       description: "This will permanently remove the selected exceptions.",
       onConfirm: async () => {
@@ -746,7 +831,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   const value: AdminContextValue = {
-    activeSection, navigateToSection,
+    activeSection, navigateToSection, backTrail, backTargetLabel, goBackFromTrail,
     userData, usersLoading, exceptionsData, exceptionsLoading,
     liveUsers, liveCharacters, liveScores,
     userSearch, setUserSearch, userPage, setUserPage, userSort, setUserSort,
@@ -761,7 +846,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     filteredExceptions, pagedExcs, excPageCount, selExcs, setSelExcs,
     excInlineEdit, setExcInlineEdit,
     charDetail, setCharDetail, userDetail, setUserDetail,
-    prevContext, setPrevContext, openCharDetail,
+    prevContext, setPrevContext, openCharDetail, openUserDetail,
     userMemberData, userDetailCharSort, setUserDetailCharSort,
     selUserDetailChars, setSelUserDetailChars,
     charEdits, setCharEdits, charEditsDirty, setCharEditsDirty,

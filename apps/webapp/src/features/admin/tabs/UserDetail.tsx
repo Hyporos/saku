@@ -1,5 +1,4 @@
 import { cn } from "../../../lib/utils";
-import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   FaArrowLeft, FaUserAlt, FaTrash, FaShieldAlt,
@@ -14,9 +13,9 @@ import { useAdminContext } from "../context";
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 export const UserDetail = () => {
-  const navigate = useNavigate();
   const {
     userDetail, setUserDetail,
+    backTargetLabel, goBackFromTrail,
     userMemberData, userDetailCharSort, setUserDetailCharSort,
     selUserDetailChars, setSelUserDetailChars,
     deleteUser, deleteCharacter, batchDeleteUserDetailChars,
@@ -49,10 +48,10 @@ export const UserDetail = () => {
     <div className="flex flex-col gap-6">
       {/* Back button */}
       <button
-        onClick={() => { setUserDetail(null); navigate("/admin/users"); }}
+        onClick={() => { setUserDetail(null); goBackFromTrail(); }}
         className="flex items-center gap-2 text-sm text-tertiary hover:text-white transition-colors self-start"
       >
-        <FaArrowLeft size={12} /> Back to Users
+        <FaArrowLeft size={12} /> {`Back to ${backTargetLabel}`}
       </button>
 
       {/* Header */}
@@ -123,24 +122,30 @@ export const UserDetail = () => {
           onDelete={batchDeleteUserDetailChars}
           onClear={() => setSelUserDetailChars(new Set())}
         />
-        <table className="w-full table-fixed">
-          <SortableHead
-            cols={[
-              { label: "Name",          field: "name"              },
-              { label: "Member Since",  field: "memberSince"       },
-              { label: "Participation", field: "participationRate" },
-              { label: "Scores",        field: "scores"            },
-            ]}
-            sort={userDetailCharSort}
-            onSort={(f) => toggleSort(userDetailCharSort, f, setUserDetailCharSort)}
-            onSelectAll={() =>
-              toggleAll(userChars.map((c) => c.name), selUserDetailChars, setSelUserDetailChars)
-            }
-            allSelected={userChars.length > 0 && userChars.every((c) => selUserDetailChars.has(c.name))}
-            someSelected={userChars.some((c) => selUserDetailChars.has(c.name))}
-          />
-          <tbody>
-            {userChars.map((char) => (
+        {userChars.length === 0 ? (
+          <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
+            <FaUserAlt size={24} />
+            <p className="text-sm">No characters linked</p>
+          </div>
+        ) : (
+          <table className="w-full table-fixed">
+            <SortableHead
+              cols={[
+                { label: "Name",          field: "name"              },
+                { label: "Member Since",  field: "memberSince"       },
+                { label: "Participation", field: "participationRate" },
+                { label: "Scores",        field: "scores"            },
+              ]}
+              sort={userDetailCharSort}
+              onSort={(f) => toggleSort(userDetailCharSort, f, setUserDetailCharSort)}
+              onSelectAll={() =>
+                toggleAll(userChars.map((c) => c.name), selUserDetailChars, setSelUserDetailChars)
+              }
+              allSelected={userChars.length > 0 && userChars.every((c) => selUserDetailChars.has(c.name))}
+              someSelected={userChars.some((c) => selUserDetailChars.has(c.name))}
+            />
+            <tbody>
+              {userChars.map((char) => (
               <tr
                 key={char.name}
                 onClick={() => {
@@ -176,19 +181,13 @@ export const UserDetail = () => {
                 </td>
                 <td className="px-6 py-4 text-sm">{char.scores.length}</td>
                 <RowActions
-                  onDelete={() => { deleteCharacter(userDetail._id, char.name); }}
+                  onDelete={() => { deleteCharacter(userDetail._id, char.name, "delete"); }}
                 />
               </tr>
-            ))}
-            {userChars.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-sm text-tertiary/50 text-center">
-                  No characters linked
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

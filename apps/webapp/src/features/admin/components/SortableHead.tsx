@@ -54,7 +54,7 @@ export const SortableHead = ({
             <span
               className={cn(
                 "inline-flex items-center leading-none transition-opacity duration-150",
-                field && sort?.field === field ? "opacity-100 text-accent" : "opacity-0"
+                field && sort?.field === field ? "opacity-100 text-accent" : "opacity-0 text-accent"
               )}
             >
               {sort?.field === field && sort?.dir === "asc"

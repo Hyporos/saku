@@ -75,7 +75,8 @@ export function useTabState({
   // ⎯⎯ Exceptions tab ⎯⎯ //
   const [excSearch, setExcSearch] = useState("");
   const [excPage, setExcPage] = useState(1);
-  const [excSort, setExcSort] = useState<SortState | null>(null);
+  // exceptions default to character name descending (A → Z)
+  const [excSort, setExcSort] = useState<SortState | null>({ field: "name", dir: "desc" });
   const [selExcs, setSelExcs] = useState<Set<string>>(new Set());
   const [excInlineEdit, setExcInlineEdit] = useState<ExcInlineEditState | null>(null);
 

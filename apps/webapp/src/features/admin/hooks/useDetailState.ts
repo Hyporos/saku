@@ -44,7 +44,7 @@ export function useDetailState({ userData }: DetailStateInput) {
   const [graphColorDirty, setGraphColorDirty] = useState(false);
 
   // ⎯⎯ Character detail — score view ⎯⎯ //
-  const [detailScoreSort, setDetailScoreSort] = useState<SortState>({ field: "date", dir: "desc" });
+  const [detailScoreSort, setDetailScoreSort] = useState<SortState | null>({ field: "date", dir: "desc" });
   const [detailScorePage, setDetailScorePage] = useState(1);
   const [detailDateFrom, setDetailDateFrom] = useState("");
   const [detailDateTo, setDetailDateTo] = useState("");

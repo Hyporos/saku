@@ -1,5 +1,4 @@
 import { cn } from "../../../lib/utils";
-import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft, FaCheck, FaTimes, FaEdit, FaTrash,
   FaExternalLinkAlt, FaHistory, FaPlus, FaUserAlt,
@@ -21,32 +20,34 @@ import type { UserDoc } from "../types";
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 export const CharacterDetail = () => {
-  const navigate = useNavigate();
   const {
-    charDetail, setCharDetail, prevContext, setPrevContext,
-    userData, setUserDetail, ownerData, charApiData, charApiDataFor, charApiLoading, charApiError,
+    charDetail, setCharDetail, userData, ownerData, charApiData, charApiDataFor, charApiLoading, charApiError,
     charEdits, setCharEdits, charEditsDirty,
     memberSinceDirty, setMemberSinceDirty, graphColorDirty, setGraphColorDirty,
     detailScoreSort, setDetailScoreSort, detailScorePage, setDetailScorePage,
     detailDateFrom, setDetailDateFrom, detailDateTo, setDetailDateTo,
     scoreInlineEdit, setScoreInlineEdit, selDetailScores, setSelDetailScores,
     setDrawer, setTransferModal,
-    openCharDetail, liveCharacters,
+    liveScores,
+    openUserDetail, goBackFromTrail, backTargetLabel,
     saveCharEdits, saveMemberSince, saveGraphColor,
     deleteCharacter, deleteScore, batchDeleteDetailScores,
-    inlineSaveScore, toggleSel, toggleAll,
+    inlineSaveScore, toggleSel, toggleAll, toggleSort,
   } = useAdminContext();
 
   if (!charDetail) return null;
 
   // Sort score history
-  let detailScores = [...charDetail.scores].sort((a, b) => {
-    if (detailScoreSort.field === "score") {
-      return detailScoreSort.dir === "asc" ? a.score - b.score : b.score - a.score;
-    }
-    const cmp = a.date.localeCompare(b.date);
-    return detailScoreSort.dir === "asc" ? cmp : -cmp;
-  });
+  let detailScores = [...charDetail.scores];
+  if (detailScoreSort) {
+    detailScores.sort((a, b) => {
+      if (detailScoreSort.field === "score") {
+        return detailScoreSort.dir === "asc" ? a.score - b.score : b.score - a.score;
+      }
+      const cmp = a.date.localeCompare(b.date);
+      return detailScoreSort.dir === "asc" ? cmp : -cmp;
+    });
+  }
 
   // Apply date range filter only when both ends are selected
   if (detailDateFrom && detailDateTo) {
@@ -85,18 +86,7 @@ export const CharacterDetail = () => {
 
   const handleBack = () => {
     setCharDetail(null);
-    setPrevContext(null);
-    if (prevContext?.type === "user") {
-      const found = userData.find((u) => String(u._id) === prevContext.userId);
-      if (found) { setUserDetail(found); navigate(`/admin/users/${prevContext.userId}`); }
-      else navigate("/admin/users");
-    } else if (prevContext?.type === "char") {
-      const prevChar = liveCharacters.find((c) => c.name === prevContext.charName);
-      if (prevChar) openCharDetail(prevChar);
-      else navigate("/admin/characters");
-    } else {
-      navigate("/admin/characters");
-    }
+    goBackFromTrail();
   };
 
   return (
@@ -107,11 +97,7 @@ export const CharacterDetail = () => {
         className="flex items-center gap-2 text-sm text-tertiary hover:text-white transition-colors self-start"
       >
         <FaArrowLeft size={12} />
-        {prevContext?.type === "user"
-          ? `Back to ${prevContext.username ?? "User"}`
-          : prevContext?.type === "char"
-            ? `Back to ${prevContext.charName}`
-            : "Back to Characters"}
+        {`Back to ${backTargetLabel}`}
       </button>
 
       {/* Header — avatar panel */}
@@ -178,17 +164,16 @@ export const CharacterDetail = () => {
             onClick={() => {
               const found = userData.find((u) => String(u._id) === String(charDetail.userId));
               if (found) {
-                setCharDetail(null); setPrevContext(null);
-                setUserDetail(found); navigate(`/admin/users/${found._id}`);
+                setCharDetail(null);
+                openUserDetail(found);
               } else if (ownerData) {
-                setCharDetail(null); setPrevContext(null);
-                setUserDetail({
+                setCharDetail(null);
+                openUserDetail({
                   _id: ownerData._id, graphColor: "", characters: [],
                   username: ownerData.username, nickname: ownerData.nickname,
                   avatarUrl: ownerData.avatarUrl, joinedAt: ownerData.joinedAt ?? null,
                   role: (ownerData.role as UserDoc["role"]) ?? null,
                 });
-                navigate(`/admin/users/${ownerData._id}`);
               }
             }}
             className="flex items-center gap-2 min-w-0 hover:text-accent transition-colors text-left"
@@ -299,6 +284,7 @@ export const CharacterDetail = () => {
                 from={detailDateFrom}
                 to={detailDateTo}
                 onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
+                clearable
                 placeholder="All Dates"
                 align="right"
                 subtle
@@ -344,11 +330,7 @@ export const CharacterDetail = () => {
                 ]}
                 sort={detailScoreSort}
                 onSort={(f) => {
-                  setDetailScoreSort((s) =>
-                    s.field === f
-                      ? { field: f, dir: s.dir === "asc" ? "desc" : "asc" }
-                      : { field: f, dir: "desc" }
-                  );
+                  toggleSort(detailScoreSort, f, setDetailScoreSort);
                   setDetailScorePage(1);
                 }}
                 onSelectAll={() =>
@@ -358,7 +340,17 @@ export const CharacterDetail = () => {
                 someSelected={pagedDetailScores.some((e) => selDetailScores.has(e.date))}
               />
               <tbody>
-                {pagedDetailScores.map((entry, i) => {
+                {pagedDetailScores.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-12">
+                      <div className="flex flex-col items-center gap-3 text-tertiary/50">
+                        <FaHistory size={24} />
+                        <p className="text-sm">No scores in selected range</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  pagedDetailScores.map((entry, i) => {
                   const isEditing = scoreInlineEdit?.origDate === entry.date;
                   return (
                     <tr
@@ -377,11 +369,22 @@ export const CharacterDetail = () => {
                       {/* Date */}
                       <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
                         {isEditing ? (
-                          <DatePicker
-                            subtle compact wednesdayOnly
-                            value={scoreInlineEdit!.dateValue}
-                            onChange={(v) => setScoreInlineEdit((s) => s && { ...s, dateValue: v })}
-                          />
+                          <div className="flex flex-col gap-1">
+                            <DatePicker
+                              subtle compact wednesdayOnly
+                              value={scoreInlineEdit!.dateValue}
+                              onChange={(v) => setScoreInlineEdit((s) => s && { ...s, dateValue: v })}
+                            />
+                            {scoreInlineEdit!.dateValue &&
+                              scoreInlineEdit!.dateValue !== scoreInlineEdit!.origDate &&
+                              liveScores.some(
+                                (s) =>
+                                  s.character === charDetail.name &&
+                                  s.date === scoreInlineEdit!.dateValue
+                              ) && (
+                                <p className="text-[#A46666] text-xs">Warning — score exists for selected date</p>
+                              )}
+                          </div>
                         ) : (
                           <span>{entry.date}</span>
                         )}
@@ -451,13 +454,7 @@ export const CharacterDetail = () => {
                       </td>
                     </tr>
                   );
-                })}
-                {pagedDetailScores.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-8 text-sm text-tertiary/50 text-center">
-                      No scores in selected range
-                    </td>
-                  </tr>
+                  })
                 )}
               </tbody>
             </table>

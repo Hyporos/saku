@@ -1,5 +1,5 @@
 import { cn } from "../../../lib/utils";
-import { FaSearch } from "react-icons/fa";
+import { FaSearch, FaUserAlt } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import CopyId from "../../../components/CopyId";
 import { SortableHead } from "../components/SortableHead";
@@ -48,22 +48,28 @@ export const CharactersTab = () => {
             onDelete={batchDeleteChars}
             onClear={() => setSelChars(new Set())}
           />
-          <table className="w-full table-fixed">
-            <SortableHead
-              cols={[
-                { label: "Name",          field: "name",              className: "w-[22%]" },
-                { label: "Discord ID",    field: "userId",            className: "w-[28%]" },
-                { label: "Member Since",  field: "memberSince",       className: "w-[20%]" },
-                { label: "Participation", field: "participationRate", className: "w-[20%]" },
-              ]}
-              sort={charSort}
-              onSort={(f) => toggleSort(charSort, f, setCharSort)}
-              onSelectAll={() => toggleAll(pagedChars.map((c) => `${c.userId}|${c.name}`), selChars, setSelChars)}
-              allSelected={pagedChars.length > 0 && pagedChars.every((c) => selChars.has(`${c.userId}|${c.name}`))}
-              someSelected={pagedChars.some((c) => selChars.has(`${c.userId}|${c.name}`))}
-            />
-            <tbody>
-              {pagedChars.map((char) => (
+          {pagedChars.length === 0 ? (
+            <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
+              <FaUserAlt size={24} />
+              <p className="text-sm">{charSearch ? `No characters matching "${charSearch}"` : "No characters found"}</p>
+            </div>
+          ) : (
+            <table className="w-full table-fixed">
+              <SortableHead
+                cols={[
+                  { label: "Name",          field: "name",              className: "w-[22%]" },
+                  { label: "Discord ID",    field: "userId",            className: "w-[28%]" },
+                  { label: "Member Since",  field: "memberSince",       className: "w-[20%]" },
+                  { label: "Participation", field: "participationRate", className: "w-[20%]" },
+                ]}
+                sort={charSort}
+                onSort={(f) => toggleSort(charSort, f, setCharSort)}
+                onSelectAll={() => toggleAll(pagedChars.map((c) => `${c.userId}|${c.name}`), selChars, setSelChars)}
+                allSelected={pagedChars.length > 0 && pagedChars.every((c) => selChars.has(`${c.userId}|${c.name}`))}
+                someSelected={pagedChars.some((c) => selChars.has(`${c.userId}|${c.name}`))}
+              />
+              <tbody>
+                {pagedChars.map((char) => (
                 <tr
                   key={`${char.userId}-${char.name}`}
                   onClick={() => openCharDetail(char)}
@@ -92,16 +98,10 @@ export const CharactersTab = () => {
                     onDelete={() => deleteCharacter(char.userId, char.name)}
                   />
                 </tr>
-              ))}
-              {pagedChars.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-sm text-tertiary/50 text-center">
-                    {charSearch ? `No characters matching "${charSearch}"` : "No characters found"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
           <Pagination
             page={charPage}
             total={filteredChars.length}

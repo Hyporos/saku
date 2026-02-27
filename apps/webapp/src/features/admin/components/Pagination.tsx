@@ -11,18 +11,18 @@ export const Pagination = ({ page, total, pageCount, onPrev, onNext }: Paginatio
     <span className="text-xs text-tertiary">
       {total === 0 ? "No results" : `Page ${page} of ${pageCount}`}
     </span>
-    <div className="flex gap-2">
+    <div className="flex gap-3">
       <button
         disabled={page <= 1}
         onClick={onPrev}
-        className="text-xs text-tertiary hover:text-white disabled:opacity-30 transition-colors px-3 py-1.5 rounded-lg bg-background/60"
+        className="text-xs text-tertiary hover:text-white disabled:opacity-30 disabled:hover:text-tertiary transition-colors px-3 py-1.5 rounded-lg bg-background/60 border border-tertiary/20 hover:bg-background/100 hover:border-accent/40 disabled:hover:bg-background/60 disabled:hover:border-tertiary/20"
       >
         Prev
       </button>
       <button
         disabled={page >= pageCount}
         onClick={onNext}
-        className="text-xs text-tertiary hover:text-white disabled:opacity-30 transition-colors px-3 py-1.5 rounded-lg bg-background/60"
+        className="text-xs text-tertiary hover:text-white disabled:opacity-30 disabled:hover:text-tertiary transition-colors px-3 py-1.5 rounded-lg bg-background/60 border border-tertiary/20 hover:bg-background/100 hover:border-accent/40 disabled:hover:bg-background/60 disabled:hover:border-tertiary/20"
       >
         Next
       </button>

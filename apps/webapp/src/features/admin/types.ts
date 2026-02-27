@@ -102,7 +102,8 @@ export type LiveScore = {
 
 export type PrevContext =
   | { type: "user"; userId: string; username: string | null }
-  | { type: "char"; charName: string };
+  | { type: "char"; charName: string }
+  | { type: "section"; section: "scores" | "exceptions" };
 
 export type UserMemberData = {
   _id: string;
