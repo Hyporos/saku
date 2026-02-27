@@ -1,8 +1,8 @@
 const culvertSchema = require("../schemas/culvertSchema.js");
-const eventSchema = require("../schemas/eventSchema.js");
 const exceptionSchema = require("../schemas/exceptionSchema.js");
 const express = require("express");
 const axios = require("axios");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
@@ -61,14 +61,24 @@ router.get("/rankings/:name", async (req, res) => {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Admin routes — called by the webapp Admin Panel (bee role required)
-// TODO: Add a middleware here that validates the request carries a valid bee session
-//       from the webapp's Express server before allowing any write operations.
+// The webapp's server.js verifies isBee from the session before forwarding, and
+// adds an X-Admin-Secret header so the bot can confirm the request is legitimate.
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const requireAdminSecret = (req, res, next) => {
+  const secret = process.env.ADMIN_API_SECRET;
+  if (!secret || req.headers["x-admin-secret"] !== secret) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+};
+
+router.use("/admin", requireAdminSecret);
 
 // Users — culvertSchema documents (keyed by Discord user ID)
 
-const BEE_ROLE_ID = "720001044746076181";
-const MEMBER_ROLE_ID = "750000646345719899";
+const BEE_ROLE_ID = process.env.BEE_ROLE_ID;
+const MEMBER_ROLE_ID = process.env.MEMBER_ROLE_ID;
 
 router.get("/admin/users", async (req, res) => {
   try {
@@ -321,35 +331,36 @@ router.delete("/admin/scores/:character/:date", async (req, res) => {
   }
 });
 
-// Events — eventSchema documents
+// By-ID score routes — used for scores that have a Mongoose-generated _id.
+// These are unambiguous and safer than using date as a key.
 
-router.get("/admin/events", async (req, res) => {
+router.patch("/admin/scores/by-id/:scoreId", async (req, res) => {
   try {
-    const events = await eventSchema.find();
-    res.json(events);
+    const scoreId = new mongoose.Types.ObjectId(req.params.scoreId);
+    const { score } = req.body;
+    await culvertSchema.findOneAndUpdate(
+      { "characters.scores._id": scoreId },
+      { $set: { "characters.$[].scores.$[s].score": score } },
+      { arrayFilters: [{ "s._id": scoreId }] }
+    );
+    res.json({ success: true });
   } catch (error) {
-    console.error("Error fetching events:", error);
+    console.error("Error updating score by id:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-router.patch("/admin/events/:id", async (req, res) => {
+router.delete("/admin/scores/by-id/:scoreId", async (req, res) => {
   try {
-    const { mobcount } = req.body;
-    await eventSchema.findByIdAndUpdate(req.params.id, { $set: { mobcount } });
+    const scoreId = new mongoose.Types.ObjectId(req.params.scoreId);
+    await culvertSchema.findOneAndUpdate(
+      { "characters.scores._id": scoreId },
+      { $pull: { "characters.$[c].scores": { _id: scoreId } } },
+      { arrayFilters: [{ "c.scores._id": scoreId }] }
+    );
     res.json({ success: true });
   } catch (error) {
-    console.error("Error updating event:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-router.delete("/admin/events/:id", async (req, res) => {
-  try {
-    await eventSchema.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting event:", error);
+    console.error("Error deleting score by id:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

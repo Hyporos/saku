@@ -9,7 +9,7 @@ const VITE_ORIGIN = "http://localhost:5173";
 const DISCORD_API = "https://discord.com/api/v10";
 
 // Role IDs
-const BEE_ROLE_ID = "720001044746076181";
+const BEE_ROLE_ID = process.env.BEE_ROLE_ID;
 const FRIENDS_ROLE_ID = "720006084252663868";
 
 const app = express();
@@ -133,6 +133,17 @@ app.get("/auth/logout", (req, res) => {
 // This avoids Mixed Content errors when the webapp is served over HTTPS
 // but the bot API is plain HTTP (e.g. a raw VPS/game-host IP).
 app.all("/bot/*", async (req, res) => {
+  // For admin routes: verify the session user is a bee (or the owner).
+  // If not, reject before forwarding — never let unauth requests reach the bot.
+  const targetPath = req.path.replace(/^\/bot/, "");
+  if (targetPath.startsWith("/api/admin/")) {
+    const user = req.session.user;
+    const isOwner = user?.id === process.env.OWNER_ID;
+    if (!user || (!user.isBee && !isOwner)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+  }
+
   // Dynamically determine bot API URL: use localhost if webapp is running locally, else use env
   let botApiUrl = process.env.BOT_API_URL;
   const isLocal = ["localhost", "127.0.0.1"].some((host) =>
@@ -147,16 +158,21 @@ app.all("/bot/*", async (req, res) => {
   }
 
   // Strip the /bot prefix and forward to the real bot API
-  const targetPath = req.path.replace(/^\/bot/, "");
   const query = req.url.includes("?") ? "?" + req.url.split("?")[1] : "";
   const targetUrl = `${botApiUrl}${targetPath}${query}`;
+
+  // For admin routes, forward the shared secret so the bot can validate the source
+  const extraHeaders = {};
+  if (targetPath.startsWith("/api/admin/")) {
+    extraHeaders["x-admin-secret"] = process.env.ADMIN_API_SECRET ?? "";
+  }
 
   try {
     const botRes = await axios({
       method: req.method,
       url: targetUrl,
       data: Object.keys(req.body ?? {}).length ? req.body : undefined,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...extraHeaders },
     });
     res.status(botRes.status).json(botRes.data);
   } catch (error) {

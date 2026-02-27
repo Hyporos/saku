@@ -20,7 +20,7 @@ const AppLayout = ({ children, noFooter = false }: { children: React.ReactNode; 
 
 // Redirect to /login if unauthenticated; redirect to / if bee access is required
 // but the user isn't a bee. Shows a blank loading state while the session resolves.
-const OWNER_ID = "631337640754675725";
+const OWNER_ID = import.meta.env.VITE_OWNER_ID as string | undefined;
 const ProtectedRoute = ({
   children,
   requireBee = false,
@@ -48,6 +48,16 @@ const ProtectedRoute = ({
   return <>{children}</>;
 };
 
+// All /admin/* routes render the same component — extract once to avoid repeating
+// the entire ProtectedRoute + AppLayout wrapper tree six times.
+const AdminRoute = () => (
+  <ProtectedRoute requireBee>
+    <AppLayout noFooter>
+      <AdminPanel />
+    </AppLayout>
+  </ProtectedRoute>
+);
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 function App() {
@@ -68,84 +78,13 @@ function App() {
             }
           />
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Deep-link to a specific character detail page */}
-          <Route
-            path="/admin/characters"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/characters/:charName"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Deep-link to a specific user detail page */}
-          <Route
-            path="/admin/users"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/users/:userId"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/scores"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/exceptions"
-            element={
-              <ProtectedRoute requireBee>
-                <AppLayout noFooter>
-                  <AdminPanel />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/admin"                    element={<AdminRoute />} />
+          <Route path="/admin/users"              element={<AdminRoute />} />
+          <Route path="/admin/users/:userId"      element={<AdminRoute />} />
+          <Route path="/admin/characters"         element={<AdminRoute />} />
+          <Route path="/admin/characters/:charName" element={<AdminRoute />} />
+          <Route path="/admin/scores"             element={<AdminRoute />} />
+          <Route path="/admin/exceptions"         element={<AdminRoute />} />
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

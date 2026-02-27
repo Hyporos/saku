@@ -11,3 +11,6 @@ const Footer = () => {
 export default Footer;
 
 // TODO WEBAPP: Action History, Error Console, Crash Log, Cron Job Manager, Alias Editor (change name between discord ids), Backfill Trigger, growth trends, server status, missing scores tracker
+// TODO WEBAPP: clean up page, with functions like purge empty users,  check users with 2 characters, data anomalies
+
+// TODO NOW: Create a toggle on the scores tab page, to the left of the 'All Dates' filter button, that toggles between regular view and a view that shows characters that have not inputted a score for the current week / Missing Scores.
