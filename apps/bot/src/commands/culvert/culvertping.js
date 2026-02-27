@@ -50,7 +50,7 @@ module.exports = {
 
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
 
     await interaction.editReply("Analyzing image...");
 
@@ -58,17 +58,15 @@ module.exports = {
     const imageBuffer = await fetchBuffer(imageOption.proxyURL || imageOption.url);
     const base64Image = imageBuffer.toString('base64');
 
-    const prompt = `You are analyzing a MapleStory guild member list screenshot.
-Extract ONLY the character names from this image which should be one column with one name per row.
+    const prompt = `Analyze this MapleStory guild list screenshot for the 'culvertping' utility.
 
-The format should be one name per line.
+Your goal is to extract character names with 100% accuracy, specifically handling truncated names and column overlaps.
 
 Rules:
-- Only include the character name (typically the first column, there is usually just one column in each image)
-- Ignore all other columns (class, level, world, guild, culvert score, etc.)
-- Return ONLY the character names, one per line
-- Preserve exact character names including special characters (ö, á, etc.)
-- Do not include headers or any other text
+- Truncation Logic: If a character name contains an ellipsis (..), stop the extraction immediately at the first dot. Do not include the dots or any text following them (e.g., 'heatherhah..Dawn' becomes 'heatherhah').
+- Column Isolation: Extract ONLY the first vertical column. Strictly ignore the Class (Adele, Night Walker, etc.), Level, and Score columns.
+- Encoding: Preserve all special characters (ö, á, etc.) exactly as they appear.
+- Formatting: Return ONLY the character names, one per line. No headers, introductory text, or blank lines.
 
 Example output:
 PlayerName1

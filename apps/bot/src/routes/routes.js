@@ -1040,21 +1040,21 @@ router.post("/admin/scanner/scan", async (req, res) => {
 
     // Init Gemini AI
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
 
-    const prompt = `You are analyzing a MapleStory guild culvert participation screenshot.
-Extract ONLY the character names and their culvert scores from this image.
+    const prompt = `Analyze this MapleStory guild culvert participation screenshot.
 
-The format should be one entry per line: CharacterName Score
+Perform a precise horizontal scan of each row to link the 'Character Name' (Leftmost Column) with the 'Culvert Score' (Rightmost Column).
 
 Rules:
-- Only include the character name (first column) and the culvert score (last number in the row)
-- Ignore all other columns (class, level, world, guild, etc.)
-- If a score cannot be read or is blank/hidden, use 0
-- Return ONLY the name and score separated by a space, nothing else
-- Each entry on a new line
-- Preserve exact character names including special characters
-- Do not include headers or any other text
+- Spatial Mapping: Treat the first text string as 'CharacterName' and the final integer in the row as 'Score'.
+- Ignore Context: Skip all middle columns (Class, Level, World, Guild).
+- Data Integrity: If a score is missing or obscured, default to 0.
+- Character Encoding: Preserve all special characters and symbols (ö, á, etc.) exactly as rendered.
+- Formatting: Return ONLY 'CharacterName Score' (space-separated), one per line. No headers, no intro text.
+- Ellipsis Truncation: If a character name contains an ellipsis (..), treat the ellipsis as the end of the name.
+- Strict Column Separation: Do not include any text that follows an ellipsis (e.g., if you see heatherhah..Dawn, the name is just heatherhah).
+- Integer Only Scores: Output the culvert score as a raw integer with no commas or symbols (e.g., 216993 instead of 216,993).
 
 Example output:
 PlayerName1 63100

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   FaCamera,
   FaCloudUploadAlt,
@@ -71,6 +71,8 @@ export const ScannerTab = () => {
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(null);
   const [finalizing, setFinalizing] = useState(false);
 
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
@@ -107,6 +109,38 @@ export const ScannerTab = () => {
     e.preventDefault();
     e.stopPropagation();
   };
+
+  // Paste anywhere on the page to add an image
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      // Don't intercept paste inside text inputs / textareas
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      // Don't accept paste once scan is in progress or done
+      if (phase !== "idle") return;
+
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imageFiles = items
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter((f): f is File => f !== null);
+
+      if (imageFiles.length > 0) {
+        addImages(imageFiles);
+      }
+    };
+
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [phase, addImages]);
+
+  // Close lightbox on Escape
+  useEffect(() => {
+    if (!lightboxSrc) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightboxSrc(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [lightboxSrc]);
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Scan
@@ -363,7 +397,7 @@ export const ScannerTab = () => {
               <p className="text-sm text-tertiary">
                 Drop culvert screenshots here or <span className="text-accent">browse</span>
               </p>
-              <p className="text-xs text-tertiary/50 mt-1">PNG, JPG, WEBP — multiple allowed</p>
+              <p className="text-xs text-tertiary/50 mt-1">PNG, JPG, WEBP — or paste with Ctrl+V</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -382,14 +416,15 @@ export const ScannerTab = () => {
                     <img
                       src={img.preview}
                       alt={`Screenshot ${i + 1}`}
-                      className="w-24 h-24 object-cover rounded-lg border border-tertiary/20"
+                      onClick={() => setLightboxSrc(img.preview)}
+                      className="w-24 h-24 object-cover rounded-lg border border-tertiary/20 cursor-zoom-in hover:border-accent/40 transition-colors"
                     />
                     {phase === "idle" && (
                       <button
                         onClick={(e) => { e.stopPropagation(); removeImage(i); }}
-                        className="absolute -top-1.5 -right-1.5 bg-background border border-tertiary/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-1.5 -right-1.5 bg-background border border-tertiary/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:border-[#C87070]/40"
                       >
-                        <FaTimes size={10} className="text-tertiary" />
+                        <FaTimes size={10} className="text-tertiary hover:text-[#C87070]" />
                       </button>
                     )}
                   </div>
@@ -592,6 +627,27 @@ export const ScannerTab = () => {
           </div>
         )}
       </div>
+
+      {/* Lightbox */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightboxSrc(null)}
+        >
+          <button
+            onClick={() => setLightboxSrc(null)}
+            className="absolute top-4 right-4 bg-background/80 border border-tertiary/20 rounded-full p-2 text-tertiary hover:text-white transition-colors"
+          >
+            <FaTimes size={14} />
+          </button>
+          <img
+            src={lightboxSrc}
+            alt="Screenshot preview"
+            className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };
