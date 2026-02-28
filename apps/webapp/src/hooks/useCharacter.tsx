@@ -1,8 +1,9 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
+import { apiBase } from "../config/apiBase";
 
 // Route through server.js proxy to avoid Mixed Content / CORS issues
-const BOT_API = import.meta.env.VITE_BOT_API_URL ?? "http://localhost:8000";
+const BOT_API = apiBase;
 
 const useCharacter = (characterName: string) => {
   const [characterData, setCharacterData] = useState<{

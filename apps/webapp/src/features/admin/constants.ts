@@ -1,8 +1,10 @@
+import { apiBase } from "../../config/apiBase";
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Proxy base — browser calls server.js which forwards to the bot server-side,
 // avoiding Mixed Content errors when the webapp is on HTTPS.
-export const BOT_API = import.meta.env.VITE_BOT_API_URL ?? "http://localhost:8000";
+export const BOT_API = apiBase;
 
 export const PAGE_SIZE = 10;
 export const SCORE_DETAIL_PAGE_SIZE = 10;

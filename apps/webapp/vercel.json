@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/auth/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/bot/(.*)",
+      "destination": "/api/index"
+    }
+  ]
+}

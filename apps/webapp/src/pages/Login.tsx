@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
 import useAuth from "../hooks/useAuth";
+import { apiBase } from "../config/apiBase";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -55,7 +56,7 @@ const Login = () => {
 
         {/* Redirect to the Express OAuth2 login handler */}
         <a
-          href="http://localhost:8000/auth/login"
+          href={`${apiBase}/auth/login`}
           className="flex items-center justify-center gap-3 bg-[#5865F2] hover:bg-[#4752C4] transition-colors rounded-lg w-full py-3 text-white font-medium"
         >
           <FaDiscord size={20} />

@@ -5,21 +5,47 @@ import cors from "cors";
 import "dotenv/config";
 
 const PORT = process.env.PORT || 8000;
-const VITE_ORIGIN = "http://localhost:5173";
+const LOCAL_WEB_ORIGIN = "http://localhost:5173";
 const DISCORD_API = "https://discord.com/api/v10";
+const isProd = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
 
 // Role IDs
 const BEE_ROLE_ID = process.env.BEE_ROLE_ID;
 const FRIENDS_ROLE_ID = "720006084252663868";
 
 const app = express();
+app.set("trust proxy", 1);
+
+const allowedOrigins = new Set(
+  [
+    LOCAL_WEB_ORIGIN,
+    process.env.WEB_ORIGIN,
+    "https://sakubot.com",
+    "https://www.sakubot.com",
+  ].filter(Boolean)
+);
+
+function getRequestOrigin(req) {
+  if (process.env.WEB_ORIGIN) return process.env.WEB_ORIGIN;
+  const protoHeader = req.headers["x-forwarded-proto"];
+  const proto = typeof protoHeader === "string"
+    ? protoHeader.split(",")[0]
+    : (req.protocol || "https");
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  if (host) return `${proto}://${host}`;
+  return LOCAL_WEB_ORIGIN;
+}
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 app.use(
   cors({
-    // Allow requests from the Vite dev server with session cookies
-    origin: VITE_ORIGIN,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      if (origin.endsWith(".vercel.app")) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -32,6 +58,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
+      secure: isProd,
       maxAge: 1000 * 60 * 60 * 24, // 24 hours
     },
   })
@@ -55,8 +82,9 @@ app.get("/auth/login", (_req, res) => {
 
 // Exchange the OAuth2 code for a token, verify guild membership and roles
 app.get("/auth/callback", async (req, res) => {
+  const appOrigin = getRequestOrigin(req);
   const { code } = req.query;
-  if (!code) return res.redirect(`${VITE_ORIGIN}/login?error=no_code`);
+  if (!code) return res.redirect(`${appOrigin}/login?error=no_code`);
 
   try {
     // Exchange the authorization code for an access token
@@ -91,7 +119,7 @@ app.get("/auth/callback", async (req, res) => {
 
     // Friends (role) are not permitted to access the dashboard
     if (roles.includes(FRIENDS_ROLE_ID)) {
-      return res.redirect(`${VITE_ORIGIN}/login?error=friends`);
+      return res.redirect(`${appOrigin}/login?error=friends`);
     }
 
     const isBee = roles.includes(BEE_ROLE_ID);
@@ -103,14 +131,14 @@ app.get("/auth/callback", async (req, res) => {
     // Persist the user to the session cookie
     req.session.user = { id, username, avatar: avatarUrl, isBee };
 
-    res.redirect(VITE_ORIGIN);
+    res.redirect(appOrigin);
   } catch (error) {
     console.error("OAuth2 callback error:", error?.response?.data ?? error);
 
     // If Discord returns 404 the user is simply not in the guild
     const status = error?.response?.status;
     const errorKey = status === 404 ? "not_in_guild" : "auth_failed";
-    res.redirect(`${VITE_ORIGIN}/login?error=${errorKey}`);
+    res.redirect(`${appOrigin}/login?error=${errorKey}`);
   }
 });
 
@@ -122,8 +150,9 @@ app.get("/auth/me", (req, res) => {
 
 // Destroy the session and redirect back to the login page
 app.get("/auth/logout", (req, res) => {
+  const appOrigin = getRequestOrigin(req);
   req.session.destroy(() => {
-    res.redirect(`${VITE_ORIGIN}/login`);
+    res.redirect(`${appOrigin}/login`);
   });
 });
 
@@ -184,6 +213,10 @@ app.all("/bot/*", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`);
+  });
+}
+
+export default app;
