@@ -154,7 +154,7 @@ export const ScannerTab = () => {
   const [exceptionModal, setExceptionModal] = useState<{ exception: string } | null>(null);
   const [exceptionCharInput, setExceptionCharInput] = useState("");
   const [exceptionSaving, setExceptionSaving] = useState(false);
-  const [lightboxClosing, setLightboxClosing] = useState(false);
+  const [lightboxVisible, setLightboxVisible] = useState(false);
   const [uploadPage, setUploadPage] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -236,13 +236,14 @@ export const ScannerTab = () => {
   }, [phase, addImages]);
 
   const openLightbox = (src: string) => {
-    setLightboxClosing(false);
     setLightboxSrc(src);
+    setLightboxVisible(false);
+    requestAnimationFrame(() => setLightboxVisible(true));
   };
 
   const closeLightbox = () => {
-    setLightboxClosing(true);
-    setTimeout(() => { setLightboxSrc(null); setLightboxClosing(false); }, 200);
+    setLightboxVisible(false);
+    setTimeout(() => { setLightboxSrc(null); }, 220);
   };
 
   // Close lightbox on Escape
@@ -577,7 +578,7 @@ export const ScannerTab = () => {
     setExceptionModal(null);
     setExceptionCharInput("");
     setRemoveConfirmIdx(null);
-    setLightboxClosing(false);
+    setLightboxVisible(false);
     setUploadPage(0);
     setProgress({ current: 0, total: 0, message: "", imageName: "" });
   };
@@ -733,10 +734,6 @@ export const ScannerTab = () => {
                                   className="w-40 h-28 object-cover rounded-lg border border-tertiary/20 cursor-zoom-in hover:border-accent/40 transition-colors"
                                 />
                               </Tooltip>
-                              {/* Number badge — top-left */}
-                              <span className="absolute top-1.5 left-1.5 min-w-[22px] h-[22px] flex items-center justify-center bg-accent/90 text-panel text-[11px] font-bold rounded-full px-1.5 leading-none pointer-events-none">
-                                {globalIdx + 1}
-                              </span>
                               {/* X badge — top-right, inside image */}
                               {phase === "idle" && (
                                 <button
@@ -755,9 +752,9 @@ export const ScannerTab = () => {
                             onClick={() => fileInputRef.current?.click()}
                             className="w-40 h-28 border-2 border-dashed border-tertiary/20 rounded-lg flex flex-col items-center justify-center gap-2 text-tertiary/40 hover:text-accent hover:border-accent/40 transition-colors flex-shrink-0"
                           >
-                            <FaCloudUploadAlt size={22} />
-                            <span className="text-[10px] leading-none text-center">Add more</span>
-                            <span className="text-[9px] leading-none text-tertiary/30">or Ctrl+V to paste</span>
+                            <FaCloudUploadAlt size={30} />
+                            <span className="text-sm font-medium leading-none text-center">Add more</span>
+                            <span className="text-xs leading-none text-tertiary/45">or Ctrl+V to paste</span>
                           </button>
                         )}
                       </div>
@@ -971,9 +968,6 @@ export const ScannerTab = () => {
                                         : "border-tertiary/20 cursor-zoom-in hover:border-accent/40"
                                   )}
                                 />
-                                <span className="absolute top-1 left-1 w-4 h-4 flex items-center justify-center bg-black/75 text-white text-[9px] font-semibold rounded-full leading-none pointer-events-none">
-                                  {i + 1}
-                                </span>
                                 {needsRetry && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); rescanSingle(img); }}
@@ -1383,7 +1377,7 @@ export const ScannerTab = () => {
           <div
             className={cn(
               "absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-200",
-              lightboxClosing ? "opacity-0" : "opacity-100"
+              lightboxVisible ? "opacity-100" : "opacity-0"
             )}
             onClick={closeLightbox}
           />
@@ -1391,17 +1385,11 @@ export const ScannerTab = () => {
           <div
             className={cn(
               "relative transition-all duration-200 ease-out",
-              lightboxClosing
-                ? "opacity-0 scale-95"
-                : "opacity-100 scale-100"
+              lightboxVisible
+                ? "opacity-100 scale-100"
+                : "opacity-0 scale-95"
             )}
           >
-            <button
-              onClick={closeLightbox}
-              className="absolute top-3 right-3 bg-background/80 border border-tertiary/20 rounded-full p-2 text-tertiary hover:text-white transition-colors z-10"
-            >
-              <FaTimes size={14} />
-            </button>
             <img
               src={lightboxSrc}
               alt="Screenshot preview"
