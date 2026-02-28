@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const weekSchema = require("../../schemas/weekSchema.js");
 const { getResetDates } = require("../../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 
@@ -73,17 +74,38 @@ module.exports = {
 
       // Create a buffer from the JSON data
       const buffer = Buffer.from(jsonData, "utf-8");
-      const attachment = new AttachmentBuilder(buffer, { name: `culvert-${weekOption}.json` });
+      const attachment = new AttachmentBuilder(buffer, { name: `saku_culvert_${weekOption}_${Date.now()}.json` });
+
+      const submitted = allCharacters.length - missedCharactersArray.length;
+      const total = allCharacters.length;
+      const overrideUsed = missedCharactersArray.length > 0 && overrideOption;
+
+      // Upsert the week record with scores snapshot
+      const scoresSnapshot = allCharacters
+        .filter((c) => c.scores.some((s) => s.date === weekOption))
+        .map((c) => {
+          const entry = c.scores.find((s) => s.date === weekOption);
+          return { name: c.name, score: entry.score };
+        })
+        .sort((a, b) => b.score - a.score);
+
+      await weekSchema.findOneAndUpdate(
+        { week: weekOption },
+        { week: weekOption, finalized: true, override: overrideUsed, submitted, total, scores: scoresSnapshot },
+        { upsert: true, new: true }
+      );
 
       // Handle responses
       await interaction.followUp({
         content: `${
           missedCharactersArray.length !== 0
-            ? `**${allCharacters.length - missedCharactersArray.length}/${
-                allCharacters.length
+            ? `**${submitted}/${
+                total
               }** scores`
             : "All scores"
-        } have been submitted for the week of **${weekOption}**\n\nJSON backup data:`,
+        } have been submitted for the week of **${weekOption}**${
+          overrideUsed ? " *(override used)*" : ""
+        }\n\nJSON backup data:`,
         files: [attachment],
       });
     } catch (error) {

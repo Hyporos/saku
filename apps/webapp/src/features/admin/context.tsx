@@ -15,6 +15,7 @@ import {
   FaExclamationCircle,
   FaHistory,
   FaCamera,
+  FaArchive,
 } from "react-icons/fa";
 import {
   BOT_API,
@@ -360,6 +361,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const [activeToolSection, setActiveToolSection] = useState<ToolSection | null>(() => {
     if (location.pathname.startsWith("/admin/action-log")) return "action-log";
     if (location.pathname.startsWith("/admin/scanner")) return "scanner";
+    if (location.pathname.startsWith("/admin/backups")) return "backups";
     return null;
   });
 
@@ -435,6 +437,12 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     }
     if (location.pathname.startsWith("/admin/scanner")) {
       setActiveToolSection("scanner");
+      setCharDetail(null);
+      setUserDetail(null);
+      return;
+    }
+    if (location.pathname.startsWith("/admin/backups")) {
+      setActiveToolSection("backups");
       setCharDetail(null);
       setUserDetail(null);
       return;
@@ -616,6 +624,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       navigate("/admin/action-log");
     } else if (id === "scanner") {
       navigate("/admin/scanner");
+    } else if (id === "backups") {
+      navigate("/admin/backups");
     }
   };
 
@@ -763,11 +773,11 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       const liveUser = liveUsers.find((u) => u.id === userId);
       const unlinkUsername = liveUser?.username ?? userId;
       const unlinkParams = new URLSearchParams();
+      unlinkParams.set("username", unlinkUsername);
       if (unlinkDeleteSource) {
         unlinkParams.set("deleteSource", "true");
-        unlinkParams.set("username", unlinkUsername);
       }
-      const unlinkQuery = unlinkParams.toString() ? `?${unlinkParams.toString()}` : "";
+      const unlinkQuery = `?${unlinkParams.toString()}`;
       await axios.delete(
         `${BOT_API}/bot/api/admin/characters/${encodeURIComponent(userId)}/${encodeURIComponent(name)}${unlinkQuery}`
       );
@@ -1132,6 +1142,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
 
   const monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
     { id: "action-log", label: "Action Log", icon: FaHistory },
+    { id: "backups",    label: "Backups",    icon: FaArchive },
   ];
 
   const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [

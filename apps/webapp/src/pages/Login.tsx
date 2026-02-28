@@ -27,9 +27,7 @@ const Login = () => {
   }, [user, isLoading, navigate]);
 
   return (
-    <div className="flex flex-col justify-between items-center bg-background h-dvh py-12 px-6">
-      <div />
-
+    <div className="flex flex-col justify-center items-center bg-background h-dvh py-12 px-6">
       {/* Login card */}
       <div className="flex flex-col items-center bg-panel rounded-xl drop-shadow-[0_0_12px_rgba(0,0,0,0.4)] gap-6 px-12 py-10 w-full max-w-sm">
         <div className="flex flex-col items-center gap-3">
@@ -40,10 +38,9 @@ const Login = () => {
         <div className="bg-tertiary/20 rounded-full w-full h-px" />
 
         <div className="flex flex-col items-center gap-2 text-center">
-          <h2 className="text-xl">Welcome back</h2>
           <p className="text-tertiary text-sm leading-relaxed">
             Sign in with your Discord account to access your dashboard. Your
-            account must be an active member of the Saku guild.
+            account must be a member of Saku.
           </p>
         </div>
 
@@ -65,8 +62,6 @@ const Login = () => {
           Login with Discord
         </a>
       </div>
-
-      <p className="text-tertiary/50 text-sm">© 2024 Saku</p>
     </div>
   );
 };

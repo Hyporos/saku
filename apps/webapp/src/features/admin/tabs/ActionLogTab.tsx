@@ -13,7 +13,7 @@ import type { ActionLogCategory } from "../types";
 
 const LOG_PAGE_SIZE = 10;
 
-const CATEGORIES: ActionLogCategory[] = ["create", "edit", "delete", "transfer", "rename"];
+const CATEGORIES: ActionLogCategory[] = ["create", "edit", "delete", "transfer", "rename", "finalize", "scan"];
 
 const CATEGORY_LABEL: Record<ActionLogCategory, string> = {
   create:   "Create",
@@ -21,6 +21,8 @@ const CATEGORY_LABEL: Record<ActionLogCategory, string> = {
   delete:   "Delete",
   transfer: "Transfer",
   rename:   "Rename",
+  finalize: "Finalize",
+  scan:     "Scan",
 };
 
 // Pill styles used in table rows and the dropdown accent indicator
@@ -30,6 +32,8 @@ const CATEGORY_PILL: Record<ActionLogCategory, string> = {
   delete:   "bg-red-900/40 text-[#C87070] border-red-800/40",
   transfer: "bg-sky-900/40 text-[#6EB3D8] border-sky-800/40",
   rename:   "bg-yellow-900/40 text-[#C8A855] border-yellow-800/40",
+  finalize: "bg-teal-900/40 text-[#4ECDC4] border-teal-800/40",
+  scan:     "bg-purple-900/40 text-[#B49FDA] border-purple-800/40",
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -269,8 +273,14 @@ export const ActionLogTab = () => {
     if (entry.action === "Create Score") return true;
     if (entry.action === "Create Exception") return true;
     if (entry.action === "Rename Character") return true;
+    if (entry.action === "Link Character") return true;
     if (entry.action !== "Edit Character") return false;
     return /Member Since updated from|Graph Color updated from/i.test(entry.details);
+  };
+
+  // Hide the "Changes Made" rows for actions that only need a plain summary statement
+  const shouldHideChanges = (entry: (typeof actionLog)[number]) => {
+    return entry.action === "Unlink Character";
   };
 
   return (
@@ -401,7 +411,7 @@ export const ActionLogTab = () => {
                       <span className="text-xs text-tertiary/50 tabular-nums">{dateTime}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {entry.action === "Delete User" || entry.action === "Unlink Character" ? (
+                      {entry.action === "Delete User" || (entry.action === "Unlink Character" && !entry.details) ? (
                         <span className="text-sm text-tertiary/50">—</span>
                       ) : (
                         <button
@@ -474,7 +484,7 @@ export const ActionLogTab = () => {
                 ) : null;
               })()}
 
-              {parseDetailRows(selectedEntry.details).length > 0 && (
+              {parseDetailRows(selectedEntry.details).length > 0 && !shouldHideChanges(selectedEntry) && (
                 <div className="mt-4 rounded-xl border border-tertiary/[8%] overflow-hidden">
                   <div className="px-4 py-2.5 bg-background/40 border-b border-tertiary/[8%]">
                     <p className="text-xs uppercase tracking-wider text-tertiary/50">Changes Made</p>
@@ -483,7 +493,7 @@ export const ActionLogTab = () => {
                     {parseDetailRows(selectedEntry.details).map((row, idx) => (
                       row.oldValue === null ? (
                         <div key={`${row.label}-${idx}`} className="px-4 py-3 grid grid-cols-[1fr_2fr] gap-3 items-start">
-                          <p className="text-sm text-tertiary">{row.label}</p>
+                          <p className="text-sm text-white">{row.label}</p>
                           <p className="text-sm text-[#669A68] break-words">{row.newValue}</p>
                         </div>
                       ) : (
@@ -505,9 +515,6 @@ export const ActionLogTab = () => {
   );
 };
 
-// TODO: Log /scan
-// TODO: Add Add New to the characters list
-// TODO: Implement /scan
 // TODO: make so all members are listed as users, probably remove the Delete User from deleting characters.
 // TODO: implement culvertping, finalize, export, backup system,
 // TODO: maybe owner tab that shows all commands and stuff, lets you reload from here too etc.

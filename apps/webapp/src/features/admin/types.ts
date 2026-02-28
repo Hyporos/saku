@@ -158,9 +158,9 @@ export type ExcInlineEditState = {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-export type ToolSection = "action-log" | "scanner";
+export type ToolSection = "action-log" | "scanner" | "backups";
 
-export type ActionLogCategory = "create" | "edit" | "delete" | "transfer" | "rename";
+export type ActionLogCategory = "create" | "edit" | "delete" | "transfer" | "rename" | "finalize" | "scan";
 
 export type ActionLogEntry = {
   id: string;
@@ -180,6 +180,7 @@ export type ScanResultEntry = {
   score: number;
   sandbag: boolean;
   isNaN: boolean;
+  personalBest?: number;
 };
 
 export type ScanImageResult = {
@@ -199,6 +200,11 @@ export type FinalizeResult = {
   total: number;
   submitted: number;
   week: string;
-  backup?: string;
   backupFilename?: string;
+};
+
+export type BackupEntry = {
+  filename: string;
+  createdAt: string;
+  size: number;
 };

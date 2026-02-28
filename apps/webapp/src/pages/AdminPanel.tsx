@@ -14,6 +14,7 @@ import { CharacterDetail } from "../features/admin/tabs/CharacterDetail";
 import { UserDetail } from "../features/admin/tabs/UserDetail";
 import { ActionLogTab } from "../features/admin/tabs/ActionLogTab";
 import { ScannerTab } from "../features/admin/tabs/ScannerTab";
+import { BackupsTab } from "../features/admin/tabs/BackupsTab";
 import WarningModal from "../components/WarningModal";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -26,7 +27,7 @@ const AdminPanelLayout = () => {
 
   const renderMain = () => {
     if (activeToolSection === "action-log") return <ActionLogTab />;
-    if (activeToolSection === "scanner") return <ScannerTab />;
+    if (activeToolSection === "backups") return <BackupsTab />;
 
     if (charDetail || isCharDetailRoute) return <CharacterDetail />;
     if (userDetail || isUserDetailRoute) return <UserDetail />;
@@ -44,7 +45,13 @@ const AdminPanelLayout = () => {
       <AdminSidebar />
 
       <main className="flex-1 overflow-y-auto p-8 flex flex-col gap-6">
-        {renderMain()}
+        {/* ScannerTab is always mounted so its results survive tab switches.
+            display:contents makes it transparent to the flex layout when active;
+            display:none hides it (but keeps it alive in the tree) when inactive. */}
+        <div className={activeToolSection === "scanner" ? "contents" : "hidden"}>
+          <ScannerTab />
+        </div>
+        {activeToolSection !== "scanner" && renderMain()}
       </main>
 
       <DrawerPanel />

@@ -23,7 +23,7 @@ const actionLogSchema = new Schema(
     },
     category: {
       type: String,
-      enum: ["create", "edit", "delete", "transfer", "rename"],
+      enum: ["create", "edit", "delete", "transfer", "rename", "finalize", "scan"],
       required: true,
     },
     actorId: {

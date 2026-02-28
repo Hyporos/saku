@@ -1,13 +1,17 @@
 const culvertSchema = require("../schemas/culvertSchema.js");
 const exceptionSchema = require("../schemas/exceptionSchema.js");
 const actionLogSchema = require("../schemas/actionLogSchema.js");
+const weekSchema = require("../schemas/weekSchema.js");
 const express = require("express");
 const axios = require("axios");
 const mongoose = require("mongoose");
+const fs = require("fs");
+const path = require("path");
 
 const router = express.Router();
 const MAX_ACTION_LOG_ENTRIES = 500;
-const ACTION_LOG_CATEGORIES = new Set(["create", "edit", "delete", "transfer", "rename"]);
+const ACTION_LOG_CATEGORIES = new Set(["create", "edit", "delete", "transfer", "rename", "finalize", "scan"]);
+const BACKUPS_DIR = path.join(__dirname, "../../backups");
 const GRAPH_COLOR_NAMES = {
   "255,189,213": "Pink",
   "145,68,207": "Purple",
@@ -376,7 +380,7 @@ router.get("/admin/guild-members", async (req, res) => {
         id: m.id,
         username: m.user.username,
         nickname: m.nickname || m.user.globalName || m.user.username,
-        avatarUrl: m.displayAvatarURL({ extension: "webp", size: 64 }),
+        avatarUrl: m.displayAvatarURL({ extension: "webp", forceStatic: true, size: 64 }),
       }));
 
     list.sort((a, b) => (a.nickname ?? a.username).localeCompare(b.nickname ?? b.username));
@@ -624,7 +628,7 @@ router.delete("/admin/characters/batch", async (req, res) => {
         target: String(name),
         details: deleteSource
           ? `Deleted character ${String(name)} and its associated user ${username || userId}`
-          : undefined,
+          : `Unlinked character ${String(name)} from user ${username || userId}`,
         category: "delete",
       });
     }
@@ -667,7 +671,7 @@ router.delete("/admin/characters/:userId/:name", async (req, res) => {
       target: String(req.params.name),
       details: deleteSource
         ? `Deleted character ${String(req.params.name)} and its associated user ${unlinkUsername || String(req.params.userId)}`
-        : undefined,
+        : `Unlinked character ${String(req.params.name)} from user ${unlinkUsername || String(req.params.userId)}`,
       category: "delete",
     });
 
@@ -1149,6 +1153,43 @@ PlayerName3 0`;
       let character;
       let userDiscordId;
 
+      // I ↔ l substitution fallback: if standard matching yields nothing, try swapping I and l in
+      // the scanned name. normalizeConfusableChars already maps both to 'i', but this provides an
+      // explicit second pass for any edge cases where the chosen 4-char prefix/suffix avoids the
+      // confusable letter entirely (common in MapleStory where I and l are visually identical).
+      if (matchingNames.length === 0 && /[Il]/.test(validCharacter.name)) {
+        const variants = new Set([
+          validCharacter.name.replace(/l/g, "I"),
+          validCharacter.name.replace(/I/g, "l"),
+        ]);
+        for (const variant of variants) {
+          if (variant === validCharacter.name) continue;
+          const varIsTruncated =
+            variant.endsWith("...") || variant.endsWith("..") || variant.endsWith(".");
+          const varPrefix = varIsTruncated
+            ? (variant.endsWith("...") ? variant.slice(0, -3) : variant.endsWith("..") ? variant.slice(0, -2) : variant.slice(0, -1))
+            : null;
+          const varBeginning = varIsTruncated ? varPrefix.substring(0, 4) : variant.substring(0, 4);
+          const varEnd = varIsTruncated ? null : variant.substring(variant.length - 4);
+          for (const character of characterList) {
+            if (!character.name) continue;
+            const normChar = normalizeConfusableChars(character.name.toLowerCase());
+            const normBeg = normalizeConfusableChars(varBeginning.toLowerCase());
+            let isMatch = false;
+            if (varIsTruncated) {
+              isMatch = normChar.startsWith(normalizeConfusableChars(varPrefix.toLowerCase()));
+            } else {
+              const normEnd = normalizeConfusableChars(varEnd.toLowerCase());
+              isMatch = !!normChar.match(new RegExp(`^${normBeg}|${normEnd}$`, "gi"))?.length;
+            }
+            if (isMatch && !matchingNames.includes(character.name.toLowerCase())) {
+              matchingNames.push(character.name.toLowerCase());
+            }
+          }
+          if (matchingNames.length > 0) break;
+        }
+      }
+
       if (matchingNames.length > 1) {
         for (const duplicateName of matchingNames) {
           const searchName = isTruncated ? truncatedPrefix.toLowerCase() : validCharacter.name.toLowerCase();
@@ -1183,9 +1224,11 @@ PlayerName3 0`;
           character = user?.characters[0];
           userDiscordId = user?._id;
         } else {
-          const namePattern = `${nameBeginning}|${nameEnd}`;
+          // Use the resolved DB name from matchingNames[0] directly — the original
+          // nameBeginning|nameEnd pattern would fail if the I↔l fallback found the character
+          // via a swapped variant (e.g. OCR read 'GaIRen' but DB name is 'GalRen').
           const user = await culvertSchema.findOne(
-            { "characters.name": { $regex: `^${namePattern}$`, $options: "i" } },
+            { "characters.name": { $regex: `^${matchingNames[0]}$`, $options: "i" } },
             { "characters.$": 1, _id: 1 }
           );
           character = user?.characters[0];
@@ -1223,6 +1266,7 @@ PlayerName3 0`;
         const bestScore = sortedScores[0]?.score || 0;
         if (validCharacter.score !== 0 && !isNaN(validCharacter.score) && validCharacter.score < bestScore * 0.85) {
           validCharacter.sandbag = true;
+          validCharacter.personalBest = bestScore;
         }
       } else {
         totalFailure++;
@@ -1238,6 +1282,7 @@ PlayerName3 0`;
         score: v.score,
         sandbag: v.sandbag,
         isNaN: NaNScores.some((n) => n.name === v.name),
+        ...(v.sandbag && v.personalBest ? { personalBest: v.personalBest } : {}),
       }));
 
     res.json({
@@ -1263,12 +1308,38 @@ PlayerName3 0`;
  */
 router.post("/admin/scanner/log", async (req, res) => {
   try {
-    const { week, imageCount, totalSuccess, totalFailure } = req.body;
+    const { weekLabel, imageCount, matched = [], notFound = [], anomalies = [] } = req.body;
+    const target = weekLabel || "Unknown Week";
+
+    // Build a structured details string: first segment is the summary (shown as Detail Summary)
+    // in the action log modal; subsequent Key: Value pairs populate the Changes Made section.
+    const parts = [`Scanned ${imageCount} image${imageCount !== 1 ? "s" : ""} for ${target}`];
+
+    for (const m of matched) {
+      if (m.isNaN) {
+        parts.push(`${m.name} (NaN Score): NaN`);
+      } else if (m.sandbag) {
+        parts.push(`${m.name} (Sandbag): ${m.score}`);
+      } else if (m.score === 0) {
+        parts.push(`${m.name} (Zero Score): 0`);
+      } else {
+        parts.push(`${m.name}: ${m.score}`);
+      }
+    }
+
+    for (const nf of notFound) {
+      parts.push(`${nf.name} (Not Found): —`);
+    }
+
+    for (const anomaly of anomalies) {
+      parts.push(`${anomaly.name} (Score Anomaly): ${anomaly.score} above previous ${anomaly.previousScore}`);
+    }
+
     await writeActionLog(req, {
       action: "Scan Scores",
-      target: `${week}`,
-      details: `Scanned ${imageCount} image${imageCount !== 1 ? "s" : ""} | ${totalSuccess} matched | ${totalFailure} not found | Week: ${week}`,
-      category: "create",
+      target,
+      details: parts.join(" | "),
+      category: "scan",
     });
     res.json({ ok: true });
   } catch (error) {
@@ -1312,30 +1383,139 @@ router.post("/admin/scanner/finalize", async (req, res) => {
     // Create backup
     const data = await culvertSchema.find({});
     const jsonData = JSON.stringify(data, null, 2);
-    const backupBase64 = Buffer.from(jsonData, "utf-8").toString("base64");
+    const backupFilename = `saku_culvert_${selectedWeek}_${Date.now()}.json`;
+
+    // Save backup to disk
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+    fs.writeFileSync(path.join(BACKUPS_DIR, backupFilename), jsonData, "utf-8");
+
+    const submitted = allCharacters.length - missedCharacters.length;
+    const total = allCharacters.length;
+
+    const summaryLine = missedCharacters.length > 0
+      ? `${submitted}/${total} scores submitted for week of ${selectedWeek}`
+      : `All scores submitted for week of ${selectedWeek}`;
+
+    const weekLabel = week === "this_week" ? `This Week (${selectedWeek})` : `Last Week (${selectedWeek})`;
+    const overrideUsed = missedCharacters.length > 0 && !!override;
 
     await writeActionLog(req, {
       action: "Finalize Scores",
-      target: `${selectedWeek}`,
-      details: `${missedCharacters.length > 0
-        ? `${allCharacters.length - missedCharacters.length}/${allCharacters.length} scores`
-        : "All scores"
-      } submitted for week of ${selectedWeek}`,
-      category: "create",
+      target: weekLabel,
+      details: `${summaryLine} | Backup: ${backupFilename}${overrideUsed ? " | Override: true" : ""}`,
+      category: "finalize",
     });
+
+    // Build scores snapshot (all characters that have a score this week, sorted desc)
+    const scoresSnapshot = allCharacters
+      .filter((c) => c.scores.some((s) => s.date === selectedWeek))
+      .map((c) => {
+        const entry = c.scores.find((s) => s.date === selectedWeek);
+        return { name: c.name, score: entry.score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    // Upsert the week record
+    await weekSchema.findOneAndUpdate(
+      { week: selectedWeek },
+      { week: selectedWeek, finalized: true, override: overrideUsed, submitted, total, scores: scoresSnapshot },
+      { upsert: true, new: true }
+    );
 
     res.json({
       success: true,
       missedCharacters,
-      total: allCharacters.length,
-      submitted: allCharacters.length - missedCharacters.length,
+      total,
+      submitted,
       week: selectedWeek,
-      backup: backupBase64,
-      backupFilename: `culvert-${selectedWeek}.json`,
+      backupFilename,
     });
   } catch (error) {
     console.error("Finalize error:", error);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Weeks routes
+
+/**
+ * GET /admin/weeks
+ * Returns all week records ordered by date descending.
+ */
+router.get("/admin/weeks", async (req, res) => {
+  try {
+    const weeks = await weekSchema
+      .find({}, "week finalized override submitted total")
+      .sort({ week: -1 })
+      .lean();
+    res.json({ weeks });
+  } catch (error) {
+    console.error("Weeks list error:", error);
+    res.status(500).json({ error: "Failed to list weeks" });
+  }
+});
+
+/**
+ * GET /admin/weeks/:date
+ * Returns the full week record including the scores snapshot.
+ */
+router.get("/admin/weeks/:date(\\d{4}-\\d{2}-\\d{2})", async (req, res) => {
+  try {
+    const { date } = req.params;
+    const weekRecord = await weekSchema.findOne({ week: date }).lean();
+    if (!weekRecord) return res.status(404).json({ error: "Week not found" });
+    res.json(weekRecord);
+  } catch (error) {
+    console.error("Week detail error:", error);
+    res.status(500).json({ error: "Failed to get week" });
+  }
+});
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Backups routes
+
+/**
+ * GET /admin/backups
+ * Returns a list of all saved backup files.
+ */
+router.get("/admin/backups", (req, res) => {
+  try {
+    if (!fs.existsSync(BACKUPS_DIR)) return res.json({ backups: [] });
+
+    const backups = fs
+      .readdirSync(BACKUPS_DIR)
+      .filter((f) => f.endsWith(".json"))
+      .map((filename) => {
+        const stat = fs.statSync(path.join(BACKUPS_DIR, filename));
+        return { filename, createdAt: stat.mtime.toISOString(), size: stat.size };
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ backups });
+  } catch (error) {
+    console.error("Backups list error:", error);
+    res.status(500).json({ error: "Failed to list backups" });
+  }
+});
+
+/**
+ * GET /admin/backups/:filename
+ * Returns the parsed JSON content of a single backup file.
+ */
+router.get("/admin/backups/:filename", (req, res) => {
+  try {
+    const { filename } = req.params;
+    if (!/^saku_culvert_[\d-]+_\d+\.json$/.test(filename)) {
+      return res.status(400).json({ error: "Invalid filename" });
+    }
+    const filePath = path.join(BACKUPS_DIR, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Backup not found" });
+    const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    res.json({ filename, content });
+  } catch (error) {
+    console.error("Backup read error:", error);
+    res.status(500).json({ error: "Failed to read backup" });
   }
 });
 

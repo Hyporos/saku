@@ -2,12 +2,15 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import dayjs from "dayjs";
 import { cn } from "../../../lib/utils";
-import { FaLink, FaChevronDown } from "react-icons/fa";
+import { FaTimes, FaChevronDown } from "react-icons/fa";
 import { useAdminContext } from "../context";
 import { inputCls, BOT_API } from "../constants";
 import { useNotifications } from "../../../context/NotificationContext";
+import DatePicker from "../../../components/DatePicker";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+// Discord CDN serves GIF avatars for animated profile pictures — static is enforced server-side via forceStatic
 
 type GuildMember = {
   id: string;
@@ -32,29 +35,42 @@ export const LinkCharacterModal = ({ isOpen, onClose }: Props) => {
   // Guild members for autocomplete
   const [guildMembers, setGuildMembers] = useState<GuildMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState(false);
+
+  const fetchGuildMembers = () => {
+    setMembersLoading(true);
+    setMembersError(false);
+    axios
+      .get<GuildMember[]>(`${BOT_API}/bot/api/admin/guild-members`, { withCredentials: true })
+      .then((res) => setGuildMembers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setMembersError(true))
+      .finally(() => setMembersLoading(false));
+  };
 
   // Form state
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<GuildMember | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [charInput, setCharInput] = useState("");
-  const [memberSince, setMemberSince] = useState(dayjs().format("MMM DD, YYYY"));
+  const [memberSince, setMemberSince] = useState(dayjs().format("YYYY-MM-DD"));
   const [verifyState, setVerifyState] = useState<VerifyState>("idle");
   const [verifiedName, setVerifiedName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [creating, setCreating] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when dropdown opens
+  useEffect(() => {
+    if (dropdownOpen) searchInputRef.current?.focus();
+  }, [dropdownOpen]);
 
   // Fetch guild members on open
   useEffect(() => {
     if (!isOpen) return;
-    setMembersLoading(true);
-    axios
-      .get<GuildMember[]>(`${BOT_API}/bot/api/admin/guild-members`)
-      .then((res) => setGuildMembers(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setGuildMembers([]))
-      .finally(() => setMembersLoading(false));
+    fetchGuildMembers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Reset state on close
@@ -64,11 +80,13 @@ export const LinkCharacterModal = ({ isOpen, onClose }: Props) => {
       setSelectedUser(null);
       setDropdownOpen(false);
       setCharInput("");
-      setMemberSince(dayjs().format("MMM DD, YYYY"));
+      setMemberSince(dayjs().format("YYYY-MM-DD"));
       setVerifyState("idle");
       setVerifiedName("");
       setErrorMsg("");
       setCreating(false);
+      setGuildMembers([]);
+      setMembersError(false);
     }
   }, [isOpen]);
 
@@ -165,40 +183,39 @@ export const LinkCharacterModal = ({ isOpen, onClose }: Props) => {
 
   const canVerify = charInput.trim().length > 0 && verifyState !== "loading" && !!selectedUser;
   const isVerified = verifyState === "found";
+  const submitDisabled = isVerified ? creating : !canVerify;
 
   return (
     <>
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60]"
+        className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40"
         onClick={onClose}
       />
-      <div className="fixed inset-0 flex items-center justify-center z-[70] pointer-events-none">
-        <div
-          className="bg-panel border border-tertiary/[8%] rounded-2xl p-8 w-[480px] pointer-events-auto drop-shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col gap-5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Icon + title */}
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center mt-0.5">
-              <FaLink size={14} className="text-accent" />
-            </div>
-            <div>
-              <h3 className="text-lg">Link Character</h3>
-              <p className="text-sm text-tertiary mt-1 leading-relaxed">
-                Select a Discord user and enter the character name to link.
-              </p>
-            </div>
+
+      {/* Drawer panel */}
+      <div className="fixed right-0 top-0 h-full w-[420px] bg-panel border-l border-tertiary/[8%] z-50 overflow-y-auto flex flex-col">
+
+        {/* Header */}
+        <div className="flex justify-between items-center px-8 py-6 border-b border-tertiary/[8%]">
+          <div>
+            <h2 className="text-xl">Link Character</h2>
+            <p className="text-tertiary text-sm mt-0.5">Link a new character for a user in the guild.</p>
           </div>
+          <button onClick={onClose} className="text-tertiary hover:text-white transition-colors">
+            <FaTimes size={16} />
+          </button>
+        </div>
+
+        {/* Fields */}
+        <div className="flex flex-col gap-5 px-8 py-6 flex-1">
 
           {/* Discord user select with autocomplete */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-tertiary/70 uppercase tracking-wider">Discord User</label>
             <div className="relative" ref={dropdownRef}>
               <div
-                className={cn(
-                  inputCls,
-                  "flex items-center gap-2 cursor-pointer"
-                )}
+                className={cn(inputCls, "flex items-center gap-2 cursor-pointer")}
                 onClick={() => setDropdownOpen(!dropdownOpen)}
               >
                 {selectedUser ? (
@@ -222,47 +239,63 @@ export const LinkCharacterModal = ({ isOpen, onClose }: Props) => {
                   )}
                 />
               </div>
-              {dropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-panel border border-tertiary/20 rounded-lg shadow-lg z-[10] max-h-[240px] overflow-hidden flex flex-col">
-                  <div className="px-3 py-2 border-b border-tertiary/10">
-                    <input
-                      type="text"
-                      placeholder="Search members..."
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none w-full"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="overflow-y-auto flex-1">
-                    {membersLoading ? (
-                      <p className="px-3 py-4 text-sm text-tertiary/50 text-center">Loading members...</p>
-                    ) : filteredMembers.length === 0 ? (
-                      <p className="px-3 py-4 text-sm text-tertiary/50 text-center">No members found</p>
-                    ) : (
-                      filteredMembers.slice(0, 50).map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => handleSelectUser(m)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-background/60 transition-colors text-left"
-                        >
-                          <img
-                            src={m.avatarUrl}
-                            alt=""
-                            className="w-5 h-5 rounded-full flex-shrink-0"
-                          />
-                          <span className="text-sm text-white truncate flex-1">
-                            {m.nickname || m.username}
-                          </span>
-                          {m.nickname !== m.username && (
-                            <span className="text-xs text-tertiary/40">{m.username}</span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
+              <div
+                className={cn(
+                  "absolute top-full left-0 right-0 mt-1 bg-panel border border-tertiary/20 rounded-lg shadow-lg z-[10] overflow-hidden flex flex-col",
+                  "transition-all duration-150 ease-in-out",
+                  dropdownOpen
+                    ? "max-h-[240px] opacity-100 pointer-events-auto"
+                    : "max-h-0 opacity-0 pointer-events-none"
+                )}
+              >
+                <div className="px-3 py-2 border-b border-tertiary/10">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search members..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none w-full"
+                  />
                 </div>
-              )}
+                <div className="overflow-y-auto flex-1">
+                  {membersLoading ? (
+                    <p className="px-3 py-4 text-sm text-tertiary/50 text-center">Loading members...</p>
+                  ) : membersError ? (
+                    <div className="px-3 py-4 text-center">
+                      <p className="text-sm text-[#C87070] mb-2">Failed to load members</p>
+                      <button
+                        onClick={fetchGuildMembers}
+                        className="text-xs text-accent hover:text-accent/80 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : filteredMembers.length === 0 ? (
+                    <p className="px-3 py-4 text-sm text-tertiary/50 text-center">No members found</p>
+                  ) : (
+                    filteredMembers.slice(0, 50).map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => handleSelectUser(m)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-background/60 transition-colors text-left"
+                      >
+                        <img
+                          src={m.avatarUrl}
+                          alt=""
+                          className="w-5 h-5 rounded-full flex-shrink-0"
+                        />
+                        <span className="text-sm text-white truncate flex-1">
+                          {m.nickname || m.username}
+                        </span>
+                        {m.nickname !== m.username && (
+                          <span className="text-xs text-tertiary/40">{m.username}</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -292,42 +325,44 @@ export const LinkCharacterModal = ({ isOpen, onClose }: Props) => {
           {/* Member Since */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-tertiary/70 uppercase tracking-wider">Member Since</label>
-            <input
-              className={cn(inputCls)}
-              placeholder="e.g. Jun 15, 2024"
+            <DatePicker
               value={memberSince}
-              onChange={(e) => setMemberSince(e.target.value)}
+              onChange={setMemberSince}
+              placeholder="Select Date"
+              subtle
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 mt-1">
-            <button
-              disabled={isVerified ? creating : !canVerify}
-              onClick={isVerified ? handleCreate : handleVerify}
-              className={cn(
-                "flex-1 rounded-lg py-2.5 text-sm transition-colors",
-                (isVerified || canVerify) && !creating
-                  ? "bg-accent/15 hover:bg-accent/20 text-accent"
-                  : "bg-background/60 text-tertiary/30 cursor-default"
-              )}
-            >
-              {verifyState === "loading"
-                ? "Verifying..."
-                : creating
-                  ? "Creating..."
-                  : isVerified
-                    ? "Create"
-                    : "Verify Name"}
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 bg-background hover:bg-background/60 text-tertiary rounded-lg py-2.5 text-sm transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 px-8 py-6 border-t border-tertiary/[8%]">
+          <button
+            disabled={submitDisabled}
+            onClick={isVerified ? handleCreate : handleVerify}
+            className={cn(
+              "flex-1 rounded-lg py-2.5 text-sm transition-colors",
+              !submitDisabled
+                ? "bg-accent/15 hover:bg-accent/20 text-accent"
+                : "bg-tertiary/10 text-tertiary/40 cursor-default"
+            )}
+          >
+            {verifyState === "loading"
+              ? "Verifying..."
+              : creating
+                ? "Creating..."
+                : isVerified
+                  ? "Create"
+                  : "Verify Name"}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-background hover:bg-background/60 text-tertiary rounded-lg py-2.5 text-sm transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+
       </div>
     </>
   );

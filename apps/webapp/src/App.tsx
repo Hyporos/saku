@@ -91,6 +91,7 @@ function App() {
           <Route path="/admin/exceptions"         element={<AdminRoute />} />
           <Route path="/admin/action-log"         element={<AdminRoute />} />
           <Route path="/admin/scanner"            element={<AdminRoute />} />
+          <Route path="/admin/backups"            element={<AdminRoute />} />
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
