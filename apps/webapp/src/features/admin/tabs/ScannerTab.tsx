@@ -297,34 +297,42 @@ export const ScannerTab = () => {
     const failed: ImageFile[] = [];
     const notFoundFps = new Set<string>();
 
-    for (let i = 0; i < images.length; i++) {
-      const imageName = images[i].file.name || `Image ${i + 1}`;
-      setProgress({
-        current: i + 1,
-        total: images.length,
-        message: `Analyzing image ${i + 1} of ${images.length}`,
-        imageName,
-      });
-
-      try {
-        const payload = await fileToBase64(images[i].file);
+    // Dispatch all images in parallel — each image fires its own scan request concurrently
+    // instead of waiting for the previous one to finish. Progress updates as each resolves.
+    let completedCount = 0;
+    const scanResults = await Promise.allSettled(
+      images.map(async (img, i) => {
+        const payload = await fileToBase64(img.file);
         const { data } = await axios.post<ScanImageResult>(
           `${BOT_API}/bot/api/admin/scanner/scan`,
           { image: payload, week },
           { withCredentials: true, timeout: 120_000 }
         );
+        setProgress({
+          current: ++completedCount,
+          total: images.length,
+          message: `Analyzed ${completedCount} of ${images.length} images`,
+          imageName: img.file.name || `Image ${i + 1}`,
+        });
+        return { img, data };
+      })
+    );
 
+    for (let i = 0; i < scanResults.length; i++) {
+      const result = scanResults[i];
+      if (result.status === "fulfilled") {
+        const { img, data } = result.value;
         aggregated.week = data.week;
         aggregated.success.push(...data.success);
         aggregated.notFound.push(...data.notFound);
-        if (data.notFound.length > 0) notFoundFps.add(images[i].fingerprint);
+        if (data.notFound.length > 0) notFoundFps.add(img.fingerprint);
         aggregated.nanScores.push(...data.nanScores);
         aggregated.zeroScores.push(...data.zeroScores);
         aggregated.totalSuccess += data.totalSuccess;
         aggregated.totalFailure += data.totalFailure;
         aggregated.totalScanned += data.totalScanned;
-      } catch (err) {
-        console.error("Scan failed for image", i, err);
+      } else {
+        console.error("Scan failed for image", i, result.reason);
         failed.push(images[i]);
       }
     }

@@ -1025,6 +1025,29 @@ function normalizeConfusableChars(str) {
     .replace(/[O0]/g, "o");
 }
 
+// Short-lived cache for scan base data — coalesces concurrent parallel scan requests
+// (e.g. 5 images dispatched at once) into a single DB round-trip instead of N duplicates.
+let _scanDataCache = null;
+let _scanDataCacheTime = 0;
+const SCAN_CACHE_TTL_MS = 10_000;
+
+function getScanBaseData() {
+  const now = Date.now();
+  if (_scanDataCache && now - _scanDataCacheTime < SCAN_CACHE_TTL_MS) {
+    return _scanDataCache;
+  }
+  _scanDataCacheTime = now;
+  _scanDataCache = Promise.all([
+    culvertSchema.find({}, { characters: 1, _id: 1 }).lean(),
+    exceptionSchema.find({}).lean(),
+  ]).catch((err) => {
+    // On error clear cache so next request retries
+    _scanDataCache = null;
+    throw err;
+  });
+  return _scanDataCache;
+}
+
 /**
  * POST /admin/scanner/scan
  * Body: { image: { data: base64, mimeType: string }, week: "this_week" | "last_week" }
@@ -1039,10 +1062,31 @@ router.post("/admin/scanner/scan", async (req, res) => {
 
     const { lastReset, reset } = getResetDates();
     const selectedWeek = week === "this_week" ? reset : lastReset;
-    const characterList = await getAllCharacters();
-    const exceptions = await exceptionSchema.find({});
 
-    // Init Gemini AI
+    // Fetch all character data (with discordIds) and exceptions in parallel.
+    // Building in-memory lookup maps eliminates N individual DB queries per scan.
+    // getScanBaseData() caches the result briefly to serve all concurrent images from one DB read.
+    const [allUsers, exceptions] = await getScanBaseData();
+
+    // Flat list for name-matching loops (same shape as getAllCharacters())
+    const characterList = [];
+    // name(lower) → { char fields + discordId } — used instead of per-char findOne()
+    const charDetailMap = new Map();
+    // names that already have a score this week — replaces per-char isScoreSubmitted()
+    const hasScoreThisWeek = new Set();
+
+    for (const user of allUsers) {
+      for (const char of user.characters ?? []) {
+        if (!char.name) continue;
+        const key = char.name.toLowerCase();
+        characterList.push(char);
+        charDetailMap.set(key, { ...char, discordId: user._id });
+        if (char.scores?.some((s) => String(s.date) === String(selectedWeek))) {
+          hasScoreThisWeek.add(key);
+        }
+      }
+    }
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
 
@@ -1105,6 +1149,9 @@ PlayerName3 0`;
       }
       validScores.push({ name: checkedName, score, sandbag: false });
     }
+
+    // Bulk write operations — collected below, executed in a single batched call
+    const bulkOps = [];
 
     // Match against DB characters
     for (const validCharacter of validScores) {
@@ -1190,55 +1237,35 @@ PlayerName3 0`;
         }
       }
 
+      // Resolve character from in-memory map — replaces per-character culvertSchema.findOne()
       if (matchingNames.length > 1) {
-        for (const duplicateName of matchingNames) {
-          const searchName = isTruncated ? truncatedPrefix.toLowerCase() : validCharacter.name.toLowerCase();
-          const normalizedDuplicate = normalizeConfusableChars(duplicateName);
+        const searchName = isTruncated ? truncatedPrefix.toLowerCase() : validCharacter.name.toLowerCase();
+        for (const candidateName of matchingNames) {
+          const normalizedCandidate = normalizeConfusableChars(candidateName);
           const normalizedSearch = normalizeConfusableChars(searchName);
-
-          if (isTruncated) {
-            if (normalizedDuplicate.startsWith(normalizedSearch)) {
-              const user = await culvertSchema.findOne(
-                { "characters.name": { $regex: `^${duplicateName}$`, $options: "i" } },
-                { "characters.$": 1, _id: 1 }
-              );
-              character = user?.characters[0];
-              userDiscordId = user?._id;
-              break;
+          const isHit = isTruncated
+            ? normalizedCandidate.startsWith(normalizedSearch)
+            : normalizedCandidate.includes(normalizedSearch);
+          if (isHit) {
+            const detail = charDetailMap.get(candidateName);
+            if (detail) {
+              character = detail;
+              userDiscordId = detail.discordId;
+              if (isTruncated) break;
             }
-          } else if (normalizedDuplicate.includes(normalizedSearch)) {
-            const user = await culvertSchema.findOne(
-              { "characters.name": { $regex: `^${duplicateName}$`, $options: "i" } },
-              { "characters.$": 1, _id: 1 }
-            );
-            character = user?.characters[0];
-            userDiscordId = user?._id;
           }
         }
       } else if (matchingNames.length === 1) {
-        if (isTruncated) {
-          const user = await culvertSchema.findOne(
-            { "characters.name": { $regex: `^${matchingNames[0]}$`, $options: "i" } },
-            { "characters.$": 1, _id: 1 }
-          );
-          character = user?.characters[0];
-          userDiscordId = user?._id;
-        } else {
-          // Use the resolved DB name from matchingNames[0] directly — the original
-          // nameBeginning|nameEnd pattern would fail if the I↔l fallback found the character
-          // via a swapped variant (e.g. OCR read 'GaIRen' but DB name is 'GalRen').
-          const user = await culvertSchema.findOne(
-            { "characters.name": { $regex: `^${matchingNames[0]}$`, $options: "i" } },
-            { "characters.$": 1, _id: 1 }
-          );
-          character = user?.characters[0];
-          userDiscordId = user?._id;
+        // Use charDetailMap directly — works for both normal and I↔l fallback matches
+        const detail = charDetailMap.get(matchingNames[0]);
+        if (detail) {
+          character = detail;
+          userDiscordId = detail.discordId;
         }
       }
 
       if (character && dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, "week"))) {
         totalSuccess++;
-        const scoreExists = await isScoreSubmitted(character.name, selectedWeek);
         const oldName = validCharacter.name;
         validCharacter.name = character.name;
         validCharacter.discordId = userDiscordId;
@@ -1248,18 +1275,25 @@ PlayerName3 0`;
         const zeroEntry = zeroScores.find((z) => z.name === oldName || z.name === character.name);
         if (zeroEntry) { zeroEntry.name = character.name; zeroEntry.discordId = userDiscordId; }
 
+        const scoreValue = !isNaN(validCharacter.score) ? validCharacter.score : 0;
+        // hasScoreThisWeek replaces the per-character isScoreSubmitted() aggregation pipeline
+        const scoreExists = hasScoreThisWeek.has(character.name.toLowerCase());
         if (!scoreExists) {
-          await culvertSchema.findOneAndUpdate(
-            { "characters.name": validCharacter.name },
-            { $addToSet: { "characters.$[nameElem].scores": { score: !isNaN(validCharacter.score) ? validCharacter.score : 0, date: selectedWeek } } },
-            { arrayFilters: [{ "nameElem.name": character.name }], new: true }
-          );
+          bulkOps.push({
+            updateOne: {
+              filter: { "characters.name": character.name },
+              update: { $addToSet: { "characters.$[nameElem].scores": { score: scoreValue, date: selectedWeek } } },
+              arrayFilters: [{ "nameElem.name": character.name }],
+            },
+          });
         } else {
-          await culvertSchema.findOneAndUpdate(
-            { "characters.name": character.name, "characters.scores.date": selectedWeek },
-            { $set: { "characters.$[nameElem].scores.$[dateElem].score": !isNaN(validCharacter.score) ? validCharacter.score : 0 } },
-            { arrayFilters: [{ "nameElem.name": character.name }, { "dateElem.date": selectedWeek }], new: true }
-          );
+          bulkOps.push({
+            updateOne: {
+              filter: { "characters.name": character.name, "characters.scores.date": selectedWeek },
+              update: { $set: { "characters.$[nameElem].scores.$[dateElem].score": scoreValue } },
+              arrayFilters: [{ "nameElem.name": character.name }, { "dateElem.date": selectedWeek }],
+            },
+          });
         }
 
         const sortedScores = [...character.scores].sort((a, b) => b.score - a.score);
@@ -1272,6 +1306,11 @@ PlayerName3 0`;
         totalFailure++;
         notFoundChars.push({ name: validCharacter.name, discordId: userDiscordId });
       }
+    }
+
+    // Execute all score writes in a single batched operation
+    if (bulkOps.length > 0) {
+      await culvertSchema.bulkWrite(bulkOps, { ordered: false });
     }
 
     // Build result
