@@ -513,6 +513,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const toolSectionLabel = (ts: ToolSection) =>
+    ts === "scanner" ? "Culvert Scanner" : ts === "action-log" ? "Action Log" : "Backups";
+
   const pushCurrentToBackTrail = () => {
     if (charDetail) {
       pushBackEntry({ label: charDetail.name, path: buildCharPath(charDetail.name) });
@@ -520,6 +523,10 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     }
     if (userDetail) {
       pushBackEntry({ label: userDetail.username ?? "User", path: `/admin/users/${userDetail._id}` });
+      return;
+    }
+    if (activeToolSection) {
+      pushBackEntry({ label: toolSectionLabel(activeToolSection), path: location.pathname });
       return;
     }
     pushBackEntry({ label: sectionLabel(activeSection), path: location.pathname });
@@ -566,12 +573,28 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
+  const toolSectionForPath = (path: string): ToolSection | null => {
+    if (path.startsWith("/admin/scanner")) return "scanner";
+    if (path.startsWith("/admin/action-log")) return "action-log";
+    if (path.startsWith("/admin/backups")) return "backups";
+    return null;
+  };
+
   const goBackFromTrail = () => {
     const target = backTrail[backTrail.length - 1];
     setPrevContext(null);
     if (target) {
       setBackTrail((prev) => prev.slice(0, -1));
+      const toolSec = toolSectionForPath(target.path);
+      if (toolSec) {
+        setCharDetail(null);
+        setUserDetail(null);
+        setActiveToolSection(toolSec);
+        navigate(target.path);
+        return;
+      }
       setActiveSection(sectionForPath(target.path));
+      setActiveToolSection(null);
       const hydrated = hydrateDetailFromPath(target.path);
       if (!hydrated) {
         setCharDetail(null);
@@ -601,9 +624,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     navigate(paths[id]);
     setUserSearch(""); setCharSearch(""); setScoreSearch(""); setExcSearch("");
     setUserPage(1); setCharPage(1); setScorePage(1); setExcPage(1);
-    setUserSort(null);
-    setCharSort(null);
-    setScoreSort(null);
+    setUserSort({ field: "username", dir: "asc" });
+    setCharSort({ field: "memberSince", dir: "desc" });
+    setScoreSort({ field: "date", dir: "desc" });
     // defaults: exceptions should start sorted by character descending
     setExcSort(id === "exceptions" ? { field: "name", dir: "desc" } : null);
     setScoreDateFilter("");
@@ -1146,7 +1169,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   ];
 
   const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
-    { id: "scanner", label: "Scanner", icon: FaCamera },
+    { id: "scanner", label: "Culvert Scanner", icon: FaCamera },
   ];
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //

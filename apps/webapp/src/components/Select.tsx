@@ -22,6 +22,10 @@ interface SelectProps {
   align?: "left" | "right";
   placeholder?: string;
   className?: string;
+  // reduces vertical padding to match DatePicker compact
+  compact?: boolean;
+  // When true: label renders as text-tertiary when the first (default) option is selected, text-white otherwise
+  subtle?: boolean;
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -34,6 +38,8 @@ const Select = ({
   align = "left",
   placeholder,
   className,
+  compact,
+  subtle,
 }: SelectProps) => {
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -70,7 +76,8 @@ const Select = ({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-2.5 bg-background border rounded-lg px-3 py-1.5 text-sm text-white transition-colors focus:outline-none cursor-pointer w-full",
+          "inline-flex items-center gap-2.5 bg-background border rounded-lg px-3 text-sm text-white transition-colors focus:outline-none cursor-pointer w-full",
+          compact ? "py-1" : "py-1.5",
           open ? "border-accent/40" : "border-tertiary/20 hover:border-tertiary/40"
         )}
       >
@@ -87,7 +94,7 @@ const Select = ({
             className="w-4 h-4 rounded-full object-cover flex-shrink-0"
           />
         )}
-        <span className="flex-1 text-left">{selected?.label ?? placeholder ?? "Select…"}</span>
+        <span className={cn("flex-1 text-left", subtle && selected?.value === options[0]?.value ? "text-tertiary" : "text-white")}>{selected?.label ?? placeholder ?? "Select…"}</span>
         <FaChevronDown
           size={9}
           className={cn(

@@ -27,6 +27,7 @@ const allowedOrigins = new Set(
 
 function getRequestOrigin(req) {
   if (process.env.WEB_ORIGIN) return process.env.WEB_ORIGIN;
+  if (!isProd) return LOCAL_WEB_ORIGIN;
   const protoHeader = req.headers["x-forwarded-proto"];
   const proto = typeof protoHeader === "string"
     ? protoHeader.split(",")[0]

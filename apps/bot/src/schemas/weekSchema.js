@@ -34,6 +34,11 @@ const weekSchema = new Schema(
         score: { type: Number },
       },
     ],
+    finalizedAt: {
+      // Timestamp when finalize was completed
+      type: Date,
+      default: null,
+    },
   },
   { versionKey: false }
 );

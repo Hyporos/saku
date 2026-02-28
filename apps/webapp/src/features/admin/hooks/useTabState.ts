@@ -35,7 +35,7 @@ function applySortAndPage<T extends Record<string, any>>(
           ? dayjs(av as string).valueOf() - dayjs(bv as string).valueOf()
           : typeof av === "number" && typeof bv === "number"
             ? av - bv
-            : String(av).localeCompare(String(bv));
+            : String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0;
         return sort.dir === "asc" ? cmp : -cmp;
       })
     : items;
@@ -55,20 +55,20 @@ export function useTabState({
   // ⎯⎯ Users tab ⎯⎯ //
   const [userSearch, setUserSearch] = useState("");
   const [userPage, setUserPage] = useState(1);
-  const [userSort, setUserSort] = useState<SortState | null>(null);
+  const [userSort, setUserSort] = useState<SortState | null>({ field: "username", dir: "asc" });
   const [selUsers, setSelUsers] = useState<Set<string>>(new Set());
 
   // ⎯⎯ Characters tab ⎯⎯ //
   const [charSearch, setCharSearch] = useState("");
   const [charPage, setCharPage] = useState(1);
-  const [charSort, setCharSort] = useState<SortState | null>(null);
+  const [charSort, setCharSort] = useState<SortState | null>({ field: "memberSince", dir: "desc" });
   const [selChars, setSelChars] = useState<Set<string>>(new Set());
 
   // ⎯⎯ Scores tab ⎯⎯ //
   const [scoreSearch, setScoreSearch] = useState("");
   const [scoreDateFilter, setScoreDateFilter] = useState("");
   const [scorePage, setScorePage] = useState(1);
-  const [scoreSort, setScoreSort] = useState<SortState | null>(null);
+  const [scoreSort, setScoreSort] = useState<SortState | null>({ field: "date", dir: "desc" });
   const [selScores, setSelScores] = useState<Set<string>>(new Set());
   const [scoreTabInlineEdit, setScoreTabInlineEdit] = useState<ScoreTabInlineEditState | null>(null);
 

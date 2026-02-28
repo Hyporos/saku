@@ -94,6 +94,46 @@ const extractDetailSummary = (details?: string | null): string | null => {
   return firstSegment;
 };
 
+// Parses scan action log detail segments into { name, score, status } rows
+const parseScanEntries = (details?: string): { name: string; score: string; status: string }[] => {
+  if (!details) return [];
+  return details.split("|").map(part => part.trim()).flatMap(part => {
+    // Pattern: "CharName (Type): value"
+    const withStatus = part.match(/^(.+?)\s+\(([^)]+)\):\s*(.+)$/);
+    if (withStatus) {
+      const [, name, type, rawScore] = withStatus;
+      const scoreType = type.toLowerCase();
+      let status = type;
+      let score = rawScore;
+      if (scoreType === "score anomaly") {
+        // "12345 above previous 67890" → score is just the first number
+        const numMatch = rawScore.match(/^([\d,]+)/);
+        score = numMatch ? Number(numMatch[1].replace(/,/g, "")).toLocaleString() : rawScore;
+        status = "Anomaly";
+      } else if (scoreType === "not found") {
+        status = "Not Found";
+      } else if (scoreType === "sandbag") {
+        status = "Sandbag";
+      } else if (scoreType === "zero score") {
+        status = "Zero";
+      }
+      const numericScore = Number(rawScore.replace(/,/g, ""));
+      if (!isNaN(numericScore) && scoreType !== "score anomaly") {
+        score = numericScore.toLocaleString();
+      }
+      return [{ name: name.trim(), score, status }];
+    }
+    // Plain: "CharName: score"
+    const plain = part.match(/^(.+?):\s*(.+)$/);
+    if (plain) {
+      const numericScore = Number(plain[2].replace(/,/g, ""));
+      const score = !isNaN(numericScore) ? numericScore.toLocaleString() : plain[2];
+      return [{ name: plain[1].trim(), score, status: "ok" }];
+    }
+    return [];
+  });
+};
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 export const ActionLogTab = () => {
@@ -247,24 +287,6 @@ export const ActionLogTab = () => {
       },
     });
 
-  const SortHead = ({ label, field }: { label: string; field: string }) => (
-    <button
-      type="button"
-      onClick={() => toggleSort(field)}
-      className="inline-flex items-center gap-1.5 hover:text-white transition-colors"
-    >
-      <span>{label}</span>
-      <span
-        className={cn(
-          "inline-flex items-center leading-none transition-opacity duration-150 text-accent",
-          sort?.field === field ? "opacity-100" : "opacity-0"
-        )}
-      >
-        {sort?.field === field && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
-      </span>
-    </button>
-  );
-
   const shouldHideDetailSummary = (entry: (typeof actionLog)[number]) => {
     if (!entry?.details) return false;
     if (entry.action === "Edit Score") return true;
@@ -298,7 +320,7 @@ export const ActionLogTab = () => {
           <button
             onClick={handleClear}
             disabled={actionLog.length === 0}
-            className="w-[115px] flex items-center justify-center gap-2 bg-[#A46666]/15 border border-[#A46666]/30 text-[#C87070] hover:text-white hover:bg-[#A46666]/25 text-sm rounded-lg px-2 py-1.5 transition-colors disabled:opacity-30 disabled:cursor-default"
+            className="w-[115px] flex items-center justify-center gap-2 bg-[#A46666]/15 border border-[#A46666]/30 text-[#C87070] hover:text-white hover:bg-[#A46666]/25 text-sm rounded-lg px-3 py-1 transition-colors disabled:opacity-30 disabled:cursor-default disabled:hover:text-[#C87070] disabled:hover:bg-[#A46666]/15"
           >
             <FaTrash size={11} style={{ marginBottom: "1px" }} />
             Clear Log
@@ -325,6 +347,8 @@ export const ActionLogTab = () => {
           value={actorFilter ?? "all"}
           onChange={(v) => resetPage(() => setActorFilter(v === "all" ? null : String(v)))}
           className="w-[150px] flex-shrink-0"
+          compact
+          subtle
         />
         <Select
           variant="plain"
@@ -333,6 +357,8 @@ export const ActionLogTab = () => {
           value={categoryFilter ?? "all"}
           onChange={(v) => resetPage(() => setCategoryFilter(v === "all" ? null : (v as ActionLogCategory)))}
           className="w-[115px] flex-shrink-0"
+          compact
+          subtle
         />
         <DatePicker
           mode="range"
@@ -365,24 +391,42 @@ export const ActionLogTab = () => {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-tertiary/[8%]">
-                <th className="w-[16%] px-4 py-3 text-left">
-                  <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none"><SortHead label="User" field="actor" /></span>
+                <th onClick={() => toggleSort("actor")} className="w-[16%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                  <span className="inline-flex items-center gap-1.5">User
+                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "actor" ? "opacity-100" : "opacity-0")}>
+                      {sort?.field === "actor" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
+                    </span>
+                  </span>
                 </th>
-                <th className="w-[13%] px-4 py-3 text-left">
-                  <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none"><SortHead label="Category" field="category" /></span>
+                <th onClick={() => toggleSort("category")} className="w-[13%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                  <span className="inline-flex items-center gap-1.5">Category
+                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "category" ? "opacity-100" : "opacity-0")}>
+                      {sort?.field === "category" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
+                    </span>
+                  </span>
                 </th>
-                <th className="w-[22%] px-4 py-3 text-left">
-                  <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none"><SortHead label="Action" field="action" /></span>
+                <th onClick={() => toggleSort("action")} className="w-[22%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                  <span className="inline-flex items-center gap-1.5">Action
+                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "action" ? "opacity-100" : "opacity-0")}>
+                      {sort?.field === "action" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
+                    </span>
+                  </span>
                 </th>
-                <th className="w-[20%] px-4 py-3 text-left">
-                  <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none"><SortHead label="Target" field="target" /></span>
+                <th onClick={() => toggleSort("target")} className="w-[20%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                  <span className="inline-flex items-center gap-1.5">Target
+                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "target" ? "opacity-100" : "opacity-0")}>
+                      {sort?.field === "target" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
+                    </span>
+                  </span>
                 </th>
-                <th className="w-[18%] px-4 py-3 text-left">
-                  <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none"><SortHead label="Date & Time" field="timestamp" /></span>
+                <th onClick={() => toggleSort("timestamp")} className="w-[18%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                  <span className="inline-flex items-center gap-1.5">Date &amp; Time
+                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "timestamp" ? "opacity-100" : "opacity-0")}>
+                      {sort?.field === "timestamp" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
+                    </span>
+                  </span>
                 </th>
-                <th className="w-[16%] px-4 py-3 text-left">
-                  <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none">Details</span>
-                </th>
+                <th className="w-[16%] px-4 py-3 text-left text-xs text-tertiary font-medium uppercase tracking-wider select-none">Details</th>
               </tr>
             </thead>
             <tbody>
@@ -404,7 +448,7 @@ export const ActionLogTab = () => {
                     <td className="px-4 py-3">
                       <span className="text-sm text-white">{entry.action}</span>
                     </td>
-                    <td className="px-4 py-3 overflow-hidden">
+                    <td className="px-4 py-4 overflow-hidden">
                       <span className="text-sm text-tertiary truncate block">{entry.target}</span>
                     </td>
                     <td className="px-4 py-3">
@@ -484,12 +528,54 @@ export const ActionLogTab = () => {
                 ) : null;
               })()}
 
-              {parseDetailRows(selectedEntry.details).length > 0 && !shouldHideChanges(selectedEntry) && (
+              {selectedEntry.category === "scan" && parseScanEntries(selectedEntry.details).length > 0 && (
+                <div className="mt-4 rounded-xl border border-tertiary/[8%] overflow-hidden">
+                  <div className="px-4 py-2.5 bg-background/40 border-b border-tertiary/[8%]">
+                    <p className="text-xs uppercase tracking-wider text-tertiary/50">Scan Results</p>
+                  </div>
+                  <div className="max-h-[280px] overflow-y-auto">
+                    <table className="w-full text-sm table-fixed">
+                      <thead className="sticky top-0 bg-panel border-b border-tertiary/[6%]">
+                        <tr>
+                          <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2">Character</th>
+                          <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2 w-28">Score</th>
+                          <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2 w-24">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parseScanEntries(selectedEntry.details).map((row, idx) => (
+                          <tr key={idx} className="border-t border-tertiary/[6%]">
+                            <td className="px-4 py-2.5 text-sm text-white">{row.name}</td>
+                            <td className="px-4 py-2.5 text-sm tabular-nums text-white">{row.score}</td>
+                            <td className="px-4 py-2.5 text-xs">
+                              {row.status === "ok" ? (
+                                <span className="text-[#669A68]">&#10003;</span>
+                              ) : row.status === "Anomaly" ? (
+                                <span className="text-[#D4915E]">Anomaly</span>
+                              ) : row.status === "Sandbag" ? (
+                                <span className="text-[#C8A855]">Sandbag</span>
+                              ) : row.status === "Zero" ? (
+                                <span className="text-tertiary/50">Zero</span>
+                              ) : row.status === "Not Found" ? (
+                                <span className="text-[#C87070]">Not Found</span>
+                              ) : (
+                                <span className="text-tertiary/50">{row.status}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {selectedEntry.category !== "scan" && parseDetailRows(selectedEntry.details).length > 0 && !shouldHideChanges(selectedEntry) && (
                 <div className="mt-4 rounded-xl border border-tertiary/[8%] overflow-hidden">
                   <div className="px-4 py-2.5 bg-background/40 border-b border-tertiary/[8%]">
                     <p className="text-xs uppercase tracking-wider text-tertiary/50">Changes Made</p>
                   </div>
-                  <div className="divide-y divide-tertiary/[8%]">
+                  <div className="max-h-[280px] overflow-y-auto divide-y divide-tertiary/[8%]">
                     {parseDetailRows(selectedEntry.details).map((row, idx) => (
                       row.oldValue === null ? (
                         <div key={`${row.label}-${idx}`} className="px-4 py-3 grid grid-cols-[1fr_2fr] gap-3 items-start">
@@ -519,3 +605,5 @@ export const ActionLogTab = () => {
 // TODO: implement culvertping, finalize, export, backup system,
 // TODO: maybe owner tab that shows all commands and stuff, lets you reload from here too etc.
 // todo: action log differ pamel vs command. make admin buttons purple
+// todo: Make sure that the scan bot command also logs this the same way. Same with the finalize command from the bot. Also, druu should always be excempt from scan results and finalization
+// todo: fix lightbox arrow look

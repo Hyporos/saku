@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { FaArchive, FaEye, FaTimes, FaSpinner } from "react-icons/fa";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { FaArchive, FaSpinner, FaPlus, FaUpload, FaChevronUp, FaChevronDown, FaDownload } from "react-icons/fa";
 import axios from "axios";
 import { cn } from "../../../lib/utils";
 import { BOT_API } from "../constants";
 import { useNotifications } from "../../../context/NotificationContext";
+import useAuth from "../../../hooks/useAuth";
 import type { BackupEntry } from "../types";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -26,20 +27,29 @@ const formatSize = (bytes: number): string => {
   return `${(kb / 1024).toFixed(2)} MB`;
 };
 
+const getBackupCategory = (filename: string): string => {
+  if (filename.startsWith("saku_culvert_")) return "Culvert";
+  return "Unknown";
+};
+
+type SortField = "filename" | "category" | "date" | "size";
+type BackupSort = { field: SortField; dir: "asc" | "desc" } | null;
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 export const BackupsTab = () => {
   const { notify } = useNotifications();
+  const { user } = useAuth();
+  const ownerId = import.meta.env.VITE_OWNER_ID as string | undefined;
+  const isOwner = user?.id === ownerId;
 
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Modal state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalAnimating, setModalAnimating] = useState(false);
-  const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
-  const [modalContent, setModalContent] = useState<object | null>(null);
-  const [loadingContent, setLoadingContent] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [sort, setSort] = useState<BackupSort>({ field: "date", dir: "desc" });
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const fetchBackups = useCallback(async () => {
     setLoading(true);
@@ -61,145 +71,220 @@ export const BackupsTab = () => {
     fetchBackups();
   }, [fetchBackups]);
 
-  const openModal = async (filename: string) => {
-    setSelectedFilename(filename);
-    setModalContent(null);
-    setModalVisible(true);
-    setLoadingContent(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => setModalAnimating(true)));
+  const toggleSort = (field: SortField) => {
+    setSort((prev) => {
+      if (prev?.field === field) {
+        if (prev.dir === "asc") return { field, dir: "desc" };
+        return null;
+      }
+      return { field, dir: "asc" };
+    });
+  };
 
+  const sortedBackups = [...backups].sort((a, b) => {
+    if (!sort) return 0;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    if (sort.field === "filename") return dir * a.filename.localeCompare(b.filename);
+    if (sort.field === "category") return dir * getBackupCategory(a.filename).localeCompare(getBackupCategory(b.filename));
+    if (sort.field === "size") return dir * (a.size - b.size);
+    return dir * (new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf());
+  });
+
+  const handleDownload = async (filename: string) => {
+    setDownloading(filename);
     try {
       const { data } = await axios.get<{ filename: string; content: object }>(
         `${BOT_API}/bot/api/admin/backups/${encodeURIComponent(filename)}`,
         { withCredentials: true }
       );
-      setModalContent(data.content);
+      const blob = new Blob([JSON.stringify(data.content, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
-      notify("error", msg ?? "Failed to load backup content");
-      closeModal();
+      notify("error", msg ?? "Failed to download backup");
     } finally {
-      setLoadingContent(false);
+      setDownloading(null);
     }
   };
 
-  const closeModal = () => {
-    setModalAnimating(false);
-    setTimeout(() => {
-      setModalVisible(false);
-      setSelectedFilename(null);
-      setModalContent(null);
-    }, 220);
+  const handleCreateBackup = async () => {
+    setCreating(true);
+    try {
+      const { data } = await axios.post<{ success: boolean; filename: string; createdAt: string; size: number }>(
+        `${BOT_API}/bot/api/admin/backups`,
+        {},
+        { withCredentials: true }
+      );
+      notify("success", `Backup created: ${data.filename}`);
+      setBackups((prev) => [{ filename: data.filename, createdAt: data.createdAt, size: data.size }, ...prev]);
+    } catch (err) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
+      notify("error", msg ?? "Failed to create backup");
+    } finally {
+      setCreating(false);
+    }
   };
 
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+  const handleImportChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const content = JSON.parse(text);
+      const { data } = await axios.post<{ success: boolean; filename: string; createdAt: string; size: number }>(
+        `${BOT_API}/bot/api/admin/backups/import`,
+        { content },
+        { withCredentials: true }
+      );
+      notify("success", `Backup imported: ${data.filename}`);
+      setBackups((prev) => [{ filename: data.filename, createdAt: data.createdAt, size: data.size }, ...prev]);
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        notify("error", "Invalid JSON file");
+      } else {
+        const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
+        notify("error", msg ?? "Failed to import backup");
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+  // Render
+
+  const TableSortHead = ({ label, field }: { label: string; field: SortField }) => (
+    <span
+      onClick={() => toggleSort(field)}
+      className="inline-flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
+    >
+      {label}
+      <span
+        className={cn(
+          "inline-flex items-center text-accent transition-opacity duration-150",
+          sort?.field === field ? "opacity-100" : "opacity-0"
+        )}
+      >
+        {sort?.field === field && sort.dir === "asc" ? (
+          <FaChevronUp size={9} />
+        ) : (
+          <FaChevronDown size={9} />
+        )}
+      </span>
+    </span>
+  );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FaArchive size={16} className="text-tertiary/70" />
-          <h2 className="text-lg">Backups</h2>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-2xl border border-tertiary/[8%] overflow-hidden">
-
-        {loading ? (
-          <div className="px-6 py-16 flex flex-col items-center gap-3 text-tertiary/50">
-            <FaSpinner size={20} className="animate-spin" />
-            <p className="text-sm">Loading backups…</p>
+      <div className="flex items-center justify-between px-6 py-5">
+        <h2 className="text-xl">Backups</h2>
+        {isOwner && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCreateBackup}
+              disabled={creating}
+              className="flex items-center gap-2 text-sm bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent rounded-lg px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {creating ? <FaSpinner size={11} className="animate-spin" /> : <FaPlus size={11} />}
+              Create Backup
+            </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-2 text-sm text-tertiary hover:text-white border border-tertiary/20 hover:border-tertiary/40 rounded-lg px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {importing ? <FaSpinner size={11} className="animate-spin" /> : <FaUpload size={11} />}
+              Import
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleImportChange}
+            />
           </div>
-        ) : backups.length === 0 ? (
-          <div className="px-6 py-16 flex flex-col items-center gap-3 text-tertiary/50">
-            <FaArchive size={20} />
-            <p className="text-sm">No backups found</p>
-          </div>
-        ) : (
-          <>
-            {/* Column headers */}
-            <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-panel border-b border-tertiary/[8%]">
-              <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider">Filename</span>
-              <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider">Date</span>
-              <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider">Size</span>
-              <span className="text-xs text-tertiary/50 font-medium uppercase tracking-wider">View</span>
-            </div>
-
-            <div className="divide-y divide-tertiary/[8%]">
-              {backups.map((backup) => (
-                <div
-                  key={backup.filename}
-                  className="grid grid-cols-[2fr_1fr_1fr_auto] gap-4 px-6 py-3.5 items-center hover:bg-white/[2%] transition-colors"
-                >
-                  <span className="text-sm font-mono text-white/90 truncate">{backup.filename}</span>
-                  <span className="text-sm text-tertiary tabular-nums">{formatDate(backup.createdAt)}</span>
-                  <span className="text-sm text-tertiary tabular-nums">{formatSize(backup.size)}</span>
-                  <button
-                    onClick={() => openModal(backup.filename)}
-                    className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 transition-colors"
-                  >
-                    <FaEye size={12} />
-                    View
-                  </button>
-                </div>
-              ))}
-            </div>
-          </>
         )}
       </div>
 
-      {/* JSON viewer modal */}
-      {modalVisible && (
-        <>
-          <div
-            className={cn(
-              "fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[80] transition-opacity duration-200",
-              modalAnimating ? "opacity-100" : "opacity-0"
-            )}
-            onClick={closeModal}
-          />
-          <div className="fixed inset-0 flex items-center justify-center z-[90] pointer-events-none">
-            <div
-              className={cn(
-                "bg-panel border border-tertiary/[8%] rounded-2xl p-6 w-[720px] max-w-[94vw] max-h-[80vh] flex flex-col pointer-events-auto drop-shadow-[0_6px_24px_rgba(0,0,0,0.45)] transition-all duration-200",
-                modalAnimating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal header */}
-              <div className="flex items-start justify-between gap-4 mb-4 flex-shrink-0">
-                <div>
-                  <h3 className="text-lg">Backup Contents</h3>
-                  <p className="text-sm text-tertiary mt-0.5 font-mono">{selectedFilename}</p>
-                </div>
-                <button
-                  onClick={closeModal}
-                  className="text-tertiary/50 hover:text-white transition-colors"
-                  aria-label="Close"
-                >
-                  <FaTimes size={13} />
-                </button>
-              </div>
+      <div className="bg-tertiary/20 h-px" />
 
-              {/* JSON content */}
-              <div className="flex-1 min-h-0 rounded-xl border border-tertiary/[8%] overflow-hidden bg-background/60">
-                {loadingContent ? (
-                  <div className="flex items-center justify-center h-full py-16 text-tertiary/50 gap-3">
-                    <FaSpinner size={16} className="animate-spin" />
-                    <span className="text-sm">Loading…</span>
-                  </div>
-                ) : (
-                  <pre className="text-xs text-white/80 font-mono leading-relaxed p-4 overflow-auto h-full whitespace-pre-wrap break-words">
-                    {modalContent != null ? JSON.stringify(modalContent, null, 2) : ""}
-                  </pre>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
+      {/* Body */}
+      {loading ? (
+        <div className="px-6 py-16 flex flex-col items-center gap-3 text-tertiary/50">
+          <FaSpinner size={20} className="animate-spin" />
+          <p className="text-sm">Loading backups...</p>
+        </div>
+      ) : backups.length === 0 ? (
+        <div className="px-6 py-16 flex flex-col items-center gap-3 text-tertiary/50">
+          <FaArchive size={24} />
+          <p className="text-sm">No backups found</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-b-xl">
+          <table className={cn("w-full table-fixed", !isOwner && "opacity-100")}>
+            <thead>
+              <tr className="border-b border-tertiary/[8%]">
+                <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wider px-4 py-3 select-none">
+                  <TableSortHead label="Filename" field="filename" />
+                </th>
+                <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wider px-4 py-3 select-none w-[180px]">
+                  <TableSortHead label="Category" field="category" />
+                </th>
+                <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wider px-4 py-3 select-none w-[250px]">
+                  <TableSortHead label="Date" field="date" />
+                </th>
+                <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wider px-4 py-3 select-none w-[150px]">
+                  <TableSortHead label="Size" field="size" />
+                </th>
+                <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wider px-4 py-3 select-none w-[160px]">
+                  Download
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedBackups.map((backup) => (
+                <tr key={backup.filename} className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors">
+                  <td className="px-4 py-3 overflow-hidden">
+                    <span className="text-sm font-mono text-white truncate block">{backup.filename}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs bg-accent/10 border border-accent/30 text-accent rounded-full px-2 py-0.5">
+                      {getBackupCategory(backup.filename)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-tertiary tabular-nums">{formatDate(backup.createdAt)}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-tertiary tabular-nums">{formatSize(backup.size)}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleDownload(backup.filename)}
+                      disabled={downloading === backup.filename}
+                      className="flex items-center gap-1.5 text-xs bg-background/70 border border-tertiary/20 hover:border-accent/40 text-tertiary hover:text-white rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40"
+                    >
+                      {downloading === backup.filename
+                        ? <FaSpinner size={10} className="animate-spin" />
+                        : <FaDownload size={10} />}
+                      Download
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

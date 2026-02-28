@@ -38,7 +38,7 @@ const writeActionLog = async (req, entry) => {
   await actionLogSchema.create({
     action: String(entry.action).trim().slice(0, 120),
     target: String(entry.target).trim().slice(0, 200),
-    details: entry.details ? String(entry.details).trim().slice(0, 800) : null,
+    details: entry.details ? String(entry.details).trim().slice(0, 8000) : null,
     category: String(entry.category).trim().toLowerCase(),
     actorId,
     timestamp: new Date(),
@@ -943,6 +943,7 @@ router.post("/admin/exceptions", async (req, res) => {
     const exception = String(req.body?.exception ?? "").trim();
     if (!name) return res.status(400).json({ error: "Name is required" });
     await exceptionSchema.create({ name, exception });
+    clearScanCache();
     await writeActionLog(req, {
       action: "Create Exception",
       target: name,
@@ -1026,10 +1027,14 @@ function normalizeConfusableChars(str) {
 }
 
 // Short-lived cache for scan base data — coalesces concurrent parallel scan requests
-// (e.g. 5 images dispatched at once) into a single DB round-trip instead of N duplicates.
 let _scanDataCache = null;
 let _scanDataCacheTime = 0;
 const SCAN_CACHE_TTL_MS = 10_000;
+
+function clearScanCache() {
+  _scanDataCache = null;
+  _scanDataCacheTime = 0;
+}
 
 function getScanBaseData() {
   const now = Date.now();
@@ -1038,13 +1043,9 @@ function getScanBaseData() {
   }
   _scanDataCacheTime = now;
   _scanDataCache = Promise.all([
-    culvertSchema.find({}, { characters: 1, _id: 1 }).lean(),
-    exceptionSchema.find({}).lean(),
-  ]).catch((err) => {
-    // On error clear cache so next request retries
-    _scanDataCache = null;
-    throw err;
-  });
+      culvertSchema.find({}, { characters: 1, _id: 1 }).read("primary").lean(),
+      exceptionSchema.find({}).read("primary").lean(),
+  ]);
   return _scanDataCache;
 }
 
@@ -1088,7 +1089,12 @@ router.post("/admin/scanner/scan", async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3.1-flash-image-preview",
+      generationConfig: {
+        temperature: 0.0,
+      },
+    });
 
     const prompt = `Analyze this MapleStory guild culvert participation screenshot.
 
@@ -1157,6 +1163,14 @@ PlayerName3 0`;
     for (const validCharacter of validScores) {
       const matchingNames = [];
 
+      // Fast-path: exception-resolved names already carry the exact DB character name.
+      // A direct case-insensitive lookup avoids fuzzy-match false negatives for short names.
+      const directHit = charDetailMap.get(validCharacter.name.toLowerCase());
+      if (directHit) {
+        // Skip the entire fuzzy loop and jump straight to the success/failure block below.
+        matchingNames.push(validCharacter.name.toLowerCase());
+      }
+
       const isTruncated =
         validCharacter.name.endsWith("...") ||
         validCharacter.name.endsWith("..") ||
@@ -1176,23 +1190,25 @@ PlayerName3 0`;
         nameEnd = validCharacter.name.substring(validCharacter.name.length - 4);
       }
 
-      for (const character of characterList) {
-        if (!character.name) continue;
-        if (isTruncated) {
-          const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
-          const normalizedPrefix = normalizeConfusableChars(truncatedPrefix.toLowerCase());
-          if (normalizedCharName.startsWith(normalizedPrefix)) {
-            matchingNames.push(character.name.toLowerCase());
-          }
-        } else {
-          const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
-          const normalizedBeginning = normalizeConfusableChars(nameBeginning.toLowerCase());
-          const normalizedEnd = normalizeConfusableChars(nameEnd.toLowerCase());
-          const isNameMatching = normalizedCharName.match(
-            new RegExp(`^${normalizedBeginning}|${normalizedEnd}$`, "gi")
-          );
-          if (isNameMatching && isNameMatching.length > 0) {
-            matchingNames.push(character.name.toLowerCase());
+      if (matchingNames.length === 0) {
+        for (const character of characterList) {
+          if (!character.name) continue;
+          if (isTruncated) {
+            const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
+            const normalizedPrefix = normalizeConfusableChars(truncatedPrefix.toLowerCase());
+            if (normalizedCharName.startsWith(normalizedPrefix)) {
+              matchingNames.push(character.name.toLowerCase());
+            }
+          } else {
+            const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
+            const normalizedBeginning = normalizeConfusableChars(nameBeginning.toLowerCase());
+            const normalizedEnd = normalizeConfusableChars(nameEnd.toLowerCase());
+            const isNameMatching = normalizedCharName.match(
+              new RegExp(`^${normalizedBeginning}|${normalizedEnd}$`, "gi")
+            );
+            if (isNameMatching && isNameMatching.length > 0) {
+              matchingNames.push(character.name.toLowerCase());
+            }
           }
         }
       }
@@ -1431,9 +1447,7 @@ router.post("/admin/scanner/finalize", async (req, res) => {
     const submitted = allCharacters.length - missedCharacters.length;
     const total = allCharacters.length;
 
-    const summaryLine = missedCharacters.length > 0
-      ? `${submitted}/${total} scores submitted for week of ${selectedWeek}`
-      : `All scores submitted for week of ${selectedWeek}`;
+    const summaryLine = `${submitted}/${total} scores submitted for week of ${selectedWeek}`;
 
     const weekLabel = week === "this_week" ? `This Week (${selectedWeek})` : `Last Week (${selectedWeek})`;
     const overrideUsed = missedCharacters.length > 0 && !!override;
@@ -1457,7 +1471,7 @@ router.post("/admin/scanner/finalize", async (req, res) => {
     // Upsert the week record
     await weekSchema.findOneAndUpdate(
       { week: selectedWeek },
-      { week: selectedWeek, finalized: true, override: overrideUsed, submitted, total, scores: scoresSnapshot },
+      { week: selectedWeek, finalized: true, override: overrideUsed, submitted, total, scores: scoresSnapshot, finalizedAt: new Date() },
       { upsert: true, new: true }
     );
 
@@ -1485,7 +1499,7 @@ router.post("/admin/scanner/finalize", async (req, res) => {
 router.get("/admin/weeks", async (req, res) => {
   try {
     const weeks = await weekSchema
-      .find({}, "week finalized override submitted total")
+      .find({}, "week finalized override submitted total finalizedAt")
       .sort({ week: -1 })
       .lean();
     res.json({ weeks });
@@ -1539,13 +1553,59 @@ router.get("/admin/backups", (req, res) => {
 });
 
 /**
+ * POST /admin/backups
+ * Creates a manual culvert backup.
+ */
+router.post("/admin/backups", async (req, res) => {
+  try {
+    const data = await culvertSchema.find({});
+    const jsonData = JSON.stringify(data, null, 2);
+    const backupFilename = `saku_culvert_manual_${Date.now()}.json`;
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+    fs.writeFileSync(path.join(BACKUPS_DIR, backupFilename), jsonData, "utf-8");
+    const stat = fs.statSync(path.join(BACKUPS_DIR, backupFilename));
+    res.json({ success: true, filename: backupFilename, createdAt: stat.mtime.toISOString(), size: stat.size });
+  } catch (error) {
+    console.error("Manual backup error:", error);
+    res.status(500).json({ error: "Failed to create backup" });
+  }
+});
+
+/**
+ * POST /admin/backups/import
+ * Saves an imported JSON backup to disk.
+ */
+router.post("/admin/backups/import", (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || typeof content !== "object") {
+      return res.status(400).json({ error: "Invalid backup content" });
+    }
+    const importFilename = `saku_culvert_import_${Date.now()}.json`;
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+    fs.writeFileSync(path.join(BACKUPS_DIR, importFilename), JSON.stringify(content, null, 2), "utf-8");
+    const stat = fs.statSync(path.join(BACKUPS_DIR, importFilename));
+    writeActionLog(req, {
+      action: "Import Backup",
+      target: importFilename,
+      details: null,
+      category: "finalize",
+    });
+    res.json({ success: true, filename: importFilename, createdAt: stat.mtime.toISOString(), size: stat.size });
+  } catch (error) {
+    console.error("Import backup error:", error);
+    res.status(500).json({ error: "Failed to import backup" });
+  }
+});
+
+/**
  * GET /admin/backups/:filename
  * Returns the parsed JSON content of a single backup file.
  */
 router.get("/admin/backups/:filename", (req, res) => {
   try {
     const { filename } = req.params;
-    if (!/^saku_culvert_[\d-]+_\d+\.json$/.test(filename)) {
+    if (!/^saku_culvert_[^/\\<>:"|?*]+\.json$/.test(filename)) {
       return res.status(400).json({ error: "Invalid filename" });
     }
     const filePath = path.join(BACKUPS_DIR, filename);
