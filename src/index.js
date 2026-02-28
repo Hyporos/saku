@@ -1,0 +1,196 @@
+const {
+  Client,
+  Collection,
+  GatewayIntentBits,
+  Partials,
+  EmbedBuilder
+} = require("discord.js");
+const fs = require("node:fs");
+const path = require("node:path");
+const cron = require("cron");
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+dayjs.extend(utc);
+dayjs.extend(timezone);
+const User = require("./schemas/userSchema");
+const { createScheduledJob } = require("./utility/botUtils");
+require("dotenv").config();
+const express = require("express");
+const routes = require("./routes/routes");
+const cors = require("cors");
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const app = express();
+
+app.use(express.json({ limit: "50mb" }));
+
+app.use(cors());
+
+const PORT = process.env.PORT || 25637;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server Started at ${PORT}`);
+});
+
+app.use("/api", routes);
+
+// Create a new client instance
+const client = new Client({
+  intents:
+    [GatewayIntentBits.Guilds] |
+    [GatewayIntentBits.GuildMembers] |
+    [GatewayIntentBits.MessageContent] |
+    [GatewayIntentBits.GuildMessages] |
+    [GatewayIntentBits.GuildMessageReactions],
+  partials: [Partials.GuildMember],
+});
+
+// Make the Discord client accessible inside Express route handlers via req.app.get("client")
+app.set("client", client);
+
+const remindersScanChannel = "1090002887410729090";
+const sakuChannel = "719788426022617142";
+const announcementsChannel = '720002714683179070';
+
+// DST offset- 0 during standard time, 1 during DST
+const dstOffset = 0;
+
+// 1:00 PM EST every day
+const ursusAfternoonEvent = createScheduledJob(
+  client,
+  sakuChannel,
+  `0 ${13 + dstOffset} * * *`,
+  () => {
+    const now = dayjs().tz("America/New_York").hour(13 + dstOffset).minute(0).second(0);
+    const end = now.add(4, 'hours');
+    return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
+  }
+);
+
+// 8:00 PM EST every day
+const ursusNightEvent = createScheduledJob(
+  client,
+  sakuChannel,
+  `0 ${20 + dstOffset} * * *`,
+  () => {
+    const now = dayjs().tz("America/New_York").hour(20 + dstOffset).minute(0).second(0);
+    const end = now.add(4, 'hours');
+    return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
+  }
+);
+
+// Wednesday 7:00 PM EST
+const updateGuildJob = createScheduledJob(
+  client,
+  remindersScanChannel,
+  `0 ${19 + dstOffset} * * 3`,
+  "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
+);
+
+// Monday 8:00 AM EST
+const culvertFlagJobMondayAM = createScheduledJob(
+  client,
+  sakuChannel,
+  `0 ${8 + dstOffset} * * 1`,
+  "Reminder to complete Culvert and Flag Race!"
+);
+
+// Monday 8:00 PM EST
+const culvertFlagJobMondayPM = createScheduledJob(
+  client,
+  sakuChannel,
+  `0 ${20 + dstOffset} * * 1`,
+  "Reminder to complete Culvert and Flag Race!"
+);
+
+// Wednesday 8:00 AM EST
+const culvertFlagJobWednesdayAM = createScheduledJob(
+  client,
+  sakuChannel,
+  `0 ${8 + dstOffset} * * 3`,
+  "Reminder to complete Culvert and Flag Race!"
+);
+
+// Sunday 8:00 PM EST
+const culvertFlagJobSundayPM = createScheduledJob(
+  client,
+  sakuChannel,
+  `0 ${20 + dstOffset} * * 0`,
+  "https://media.discordapp.net/attachments/1147319860481765500/1435854458381668445/image.png?ex=690e23eb&is=690cd26b&hm=67db9a7562919556cccd537f67c07d353ac7658ff7e2ba2f5e42cd1818efa3ca&=&format=webp&quality=lossless"
+);
+
+const mpReminderEmbed = new EmbedBuilder()
+  .setTitle("Spiegelmann's Watching")
+  .setDescription("Get your EXP coupons!")
+  .setColor(0xffc3c5);
+
+// 7:00 PM EST every Saturday
+const mpReminderJob = createScheduledJob(
+  client,
+  announcementsChannel,
+  `0 ${19 + dstOffset} * * 6`,
+  {
+    content: "<@&962201169588019221>", // Ping for MP role
+    embeds: [mpReminderEmbed],
+  }
+);
+
+// Start cron jobs
+ursusAfternoonEvent.start();
+ursusNightEvent.start();
+
+updateGuildJob.start();
+
+culvertFlagJobMondayAM.start();
+culvertFlagJobMondayPM.start();
+culvertFlagJobWednesdayAM.start();
+culvertFlagJobSundayPM.start();
+
+mpReminderJob.start();
+
+// Grab all of the slash command files
+client.commands = new Collection();
+
+const foldersPath = path.join(__dirname, "commands");
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+  const commandsPath = path.join(foldersPath, folder);
+  const commandFiles = fs
+    .readdirSync(commandsPath)
+    .filter((file) => file.endsWith(".js"));
+
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+
+    if ("data" in command && "execute" in command) {
+      client.commands.set(command.data.name, command);
+    } else {
+      console.log(
+        `Warning - The command at ${filePath} is missing a required "data" or "execute" property`
+      );
+    }
+  }
+}
+
+// Grab all of the event handler files
+const eventsPath = path.join(__dirname, "events");
+const eventFiles = fs
+  .readdirSync(eventsPath)
+  .filter((file) => file.endsWith(".js"));
+
+for (const file of eventFiles) {
+  const filePath = path.join(eventsPath, file);
+  const event = require(filePath);
+
+  if (event.once) {
+    client.once(event.name, (...args) => event.execute(...args));
+  } else {
+    client.on(event.name, (...args) => event.execute(...args));
+  }
+}
+
+// Log in to Discord with the bot's token
+client.login(process.env.DISCORD_TOKEN);
