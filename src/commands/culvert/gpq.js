@@ -16,21 +16,21 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("gpq")
     .setDescription("Log your culvert score for this week")
-    .addStringOption((option) =>
-      option
-        .setName("character")
-        .setDescription("The character that the score will be logged to")
-        .setRequired(true)
-        .setAutocomplete(true)
-    )
     .addIntegerOption((option) =>
       option
         .setName("score")
         .setDescription("The score to be logged")
         .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("character")
+        .setDescription("The character that the score will be logged to")
+        .setRequired(false)
+        .setAutocomplete(true)
     ),
 
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async autocomplete(interaction) {
     const user = await culvertSchema.findById(
@@ -63,8 +63,20 @@ module.exports = {
 
   async execute(interaction) {
     // Parse the command arguments
-    const characterOption = interaction.options.getString("character");
+    let characterOption = interaction.options.getString("character");
     const scoreOption = interaction.options.getInteger("score");
+
+    // If no character was specified, auto-select if the user only has one linked
+    if (!characterOption) {
+      const user = await culvertSchema.findById(interaction.user.id, "characters");
+      if (!user || user.characters.length === 0) {
+        return interaction.reply("Error - You have no characters linked yet.");
+      }
+      if (user.characters.length > 1) {
+        return interaction.reply("Error - You have multiple characters linked. Please specify which character to log the score for");
+      }
+      characterOption = user.characters[0].name;
+    }
 
     // Get the current reset date (Thursday 12:00 AM UTC)
     const { reset } = getResetDates();
@@ -162,12 +174,27 @@ module.exports = {
     }
 
     // Handle Responses
-    interaction.reply(
-      `${character.name} has ${
-        scoreExists ? "been updated" : "scored"
-      } **${scoreOption}**${
-        scoreOption > bestScore ? " :trophy:" : ""
-      } for this week! (${reset})`
-    );
+    const isNewPB = scoreOption > bestScore;
+
+    if (scoreExists) {
+      // If updating an existing score, clarify which week
+      await interaction.reply(
+        `${character.name}'s score has been updated to **${scoreOption}**${isNewPB ? " :trophy:" : ""} for this week! (${reset})`
+      );
+    } else {
+      // If scoring for the first time this week, clarify which week
+      await interaction.reply(
+        `${character.name} has scored **${scoreOption}**${isNewPB ? " :trophy:" : ""} for this week! (${reset})`
+      );
+    }
+
+    // React to the message
+    const reply = await interaction.fetchReply();
+    await reply.react("1236258713153568879"); // sakuThumbShadow for all scores
+    
+    // Add sakuStonks reaction for personal bests
+    if (isNewPB) {
+      await reply.react("1134552911033139381"); // sakuStonks for PBs
+    }
   },
 };
