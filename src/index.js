@@ -3,22 +3,14 @@ const {
   Collection,
   GatewayIntentBits,
   Partials,
-  EmbedBuilder
 } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
-const cron = require("cron");
-const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const timezone = require("dayjs/plugin/timezone");
-dayjs.extend(utc);
-dayjs.extend(timezone);
-const User = require("./schemas/userSchema");
-const { createScheduledJob } = require("./utility/botUtils");
 require("dotenv").config();
 const express = require("express");
 const routes = require("./routes/routes");
 const cors = require("cors");
+const { loadDstOffset, saveDstState, JOB_DEFINITIONS, computeNextRun, startAllJobs } = require("./utility/cronRegistry");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -49,105 +41,28 @@ const client = new Client({
 // Make the Discord client accessible inside Express route handlers via req.app.get("client")
 app.set("client", client);
 
-const remindersScanChannel = "1090002887410729090";
-const sakuChannel = "719788426022617142";
-const announcementsChannel = '720002714683179070';
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// DST state & cron registry (see utility/cronRegistry.js)
 
-// DST offset- 0 during standard time, 1 during DST
-const dstOffset = 0;
+let dstOffset = loadDstOffset();
 
-// 1:00 PM EST every day
-const ursusAfternoonEvent = createScheduledJob(
-  client,
-  sakuChannel,
-  `0 ${13 + dstOffset} * * *`,
-  () => {
-    const now = dayjs().tz("America/New_York").hour(13 + dstOffset).minute(0).second(0);
-    const end = now.add(4, 'hours');
-    return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
-  }
-);
+// Keeps references to running CronJob instances so they can be stopped on DST toggle.
+const activeJobs = {};
 
-// 8:00 PM EST every day
-const ursusNightEvent = createScheduledJob(
-  client,
-  sakuChannel,
-  `0 ${20 + dstOffset} * * *`,
-  () => {
-    const now = dayjs().tz("America/New_York").hour(20 + dstOffset).minute(0).second(0);
-    const end = now.add(4, 'hours');
-    return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
-  }
-);
+// Expose the cron registry so route handlers can read state and trigger DST toggles
+// via req.app.get("cronRegistry").
+app.set("cronRegistry", {
+  getDstOffset: () => dstOffset,
+  setDstOffset: (newOffset) => {
+    dstOffset = newOffset;
+    saveDstState(newOffset);
+    startAllJobs(client, activeJobs, newOffset);
+  },
+  getDefinitions: () => JOB_DEFINITIONS,
+  computeNextRun: (def) => computeNextRun(def, dstOffset),
+});
 
-// Wednesday 7:00 PM EST
-const updateGuildJob = createScheduledJob(
-  client,
-  remindersScanChannel,
-  `0 ${19 + dstOffset} * * 3`,
-  "<@&720001044746076181> Please put in gskill points and update culvert scores for the week!"
-);
-
-// Monday 8:00 AM EST
-const culvertFlagJobMondayAM = createScheduledJob(
-  client,
-  sakuChannel,
-  `0 ${8 + dstOffset} * * 1`,
-  "Reminder to complete Culvert and Flag Race!"
-);
-
-// Monday 8:00 PM EST
-const culvertFlagJobMondayPM = createScheduledJob(
-  client,
-  sakuChannel,
-  `0 ${20 + dstOffset} * * 1`,
-  "Reminder to complete Culvert and Flag Race!"
-);
-
-// Wednesday 8:00 AM EST
-const culvertFlagJobWednesdayAM = createScheduledJob(
-  client,
-  sakuChannel,
-  `0 ${8 + dstOffset} * * 3`,
-  "Reminder to complete Culvert and Flag Race!"
-);
-
-// Sunday 8:00 PM EST
-const culvertFlagJobSundayPM = createScheduledJob(
-  client,
-  sakuChannel,
-  `0 ${20 + dstOffset} * * 0`,
-  "https://media.discordapp.net/attachments/1147319860481765500/1435854458381668445/image.png?ex=690e23eb&is=690cd26b&hm=67db9a7562919556cccd537f67c07d353ac7658ff7e2ba2f5e42cd1818efa3ca&=&format=webp&quality=lossless"
-);
-
-const mpReminderEmbed = new EmbedBuilder()
-  .setTitle("Spiegelmann's Watching")
-  .setDescription("Get your EXP coupons!")
-  .setColor(0xffc3c5);
-
-// 7:00 PM EST every Saturday
-const mpReminderJob = createScheduledJob(
-  client,
-  announcementsChannel,
-  `0 ${19 + dstOffset} * * 6`,
-  {
-    content: "<@&962201169588019221>", // Ping for MP role
-    embeds: [mpReminderEmbed],
-  }
-);
-
-// Start cron jobs
-ursusAfternoonEvent.start();
-ursusNightEvent.start();
-
-updateGuildJob.start();
-
-culvertFlagJobMondayAM.start();
-culvertFlagJobMondayPM.start();
-culvertFlagJobWednesdayAM.start();
-culvertFlagJobSundayPM.start();
-
-mpReminderJob.start();
+startAllJobs(client, activeJobs, dstOffset);
 
 // Grab all of the slash command files
 client.commands = new Collection();

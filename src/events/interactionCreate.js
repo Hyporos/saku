@@ -1,4 +1,5 @@
 const { Events } = require("discord.js");
+const { buildChecklistMessage, parseCompletionsFromMessage } = require("../utility/checklistUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -98,6 +99,29 @@ module.exports = {
           `Error - Could not execute the /${interaction.commandName} command`
         );
         console.error(error);
+      }
+    }
+
+    // Handle button interactions
+    else if (interaction.isButton()) {
+      if (interaction.customId.startsWith("checklist_")) {
+        const displayName = interaction.member?.displayName || interaction.user.username;
+        const completions = parseCompletionsFromMessage(interaction.message);
+        const existing = completions.get(interaction.customId);
+
+        if (existing !== undefined) {
+          // Only the person who checked it can uncheck it
+          if (existing === displayName) {
+            completions.delete(interaction.customId);
+          } else {
+            await interaction.deferUpdate();
+            return;
+          }
+        } else {
+          completions.set(interaction.customId, displayName);
+        }
+
+        await interaction.update(buildChecklistMessage(completions));
       }
     }
 

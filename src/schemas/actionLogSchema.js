@@ -19,7 +19,7 @@ const actionLogSchema = new Schema(
     details: {
       type: String,
       default: null,
-      maxlength: 800,
+      maxlength: 8000,
     },
     category: {
       type: String,

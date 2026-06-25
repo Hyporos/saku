@@ -322,7 +322,7 @@ PlayerName3 0`;
 
       // Perform the logic to set the score for the character
       // Don't perform any operations on characters that joined after the reset date
-      if (character && dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, 'week'))) {
+      if (character && (!character.memberSince || dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, 'week')))) {
         successCount++;
 
         // Check if a score has already been set for the selected week
