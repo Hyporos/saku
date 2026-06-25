@@ -1,20 +1,53 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { cn } from "../lib/utils";
+import { Button } from "./Button";
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+// "red"     — destructive actions (delete, remove)
+// "primary" — miscellaneous confirmations
+// "owner"   — owner-only actions (clear log, etc.)
+export type DialogColorVariant = "red" | "primary" | "owner";
+
+const colorVariantStyles: Record<
+  DialogColorVariant,
+  { iconBg: string; btnVariant: "danger" | "primary" | "owner" }
+> = {
+  red:     { iconBg: "bg-[#A46666]/10", btnVariant: "danger"  },
+  primary: { iconBg: "bg-accent/10",    btnVariant: "primary" },
+  owner:   { iconBg: "bg-lavender/10",  btnVariant: "owner"   },
+};
+
+const defaultIconColor: Record<DialogColorVariant, string> = {
+  red:     "text-[#A46666]",
+  primary: "text-accent",
+  owner:   "text-lavender",
+};
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 interface WarningModalProps {
   isOpen: boolean;
   // "confirm" — single click to confirm.
-  // "sensitive" — user must type "delete" before confirming.
+  // "sensitive" — user must type a word before confirming.
   variant?: "confirm" | "sensitive";
+  // Color scheme for the icon circle and confirm button.
+  colorVariant?: DialogColorVariant;
+  // Custom icon node (defaults to FaExclamationTriangle styled per colorVariant).
+  icon?: ReactNode;
   title: ReactNode;
   description: string;
+  /** Extra content rendered between the description and the action buttons */
+  children?: ReactNode;
   confirmLabel?: string;
   // Word the user must type in the sensitive variant to enable confirm (default: "delete")
   confirmWord?: string;
-  // When true, styles the icon + confirm button in red instead of the default accent-pink
+  /** Externally disables the confirm button (combined with AND with internal canConfirm) */
+  confirmDisabled?: boolean;
+  /** Loading state on the confirm button */
+  confirmLoading?: boolean;
+  // Legacy: forces "red" colorVariant when true (ignored if colorVariant is set explicitly)
   confirmDanger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -25,10 +58,15 @@ interface WarningModalProps {
 const WarningModal = ({
   isOpen,
   variant = "confirm",
+  colorVariant,
+  icon,
   title,
   description,
+  children,
   confirmLabel = "Delete",
   confirmWord,
+  confirmDisabled = false,
+  confirmLoading,
   confirmDanger = false,
   onConfirm,
   onCancel,
@@ -59,8 +97,16 @@ const WarningModal = ({
 
   const word = confirmWord ?? "delete";
   const canConfirm =
-    variant === "confirm" || confirmInput.toLowerCase() === word.toLowerCase();
-  const useDangerStyle = confirmDanger || variant === "sensitive";
+    (variant === "confirm" || confirmInput.toLowerCase() === word.toLowerCase()) &&
+    !confirmDisabled;
+
+  // colorVariant takes priority; legacy confirmDanger + sensitive both fall back to "red"
+  const effectiveVariant: DialogColorVariant =
+    colorVariant ?? ((confirmDanger || variant === "sensitive") ? "red" : "primary");
+  const styles = colorVariantStyles[effectiveVariant];
+  const resolvedIcon = icon ?? (
+    <FaExclamationTriangle size={15} className={defaultIconColor[effectiveVariant]} />
+  );
 
   return (
     <>
@@ -77,23 +123,23 @@ const WarningModal = ({
       <div className="fixed inset-0 flex items-center justify-center z-[70] pointer-events-none">
         <div
           className={cn(
-            "bg-panel border border-tertiary/[8%] rounded-2xl p-8 w-[440px] pointer-events-auto drop-shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col gap-5 transition-all duration-200",
+            "bg-panel border border-tertiary/[8%] rounded-2xl p-6 md:p-8 w-full md:w-[440px] mx-4 pointer-events-auto drop-shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col gap-4 transition-all duration-200",
             animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2"
           )}
         >
-          {/* Icon + title */}
-          <div className="flex items-start gap-4">
+          {/* Icon + title on one row */}
+          <div className="flex items-center gap-3.5">
             <div className={cn(
-              "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mt-0.5",
-              "bg-[#A46666]/10"
+              "flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center",
+              styles.iconBg
             )}>
-              <FaExclamationTriangle size={16} className="text-[#A46666]" />
+              {resolvedIcon}
             </div>
-            <div>
-              <h3 className="text-lg">{title}</h3>
-              <p className="text-sm text-tertiary mt-1 leading-relaxed">{description}</p>
-            </div>
+            <h3 className="text-lg leading-tight">{title}</h3>
           </div>
+
+          {/* Description — separate row, not grouped with title */}
+          <p className="text-sm text-tertiary leading-relaxed">{description}</p>
 
           {/* Sensitive variant — type-to-confirm input */}
           {variant === "sensitive" && (
@@ -114,28 +160,27 @@ const WarningModal = ({
             </div>
           )}
 
+          {/* Extra content (checkboxes, form fields, etc.) rendered between input and actions */}
+          {children}
+
           {/* Actions */}
           <div className="flex gap-3 mt-1">
-            <button
+            <Button
+              variant={styles.btnVariant}
               onClick={onConfirm}
               disabled={!canConfirm}
-              className={cn(
-                "flex-1 rounded-lg py-2.5 text-sm transition-colors",
-                canConfirm
-                  ? useDangerStyle
-                    ? "bg-[#A46666]/10 hover:bg-[#A46666]/20 text-[#A46666]"
-                    : "bg-accent/15 hover:bg-accent/20 text-accent"
-                  : "bg-background/60 text-tertiary/30 cursor-default"
-              )}
+              loading={confirmLoading}
+              className="flex-1 h-auto py-2.5 [transition:opacity_200ms_ease,color_150ms,background-color_150ms,border-color_150ms]"
             >
               {confirmLabel}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
               onClick={onCancel}
-              className="flex-1 bg-background hover:bg-background/60 text-tertiary rounded-lg py-2.5 text-sm transition-colors"
+              className="flex-1 h-auto py-2.5"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       </div>

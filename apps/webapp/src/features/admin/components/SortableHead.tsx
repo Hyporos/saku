@@ -17,6 +17,7 @@ interface SortableHeadProps {
   onSelectAll?: () => void;
   allSelected?: boolean;
   someSelected?: boolean;
+  theadClassName?: string;
 }
 
 export const SortableHead = ({
@@ -26,11 +27,12 @@ export const SortableHead = ({
   onSelectAll,
   allSelected,
   someSelected,
+  theadClassName,
 }: SortableHeadProps) => (
-  <thead>
+  <thead className={theadClassName}>
     <tr className="border-t border-tertiary/[6%]">
       {onSelectAll !== undefined && (
-        <th className="pl-5 pr-2 py-3 w-10">
+        <th className="pl-6 pr-2 py-3 w-10">
           <Checkbox
             checked={!!allSelected}
             onChange={onSelectAll}
@@ -43,9 +45,9 @@ export const SortableHead = ({
           key={field ?? idx}
           onClick={() => field && onSort(field)}
           className={cn(
-            "text-left text-xs text-tertiary font-medium uppercase tracking-wide px-6 py-3 select-none",
+            "text-left text-xs text-tertiary/50 font-medium uppercase tracking-wide px-6 py-3 select-none",
             colClass,
-            field && "cursor-pointer hover:text-white transition-colors"
+            field && "cursor-pointer hover:text-white transition-colors group"
           )}
         >
           {/* Always render the chevron slot to prevent layout shift when it appears */}
@@ -53,8 +55,9 @@ export const SortableHead = ({
             {label}
             <span
               className={cn(
-                "inline-flex items-center leading-none transition-opacity duration-150",
-                field && sort?.field === field ? "opacity-100 text-accent" : "opacity-0 text-accent"
+                "inline-flex items-center leading-none transition-all duration-150",
+                field && sort?.field === field ? "opacity-100" : "opacity-0",
+                "group-hover:text-white text-tertiary/50"
               )}
             >
               {sort?.field === field && sort?.dir === "asc"

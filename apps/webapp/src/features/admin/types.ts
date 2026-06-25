@@ -63,6 +63,8 @@ export interface SortState {
   dir: SortDir;
 }
 
+export type DialogColorVariant = "red" | "primary" | "owner";
+
 export type ModalPayload =
   | {
       variant: "confirm";
@@ -71,6 +73,8 @@ export type ModalPayload =
       onConfirm: () => void;
       confirmLabel?: string;
       confirmDanger?: boolean;
+      colorVariant?: DialogColorVariant;
+      icon?: ReactNode;
     }
   | {
       variant: "sensitive";
@@ -78,6 +82,8 @@ export type ModalPayload =
       description: string;
       onConfirm: () => void;
       confirmWord?: string;
+      colorVariant?: DialogColorVariant;
+      icon?: ReactNode;
     };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -158,7 +164,7 @@ export type ExcInlineEditState = {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-export type ToolSection = "action-log" | "scanner" | "backups";
+export type ToolSection = "action-log" | "scanner" | "scheduled-tasks";
 
 export type ActionLogCategory = "create" | "edit" | "delete" | "transfer" | "rename" | "finalize" | "scan";
 
@@ -181,14 +187,16 @@ export type ScanResultEntry = {
   sandbag: boolean;
   isNaN: boolean;
   personalBest?: number;
+  absent?: boolean;
 };
 
 export type ScanImageResult = {
   week: string;
   success: ScanResultEntry[];
-  notFound: { name: string }[];
+  notFound: { name: string; previouslyScanned?: boolean }[];
   nanScores: { name: string }[];
   zeroScores: { name: string }[];
+  absentScores: Array<{ name: string; score: number }>;
   totalSuccess: number;
   totalFailure: number;
   totalScanned: number;
@@ -203,8 +211,4 @@ export type FinalizeResult = {
   backupFilename?: string;
 };
 
-export type BackupEntry = {
-  filename: string;
-  createdAt: string;
-  size: number;
-};
+

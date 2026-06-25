@@ -15,7 +15,7 @@ import {
   FaExclamationCircle,
   FaHistory,
   FaCamera,
-  FaArchive,
+  FaCalendarAlt,
 } from "react-icons/fa";
 import {
   BOT_API,
@@ -49,6 +49,21 @@ import type {
   ToolSection,
   ActionLogEntry,
 } from "./types";
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+export type ScheduledTask = {
+  id: string;
+  name: string;
+  channelName: string;
+  category: "ursus" | "reminder" | "mp";
+  description: string;
+  baseHour: number;
+  days: number[];
+  effectiveHour: number;
+  effectiveMinute: number;
+  nextRun: string | null;
+};
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -264,6 +279,14 @@ interface AdminContextValue {
   // Action log
   actionLog: ActionLogEntry[];
   clearActionLog: () => void;
+
+  // Scheduled tasks
+  scheduledTasks: ScheduledTask[];
+  scheduledTasksDstOffset: 0 | 1;
+  scheduledTasksLoading: boolean;
+  scheduledTasksToggling: boolean;
+  refreshScheduledTasks: () => Promise<void>;
+  toggleScheduledTasksDst: () => Promise<void>;
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -275,6 +298,59 @@ export const useAdminContext = () => {
   const ctx = useContext(AdminContext);
   if (!ctx) throw new Error("useAdminContext must be used within AdminProvider");
   return ctx;
+};
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Navigation / sidebar constants (module-level — no component closure needed)
+
+export const navItems: Array<{ id: Section; label: string; icon: React.ElementType }> = [
+  { id: "users",      label: "Users",      icon: FaUsers },
+  { id: "characters", label: "Characters", icon: FaUserAlt },
+  { id: "scores",     label: "Scores",     icon: FaChartBar },
+  { id: "exceptions", label: "Exceptions", icon: FaExclamationCircle },
+];
+
+export const monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
+  { id: "action-log",       label: "Action Log",       icon: FaHistory },
+  { id: "scheduled-tasks", label: "Scheduled Tasks", icon: FaCalendarAlt },
+];
+
+export const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
+  { id: "scanner", label: "Culvert Scanner", icon: FaCamera },
+];
+
+// ⎯⎯ Path ↔ section helpers ⎯⎯ //
+
+/** Maps a URL path to its admin tab section. */
+export const sectionForPath = (path: string): Section => {
+  if (path.startsWith("/admin/users")) return "users";
+  if (path.startsWith("/admin/characters")) return "characters";
+  if (path.startsWith("/admin/scores")) return "scores";
+  if (path.startsWith("/admin/exceptions")) return "exceptions";
+  return "users";
+};
+
+/** Maps a URL path to its tool section, or null if not on a tool route. */
+export const toolSectionForPath = (path: string): ToolSection | null => {
+  if (path.startsWith("/admin/scanner")) return "scanner";
+  if (path.startsWith("/admin/action-log")) return "action-log";
+  if (path.startsWith("/admin/scheduled-tasks")) return "scheduled-tasks";
+  return null;
+};
+
+const sectionLabel = (section: Section): string =>
+  section === "users"
+    ? "Users"
+    : section === "characters"
+      ? "Characters"
+      : section === "scores"
+        ? "Scores"
+        : "Exceptions";
+
+const toolSectionLabel = (ts: ToolSection): string => {
+  if (ts === "scanner") return "Culvert Scanner";
+  if (ts === "action-log") return "Action Log";
+  return "Scheduled Tasks";
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -346,6 +422,27 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const { actionLog, clearActionLog, refreshActionLog } = useActionLog();
   const { notify } = useNotifications();
 
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [scheduledTasksDstOffset, setScheduledTasksDstOffset] = useState<0 | 1>(0);
+  const [scheduledTasksLoading, setScheduledTasksLoading] = useState(true);
+  const [scheduledTasksToggling, setScheduledTasksToggling] = useState(false);
+
+  const refreshScheduledTasks = useCallback(async () => {
+    setScheduledTasksLoading(true);
+    try {
+      const { data } = await axios.get<{ dstOffset: 0 | 1; tasks: ScheduledTask[] }>(
+        `${BOT_API}/bot/api/admin/scheduled-tasks`,
+        { withCredentials: true }
+      );
+      setScheduledTasksDstOffset(data.dstOffset);
+      setScheduledTasks(data.tasks);
+    } catch {
+      // silently fail on preload — tab will show empty state
+    } finally {
+      setScheduledTasksLoading(false);
+    }
+  }, []);
+
   // Extracts a user-friendly error message from an Axios error response
   const notifyError = useCallback((e: unknown, fallback = "Something went wrong") => {
     const ax = e as import("axios").AxiosError<{ error?: string }>;
@@ -358,10 +455,33 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     else notify("error", ax?.response?.data?.error ?? fallback);
   }, [notify]);
 
+  const toggleScheduledTasksDst = useCallback(async () => {
+    const newOffset: 0 | 1 = scheduledTasksDstOffset === 0 ? 1 : 0;
+    setScheduledTasksToggling(true);
+    try {
+      await axios.patch(
+        `${BOT_API}/bot/api/admin/scheduled-tasks/dst`,
+        { dstOffset: newOffset },
+        { withCredentials: true }
+      );
+      await refreshScheduledTasks();
+      notify(
+        "success",
+        newOffset === 1
+          ? "Switched to Daylight Saving Time (EDT, UTC-4)"
+          : "Switched to Standard Time (EST, UTC-5)"
+      );
+    } catch (e) {
+      notifyError(e, "Failed to update DST setting");
+    } finally {
+      setScheduledTasksToggling(false);
+    }
+  }, [scheduledTasksDstOffset, refreshScheduledTasks, notify, notifyError]);
+
   const [activeToolSection, setActiveToolSection] = useState<ToolSection | null>(() => {
     if (location.pathname.startsWith("/admin/action-log")) return "action-log";
     if (location.pathname.startsWith("/admin/scanner")) return "scanner";
-    if (location.pathname.startsWith("/admin/backups")) return "backups";
+    if (location.pathname.startsWith("/admin/scheduled-tasks")) return "scheduled-tasks";
     return null;
   });
 
@@ -381,6 +501,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     refreshUsers(false);
     refreshExceptions(false);
+    refreshScheduledTasks();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -441,8 +562,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       setUserDetail(null);
       return;
     }
-    if (location.pathname.startsWith("/admin/backups")) {
-      setActiveToolSection("backups");
+    if (location.pathname.startsWith("/admin/scheduled-tasks")) {
+      setActiveToolSection("scheduled-tasks");
       setCharDetail(null);
       setUserDetail(null);
       return;
@@ -455,8 +576,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       refreshUsers(),
       refreshExceptions(),
       refreshActionLog(),
+      refreshScheduledTasks(),
     ]);
-  }, [refreshUsers, refreshExceptions, refreshActionLog]);
+  }, [refreshUsers, refreshExceptions, refreshActionLog, refreshScheduledTasks]);
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Selection / sort helpers — shared across all tabs
@@ -484,23 +606,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     setter(keys.every((k) => set.has(k)) && keys.length > 0 ? new Set() : new Set(keys));
   };
 
-  const sectionForPath = (path: string): Section => {
-    if (path.startsWith("/admin/users")) return "users";
-    if (path.startsWith("/admin/characters")) return "characters";
-    if (path.startsWith("/admin/scores")) return "scores";
-    if (path.startsWith("/admin/exceptions")) return "exceptions";
-    return "users";
-  };
-
-  const sectionLabel = (section: Section) =>
-    section === "users"
-      ? "Users"
-      : section === "characters"
-        ? "Characters"
-        : section === "scores"
-          ? "Scores"
-          : "Exceptions";
-
   const buildCharPath = (charName: string) => {
     const allFlat = userData.flatMap((u) => u.characters.map((c) => ({ name: c.name, userId: String(u._id) })));
     return `/admin/characters/${encodeURIComponent(charSlug(charName, allFlat))}`;
@@ -512,9 +617,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       return [...prev, entry];
     });
   };
-
-  const toolSectionLabel = (ts: ToolSection) =>
-    ts === "scanner" ? "Culvert Scanner" : ts === "action-log" ? "Action Log" : "Backups";
 
   const pushCurrentToBackTrail = () => {
     if (charDetail) {
@@ -571,13 +673,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return false;
-  };
-
-  const toolSectionForPath = (path: string): ToolSection | null => {
-    if (path.startsWith("/admin/scanner")) return "scanner";
-    if (path.startsWith("/admin/action-log")) return "action-log";
-    if (path.startsWith("/admin/backups")) return "backups";
-    return null;
   };
 
   const goBackFromTrail = () => {
@@ -647,8 +742,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       navigate("/admin/action-log");
     } else if (id === "scanner") {
       navigate("/admin/scanner");
-    } else if (id === "backups") {
-      navigate("/admin/backups");
+    } else if (id === "scheduled-tasks") {
+      navigate("/admin/scheduled-tasks");
     }
   };
 
@@ -938,7 +1033,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       variant: "sensitive",
       confirmWord: label,
       title: <span>{label === "delete" ? "Delete" : "Unlink"} <span className="text-[#A46666]">{name}</span>?</span>,
-      description: "This will permanently remove the character and all of their scores. This action cannot be undone.",
+      description: "This will permanently remove the character and all of their scores.",
       onConfirm: async () => {
         try {
           await axios.delete(`${BOT_API}/bot/api/admin/characters/${userId}/${name}`);
@@ -957,7 +1052,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     confirm({
       variant: "sensitive",
       title: <span>Delete <span className="text-[#A46666]">{username ?? userId}</span>?</span>,
-      description: "This will permanently remove the user and all of their linked characters and scores. This action cannot be undone.",
+      description: "This will permanently remove the user and all of their linked characters and scores.",
       onConfirm: async () => {
         try {
           await axios.delete(`${BOT_API}/bot/api/admin/users/${userId}`, {
@@ -978,7 +1073,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       variant: "confirm",
       confirmDanger: true,
       title: "Delete score",
-      description: `Delete the score for ${character} on ${date}? This cannot be undone.`,
+      description: `Delete the score for ${character} on ${date}?`,
       onConfirm: async () => {
         try {
           if (scoreId) {
@@ -1156,24 +1251,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-  const navItems: Array<{ id: Section; label: string; icon: React.ElementType }> = [
-    { id: "users",      label: "Users",      icon: FaUsers },
-    { id: "characters", label: "Characters", icon: FaUserAlt },
-    { id: "scores",     label: "Scores",     icon: FaChartBar },
-    { id: "exceptions", label: "Exceptions", icon: FaExclamationCircle },
-  ];
-
-  const monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
-    { id: "action-log", label: "Action Log", icon: FaHistory },
-    { id: "backups",    label: "Backups",    icon: FaArchive },
-  ];
-
-  const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
-    { id: "scanner", label: "Culvert Scanner", icon: FaCamera },
-  ];
-
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-
   const value: AdminContextValue = {
     activeSection, navigateToSection, backTrail, backTargetLabel, goBackFromTrail,
     userData, usersLoading, exceptionsData, exceptionsLoading,
@@ -1216,6 +1293,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     toggleSel, toggleAll, toggleSort,
     navItems, monitoringItems, toolItems, activeToolSection, navigateToToolSection,
     actionLog, clearActionLog,
+    scheduledTasks, scheduledTasksDstOffset, scheduledTasksLoading, scheduledTasksToggling,
+    refreshScheduledTasks, toggleScheduledTasksDst,
   };
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;

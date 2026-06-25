@@ -23,9 +23,11 @@ const useCharacter = (characterName: string) => {
   });
 
   useEffect(() => {
+    if (!characterName) return;
+
     // Saku Bot API (MongoDB)
     axios
-      .get(`${BOT_API}/bot/api/character/${characterName}`)
+      .get(`${BOT_API}/bot/api/character/${encodeURIComponent(characterName)}`)
       .then((res) => {
         setCharacterData((prevData) => ({
           ...prevData,
@@ -40,7 +42,7 @@ const useCharacter = (characterName: string) => {
 
     // Saku Bot API (MapleStory Rankings)
     axios
-      .get(`${BOT_API}/bot/api/rankings/${characterName}`)
+      .get(`${BOT_API}/bot/api/rankings/${encodeURIComponent(characterName)}`)
       .then((res) => {
         setCharacterData((prevData) => ({
           ...prevData,
@@ -52,7 +54,7 @@ const useCharacter = (characterName: string) => {
       .catch((error) => {
         console.error("Error fetching character:", error);
       });
-  }, []);
+  }, [characterName]);
 
   return characterData;
 };

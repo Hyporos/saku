@@ -5,8 +5,9 @@ import {
 } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import CopyId from "../../../components/CopyId";
+import { Button } from "../../../components/Button";
 import { SortableHead } from "../components/SortableHead";
-import { BatchBar } from "../components/BatchBar";
+import { BatchPopup } from "../components/BatchPopup";
 import { RowActions } from "../components/RowActions";
 import { useAdminContext } from "../context";
 
@@ -47,12 +48,15 @@ export const UserDetail = () => {
   return (
     <div className="flex flex-col gap-6">
       {/* Back button */}
-      <button
+      <Button
+        variant="tertiary"
+        size="md"
         onClick={() => { setUserDetail(null); goBackFromTrail(); }}
-        className="flex items-center gap-2 text-sm text-tertiary hover:text-white transition-colors self-start"
+        icon={<FaArrowLeft size={12} />}
+        className="self-start h-auto px-0 py-1"
       >
-        <FaArrowLeft size={12} /> {`Back to ${backTargetLabel}`}
-      </button>
+        {`Back to ${backTargetLabel}`}
+      </Button>
 
       {/* Header */}
       <div className="bg-panel rounded-xl px-6 py-5 flex items-center gap-5">
@@ -75,16 +79,18 @@ export const UserDetail = () => {
             )}
           </div>
           <div className="mt-0.5 text-xs text-tertiary/50">
-            <CopyId id={userDetail._id} />
+            <CopyId id={userDetail._id} hideText />
           </div>
         </div>
-        <button
+        <Button
+          variant="danger"
+          size="mobile"
           onClick={(e) => { e.stopPropagation(); deleteUser(userDetail._id, userDetail.username); }}
           title="Delete user"
-          className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
+          className="md:h-[30px] md:w-auto md:px-2.5 shrink-0"
         >
-          <FaTrash size={11} className="mb-0.5" /> Delete
-        </button>
+          <FaTrash size={11} className="mb-0.5 shrink-0" /><span className="hidden md:inline"> Delete</span>
+        </Button>
       </div>
 
       {/* Condensed info */}
@@ -111,13 +117,13 @@ export const UserDetail = () => {
       </div>
 
       {/* Characters table */}
-      <div className="bg-panel rounded-xl overflow-hidden flex-shrink-0">
+      <div className="bg-panel rounded-xl overflow-visible flex-shrink-0">
         <div className="px-6 py-5 flex items-center gap-4">
           <h3 className="text-lg">Linked Characters</h3>
           <span className="text-tertiary/60 text-sm mt-1">{rawUserChars.length} linked</span>
         </div>
         <div className="bg-tertiary/20 h-px" />
-        <BatchBar
+        <BatchPopup
           count={selUserDetailChars.size}
           onDelete={batchDeleteUserDetailChars}
           onClear={() => setSelUserDetailChars(new Set())}
@@ -128,7 +134,8 @@ export const UserDetail = () => {
             <p className="text-sm">No characters linked</p>
           </div>
         ) : (
-          <table className="w-full table-fixed">
+          <div className="overflow-x-auto">
+          <table className="w-full table-auto min-w-[600px]">
             <SortableHead
               cols={[
                 { label: "Name",          field: "name"              },
@@ -163,7 +170,7 @@ export const UserDetail = () => {
                 }}
                 className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors cursor-pointer"
               >
-                <td className="pl-5 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
+                <td className="pl-6 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={selUserDetailChars.has(char.name)}
                     onChange={() => toggleSel(selUserDetailChars, char.name, setSelUserDetailChars)}
@@ -197,6 +204,7 @@ export const UserDetail = () => {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

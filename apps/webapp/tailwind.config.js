@@ -9,8 +9,19 @@ export default {
       colors: {
         background: "#292A30",
         panel: "#222328",
-        accent: "#FFC3C6",
         tertiary: "#C2C2C2",
+        accent: {
+          DEFAULT: "#FFC3C6",
+        },
+        lavender: {
+          DEFAULT: "#E4C6FF",
+        },
+        danger: {
+          DEFAULT: "#FFC3C6",
+        },
+        orange: {
+          DEFAULT: "#7C2D12",
+        }
       },
       keyframes: {
         lbIn: {

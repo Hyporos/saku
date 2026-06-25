@@ -1,0 +1,151 @@
+# Saku — CLAUDE.md
+
+Saku is a monorepo Discord bot + web dashboard for tracking MapleStory culvert scores in a guild.
+
+---
+
+## Project Structure
+
+```
+apps/
+  bot/        Node.js Discord bot + Express API (port 25637)
+  webapp/     React + TypeScript frontend + Express auth server (port 8000)
+```
+
+**Root scripts** (pnpm):
+- `pnpm bot` — start bot
+- `pnpm webapp` — start webapp (Vite :5173 + backend :8000)
+- `pnpm deploy-commands` — register slash commands with Discord
+
+---
+
+## Bot (`apps/bot/`)
+
+### Command Pattern
+
+Every command exports exactly:
+```js
+module.exports = {
+  data: new SlashCommandBuilder().setName(...).setDescription(...),
+  async execute(interaction) { ... },
+  async autocomplete(interaction) { ... }, // optional
+};
+```
+
+- Long operations: `await interaction.deferReply()` first, then `interaction.editReply()`
+- Errors returned to user as ephemeral replies when appropriate
+- Bee/owner permission check: `interaction.member.roles.cache.has("720001044746076181") || interaction.user.id === "631337640754675725"`
+
+### Key Schemas
+
+| Schema | Key Fields |
+|---|---|
+| `weekSchema` | `week` (ISO date Wed), `finalized`, `scores: [{name, score}]`, `submitted`, `total` |
+| `culvertSchema` | `_id` (Discord ID), `characters: [{name, memberSince, graphColor, scores: [{date, score}]}]` |
+| `exceptionSchema` | `name` (correct), `exception` (OCR misread) |
+| `actionLogSchema` | `action`, `target`, `details`, `category`, `actorId`, `timestamp` (TTL 90d) |
+
+### Date / Reset Logic
+
+- Culvert week resets **Thursday 12:00 AM UTC**
+- Week is identified by its **Wednesday** date (day before reset)
+- `getResetDates()` from `culvertUtils.js` returns `{ reset, lastReset, nextReset }` — `lastReset` is the Wednesday of last week
+- Date format stored: `"YYYY-MM-DD"` (ISO) for weeks; `"MMM DD, YYYY"` for character `memberSince`
+- Validate date option: `/^\d{4}-\d{2}-\d{2}$/.test(date)` + `dayjs(date).day() === 3` (Wednesday)
+- Use `dayjs` for date math; DST offset stored in `data/dst-state.json`
+
+### Routes
+
+- Bot serves its own Express API at port **25637**
+- Admin identity passed via `x-admin-user-id` request header
+- Scan endpoint accepts ISO date strings; falls back to `lastReset` if not a valid date
+- Historical week names queried from `weekSchema` for "renamed or unlinked" detection
+
+### Adding a Command to `/help`
+
+1. Add command name to `isBee && choices.push(...)` in `autocomplete()` in `help.js`
+2. Add `case "name":` to the `description` switch
+3. Add `case "name":` to the `parameters` switch
+4. Add the command name to the bee embed field value in `addFields` (the string concatenation block with `isBee ?`)
+5. **Important**: The `value:` string in `addFields` uses double-quoted strings with actual backtick characters. Do not use template literals as the outer delimiter there — backticks inside template literals require ``` escapes.
+
+---
+
+## Webapp (`apps/webapp/`)
+
+### Stack
+
+- React 18 + TypeScript (strict: `noUnusedLocals`, `noUnusedParameters`)
+- Vite + Tailwind CSS 3.4
+- React Router v6 (protected routes via `ProtectedRoute`)
+- Axios (credentials always included)
+- API base resolved from `VITE_BOT_API_URL` env var via `config/apiBase.ts`
+
+### Tailwind Theme
+
+Custom colors: `background` (#292A30), `panel` (#222328), `tertiary` (#C2C2C2), `accent` (#FFC3C6 pink). Use these instead of raw hex values. Font: Karla.
+
+### TypeScript Rules
+
+- All types live in `features/admin/types.ts` for admin-area shapes
+- Props interfaces defined in the same file as the component
+- Strict mode — no unused imports/variables; fix TS errors before considering a change done
+- ESLint must pass: `npm run lint` in `apps/webapp`
+
+### DatePicker
+
+`DatePicker` in `components/DatePicker.tsx` accepts:
+- `allowedDays?: number[]` — restrict selectable days (0=Sun … 6=Sat). Wednesday = 3.
+- `wednesdayOnly` — legacy single-day restriction (prefer `allowedDays={[3]}`)
+- `compact`, `align="right"` — display options
+
+### Scanner Tab Conventions
+
+- `getCulvertWednesday(weekOffset = 0)` — returns ISO string for the culvert Wednesday; `weekOffset=-1` = last week
+- `imageNotFoundNamesRef` — `Map<fingerprint, string[]>` tracks OCR names not found per image; used to target specific images when adding exceptions
+- `historicalNames` — `Set<string>` built from `weekSchema` scores; drives the "renamed or unlinked" flag
+- CoveragePanel is always visible (not gated on phase); use `items-stretch` + `flex-1` to match heights
+
+### Week Range Display
+
+When displaying a Wednesday date as a string, always pass `timeZone: "UTC"` to `toLocaleDateString` to prevent off-by-one-day shifts in UTC- timezones:
+```ts
+d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
+```
+
+---
+
+## Code Style
+
+- **Indentation**: 2 spaces
+- **Strings**: Double quotes in JS; single or double in TS — follow the file's existing style
+- **Sections**: Separate logical sections with the Unicode divider line `// ⎯⎯⎯⎯...⎯⎯⎯ //`
+- **Comments**: Minimal. Only add when the WHY is non-obvious. No multi-line comment blocks.
+- **No trailing summaries**: Do not add comments like `// Added for issue #123` or `// used by X`
+- **Async/await** everywhere — no `.then()` chains
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `BEE_ROLE_ID`, `GRAPH_TEMPLATE`)
+- **No unused imports**: TypeScript strict mode will flag them as errors
+- **No backwards-compat hacks**: If something is unused, delete it outright
+
+---
+
+## Key IDs
+
+| Constant | Value |
+|---|---|
+| Bee role | `720001044746076181` |
+| Owner Discord ID | `631337640754675725` |
+| Graph template (QuickChart) | `https://quickchart.io/chart/render/zm-c2f6cd67-0740-44d6-a023-649110e22db9` |
+| Primary graph color (RGB) | `255,189,213` |
+
+---
+
+## Common Pitfalls
+
+- **help.js unicode**: The `value:` in `addFields` uses double-quoted strings. Backticks inside double-quoted strings are fine; do **not** use template literals as the outer delimiter for that value.
+- **ISO date fallback**: If the bot's `routes.js` does not recognize an ISO date string (old code), it silently falls back to `lastReset`. Always restart the bot after changes to routes.js.
+- **Week date is Wednesday**: The culvert week is stored/referenced by its Wednesday date, not Thursday. `getResetDates().lastReset` returns the Wednesday of last week.
+- **`dayjs().day() === 3`** checks for Wednesday. Day 4 = Thursday.
+- **UTC rendering**: `new Date("YYYY-MM-DD")` parses as UTC midnight. Rendering it in a local UTC- timezone shifts the display by one day. Always use `timeZone: "UTC"` when formatting these dates.
+- **Deploy commands**: Adding new slash commands requires running `pnpm deploy-commands` — the bot restart alone does not register new commands with Discord.
+- **TypeScript build errors block deploys**: Run `npm run build` in `apps/webapp` to catch type errors before assuming webapp changes are safe.

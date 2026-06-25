@@ -1,11 +1,12 @@
 import { cn } from "../../../lib/utils";
-import { FaTimes } from "react-icons/fa";
 import DatePicker from "../../../components/DatePicker";
 import AutocompleteInput from "../../../components/AutocompleteInput";
 import { Field } from "./Field";
 import { useAdminContext } from "../context";
 import { rgbCss } from "../utils";
 import { GRAPH_COLORS, inputCls } from "../constants";
+import { Button } from "../../../components/Button";
+import Drawer from "../../../components/Drawer";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -68,6 +69,7 @@ const DrawerFields = () => {
             <DatePicker
               value={data.memberSince ?? ""}
               onChange={(v) => updateField("memberSince", v)}
+              align="right"
             />
           </Field>
           <Field
@@ -202,75 +204,42 @@ export const DrawerPanel = () => {
         : false
     );
 
+  const drawerTitle = `${mode === "create" ? "New" : "Edit"} ${section.slice(0, -1)}`;
+  const drawerSubtitle = mode === "create"
+    ? section === "scores"
+      ? "Add a new score to the database"
+      : section === "exceptions"
+      ? "Add a new exception to the database"
+      : `Add a new record to the ${section} collection`
+    : `Modify this record in the ${section} collection`;
+
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={cn(
-          "fixed inset-0 bg-background/60 backdrop-blur-sm z-40 transition-opacity duration-300",
-          drawer.isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
-        onClick={closeDrawer}
-      />
-
-      {/* Drawer panel */}
-      <div
-        className={cn(
-          "fixed right-0 top-0 h-full w-[420px] bg-panel border-l border-tertiary/[8%] z-50 overflow-y-auto flex flex-col transition-transform duration-300",
-          drawer.isOpen ? "translate-x-0" : "translate-x-full"
-        )}
-      >
-        {/* Header */}
-        <div className="flex justify-between items-center px-8 py-6 border-b border-tertiary/[8%]">
-          <div>
-            <h2 className="text-xl capitalize">
-              {mode === "create" ? "New" : "Edit"} {section.slice(0, -1)}
-            </h2>
-            <p className="text-tertiary text-sm mt-0.5">
-              {mode === "create"
-                ? section === "scores"
-                  ? "Add a new score to the database"
-                  : section === "exceptions"
-                  ? "Add a new exception to the database"
-                  : `Add a new record to the ${section} collection`
-                : `Modify this record in the ${section} collection`}
-            </p>
-          </div>
-          <button
-            onClick={closeDrawer}
-            className="text-tertiary hover:text-white transition-colors"
-          >
-            <FaTimes size={16} />
-          </button>
-        </div>
-
-        {/* Fields */}
-        <div className="flex flex-col gap-5 px-8 py-6 flex-1">
-          <DrawerFields />
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 px-8 py-6 border-t border-tertiary/[8%]">
-          <button
-            onClick={handleSave}
+    <Drawer
+      isOpen={drawer.isOpen}
+      onClose={closeDrawer}
+      title={<span className="capitalize">{drawerTitle}</span>}
+      subtitle={drawerSubtitle}
+      footer={
+        <>
+          <Button
+            variant="primary"
             disabled={submitDisabled}
-            className={cn(
-              "flex-1 rounded-lg py-2.5 text-sm transition-colors",
-              submitDisabled
-                ? "bg-tertiary/10 text-tertiary/40 cursor-default"
-                : "bg-accent/15 hover:bg-accent/20 text-accent"
-            )}
+            onClick={handleSave}
+            className="flex-1 h-auto py-2.5"
           >
             {mode === "create" ? "Create" : "Save Changes"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
             onClick={closeDrawer}
-            className="flex-1 bg-background hover:bg-background/60 text-tertiary rounded-lg py-2.5 text-sm transition-colors"
+            className="flex-1 h-auto py-2.5"
           >
             Cancel
-          </button>
-        </div>
-      </div>
-    </>
+          </Button>
+        </>
+      }
+    >
+      <DrawerFields />
+    </Drawer>
   );
 };

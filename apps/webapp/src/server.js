@@ -174,14 +174,14 @@ app.all("/bot/*", async (req, res) => {
     }
   }
 
-  // Dynamically determine bot API URL: use localhost if webapp is running locally, else use env
+  // Dynamically determine bot API URL: prefer LOCAL_BOT_API_URL when running locally,
+  // falling back to BOT_API_URL (which points to the production server).
   let botApiUrl = process.env.BOT_API_URL;
   const isLocal = ["localhost", "127.0.0.1"].some((host) =>
     req.headers.host?.startsWith(host)
   );
   if (isLocal) {
-    // Default to local bot port (3000) if running locally
-    botApiUrl = "http://localhost:3000";
+    botApiUrl = process.env.LOCAL_BOT_API_URL || "http://127.0.0.1:3000";
   }
   if (!botApiUrl) {
     return res.status(503).json({ error: "BOT_API_URL is not configured" });

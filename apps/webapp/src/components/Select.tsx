@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { FaChevronDown } from "react-icons/fa";
 import { cn } from "../lib/utils";
+import { Button } from "./Button";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -58,27 +59,30 @@ const Select = ({
     }
   }, [open]);
 
-  // Close on outside click
+  // Close on outside click — use capture phase so it fires before any stopPropagation
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, []);
 
   const selected = options.find((o) => o.value === value);
 
   return (
     <div ref={ref} className={cn("relative inline-block", className)}>
-      {/* Trigger */}
-      <button
+      {/* Trigger — Button secondary base */}
+      <Button
         type="button"
+        variant="secondary"
+        size={compact ? "sm" : "md"}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-2.5 bg-background border rounded-lg px-3 text-sm text-white transition-colors focus:outline-none cursor-pointer w-full",
-          compact ? "py-1" : "py-1.5",
-          open ? "border-accent/40" : "border-tertiary/20 hover:border-tertiary/40"
+          "w-full justify-between gap-2.5",
+          open && "bg-tertiary/[8%] border-tertiary/40 text-white",
+          subtle && selected?.value === options[0]?.value && !open && "text-tertiary",
+          subtle && selected?.value !== options[0]?.value && !open && "text-white",
         )}
       >
         {variant === "color" && selected?.color && (
@@ -94,15 +98,15 @@ const Select = ({
             className="w-4 h-4 rounded-full object-cover flex-shrink-0"
           />
         )}
-        <span className={cn("flex-1 text-left", subtle && selected?.value === options[0]?.value ? "text-tertiary" : "text-white")}>{selected?.label ?? placeholder ?? "Select…"}</span>
+        <span className="flex-1 text-left truncate">{selected?.label ?? placeholder ?? "Select…"}</span>
         <FaChevronDown
           size={9}
           className={cn(
-            "flex-shrink-0 text-tertiary/50 transition-transform duration-150",
-            open && "rotate-180"
+            "flex-shrink-0 ml-auto text-current opacity-50 transition-all duration-150",
+            open && "rotate-180 opacity-80"
           )}
         />
-      </button>
+      </Button>
 
       {/* Dropdown */}
       {visible && (
@@ -148,3 +152,4 @@ const Select = ({
 };
 
 export default Select;
+

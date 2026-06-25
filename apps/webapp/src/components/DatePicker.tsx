@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import { cn } from "../lib/utils";
 import { FaChevronLeft, FaChevronRight, FaRegCalendarAlt, FaArrowRight, FaTimes } from "react-icons/fa";
@@ -20,6 +20,8 @@ interface DatePickerSingleProps {
   compact?: boolean;
   // "wednesdayOnly" disables all non-Wednesday days — for culvert score dates
   wednesdayOnly?: boolean;
+  // "allowedDays" restricts picking to specific weekdays (0=Sun … 6=Sat); takes precedence over wednesdayOnly
+  allowedDays?: number[];
   // "disabledDates" grays out specific ISO dates (e.g. dates that already have a score)
   disabledDates?: string[];
   // "dropUp" opens the calendar above the trigger instead of below — use when near bottom of viewport
@@ -40,6 +42,7 @@ interface DatePickerRangeProps {
   subtle?: boolean;
   compact?: boolean;
   wednesdayOnly?: boolean;
+  allowedDays?: number[];
   disabledDates?: string[];
   dropUp?: boolean;
   clearable?: boolean;
@@ -70,8 +73,21 @@ const DatePicker = (props: DatePickerProps) => {
   // In range mode, track which end is being picked next
   const [picking, setPicking] = useState<"from" | "to">("from");
   const [hoverDate, setHoverDate] = useState("");
+  // Delayed clear so in-range cells keep their rounded-none class during the fade-out transition
+  const hoverClearTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleHoverEnter = useCallback((iso: string) => {
+    if (hoverClearTimer.current) clearTimeout(hoverClearTimer.current);
+    setHoverDate(iso);
+  }, []);
+
+  const handleHoverLeave = useCallback(() => {
+    hoverClearTimer.current = setTimeout(() => setHoverDate(""), 180);
+  }, []);
   const [popupSideX, setPopupSideX] = useState<"left" | "right">(props.align ?? "left");
   const [popupSideY, setPopupSideY] = useState<"down" | "up">(props.dropUp ? "up" : "down");
+  // Fixed viewport coords for the popup — prevents clipping by overflow containers
+  const [popupPos, setPopupPos] = useState<{ top?: number; bottom?: number; left?: number; right?: number }>({});
   const ref = useRef<HTMLDivElement>(null);
 
   const adjustPopupPlacement = () => {
@@ -93,6 +109,9 @@ const DatePicker = (props: DatePickerProps) => {
     let nextX: "left" | "right" = props.align ?? "left";
     if (nextX === "left" && rightOverflow && leftFits) nextX = "right";
     if (nextX === "right" && leftOverflow && rightFits) nextX = "left";
+    // If neither side fits cleanly, force left and let clamping handle it
+    if (nextX === "right" && leftOverflow && !rightFits) nextX = "left";
+    if (nextX === "left" && rightOverflow && !leftFits) nextX = "right";
 
     const below = viewportH - rect.bottom;
     const above = rect.top;
@@ -102,6 +121,28 @@ const DatePicker = (props: DatePickerProps) => {
 
     setPopupSideX(nextX);
     setPopupSideY(nextY);
+
+    // Compute fixed position so the popup escapes any overflow:hidden ancestor
+    const pos: { top?: number; bottom?: number; left?: number; right?: number } = {};
+    if (nextY === "down") {
+      pos.top = rect.bottom + 6;
+    } else {
+      pos.bottom = viewportH - rect.top + 6;
+    }
+    if (nextX === "right") {
+      pos.right = viewportW - rect.right;
+    } else {
+      pos.left = rect.left;
+    }
+
+    // Clamp so the popup is never cut off by any viewport edge
+    if (pos.left !== undefined) {
+      pos.left = Math.max(8, Math.min(pos.left, viewportW - popupW - 8));
+    }
+    if (pos.right !== undefined) {
+      pos.right = Math.max(8, Math.min(pos.right, viewportW - popupW - 8));
+    }
+    setPopupPos(pos);
   };
 
   // Sync viewing month when the controlled value changes externally
@@ -144,13 +185,13 @@ const DatePicker = (props: DatePickerProps) => {
     if (open && isRange) setPicking("from");
   }, [open, isRange]);
 
-  // Close on outside click
+  // Close on outside click — use capture phase so it fires before any stopPropagation
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, []);
 
   // Build cell array: nulls for leading empty days, then 1..daysInMonth
@@ -180,8 +221,10 @@ const DatePicker = (props: DatePickerProps) => {
     : !!(props as DatePickerSingleProps).value;
 
   const handleDayClick = (iso: string) => {
-    // Wednesday-only mode — silently ignore non-Wednesday picks
-    if (props.wednesdayOnly && dayjs(iso).day() !== 3) return;
+    // Allowed-days guard — silently ignore clicks on restricted days
+    const dow = dayjs(iso).day();
+    if (props.allowedDays && !props.allowedDays.includes(dow)) return;
+    if (props.wednesdayOnly && dow !== 3) return;
     if (!isRange) {
       (props as DatePickerSingleProps).onChange(iso);
       setOpen(false);
@@ -229,39 +272,26 @@ const DatePicker = (props: DatePickerProps) => {
 
   return (
     <div ref={ref} className={cn("relative inline-block", props.className)}>
-      {/* Trigger — accent-pink by default; "subtle" = gray, "compact" = less vertical padding */}
+      {/* Trigger — Button secondary base; active accent border when open, white text when a value is set */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "group inline-flex items-center gap-2 bg-background border rounded-lg px-3 text-sm focus:outline-none transition-colors cursor-pointer",
+          "group inline-flex items-center gap-2 bg-transparent border border-tertiary/20 rounded-lg px-3 text-sm",
+          "text-tertiary hover:text-white hover:border-tertiary/40 active:bg-tertiary/[8%]",
+          "transition-colors cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-tertiary/40",
           props.compact ? "py-1" : "py-2",
-          // Active (open) always gets accent border; otherwise mode-specific hover border
-          open
-            ? "border-accent/40"
-            : props.subtle
-              ? "border-tertiary/20 hover:border-tertiary/40"
-              : "border-accent/30 hover:border-accent/60",
-          // Text color: subtle mode — white when a date is already selected, tertiary otherwise (matches open state)
-          props.subtle
-            ? open
-              ? "text-tertiary"
-              : activeValue
-                ? "text-white"
-                : "text-tertiary"
-            : "text-accent"
+          // When open: active/pressed effect (matches Dropdown open state)
+          open && "bg-tertiary/[8%] border-tertiary/40 text-white",
+          // When a value is already set: white text to signal an active filter
+          !open && hasValue && "text-white",
         )}
       >
         <FaRegCalendarAlt
           size={12}
-          className={cn(
-            "flex-shrink-0 leading-none transition-colors mb-[2px]",
-            props.subtle
-              ? "text-tertiary"
-              : (open ? "text-accent" : "text-tertiary/50 group-hover:text-accent")
-          )}
+          className="flex-shrink-0 leading-none transition-colors mb-[2px] text-current opacity-50"
         />
-        <span className={cn(!props.subtle && !activeValue && !open && "opacity-50")}>{displayValue}</span>
+        <span>{displayValue}</span>
         {props.clearable && hasValue && (
           <span
             role="button"
@@ -295,17 +325,17 @@ const DatePicker = (props: DatePickerProps) => {
         )}
       </button>
 
-      {/* Calendar dropdown */}
+      {/* Calendar dropdown — fixed so it is never clipped by overflow:hidden ancestors */}
       {visible && (
         <div
           className={cn(
-            "absolute z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-4 w-[264px] transition-all duration-[180ms]",
+            "fixed z-[300] bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-4 transition-all duration-[180ms]",
             popupSideY === "up"
-              ? popupSideX === "right" ? "bottom-full mb-1.5 right-0 origin-bottom-right" : "bottom-full mb-1.5 left-0 origin-bottom-left"
-              : popupSideX === "right" ? "top-full mt-1.5 right-0 origin-top-right" : "top-full mt-1.5 left-0 origin-top-left",
+              ? popupSideX === "right" ? "origin-bottom-right" : "origin-bottom-left"
+              : popupSideX === "right" ? "origin-top-right" : "origin-top-left",
             animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1"
           )}
-          style={{ width: Math.min(264, window.innerWidth - 16) }}
+          style={{ width: Math.min(264, window.innerWidth - 16), ...popupPos }}
         >
           {/* Range mode — picking indicator */}
           {isRange && (
@@ -370,17 +400,19 @@ const DatePicker = (props: DatePickerProps) => {
               if (!day) return <span key={`e-${i}`} />;
               const iso = viewing.date(day).format("YYYY-MM-DD");
               const { isSelected, isInRange, isRangeStart, isRangeEnd, isToday } = getDayState(iso);
-              // Wednesday-only mode — disable all non-Wednesday days
-              const isWednesday = dayjs(iso).day() === 3;
-              const disabled = (!!props.wednesdayOnly && !isWednesday) || (props.disabledDates?.includes(iso) ?? false);
+              // Restrict to allowed days (allowedDays takes precedence over wednesdayOnly)
+              const dow = dayjs(iso).day();
+              const disabled =
+                (props.allowedDays ? !props.allowedDays.includes(dow) : (!!props.wednesdayOnly && dow !== 3)) ||
+                (props.disabledDates?.includes(iso) ?? false);
               return (
                 <button
                   key={day}
                   type="button"
                   disabled={disabled}
                   onClick={() => handleDayClick(iso)}
-                  onMouseEnter={() => !disabled && isRange && setHoverDate(iso)}
-                  onMouseLeave={() => isRange && setHoverDate("")}
+                  onMouseEnter={() => !disabled && isRange && handleHoverEnter(iso)}
+                  onMouseLeave={() => isRange && handleHoverLeave()}
                   className={cn(
                     "aspect-square text-xs flex items-center justify-center border border-transparent transition-colors",
                     disabled && "opacity-20 cursor-default",

@@ -1,17 +1,20 @@
+import { useState, useRef, useEffect } from "react";
 import { cn } from "../../../lib/utils";
 import {
   FaArrowLeft, FaCheck, FaTimes, FaEdit, FaTrash,
   FaExternalLinkAlt, FaHistory, FaPlus, FaUserAlt,
-  FaExchangeAlt, FaUnlink, FaPencilAlt,
+  FaExchangeAlt, FaUnlink, FaPencilAlt, FaEllipsisV,
 } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import DatePicker from "../../../components/DatePicker";
 import CopyId from "../../../components/CopyId";
 import Select from "../../../components/Select";
+import { Button } from "../../../components/Button";
 import { SortableHead } from "../components/SortableHead";
-import { BatchBar } from "../components/BatchBar";
+import { BatchPopup } from "../components/BatchPopup";
 import { Pagination } from "../components/Pagination";
 import { useAdminContext } from "../context";
+import { FilterSidebar, FilterTrigger } from "../components/FilterSidebar";
 import { toInputDate } from "../utils";
 import { GRAPH_COLORS, SCORE_DETAIL_PAGE_SIZE } from "../constants";
 import { rgbCss } from "../utils";
@@ -34,6 +37,40 @@ export const CharacterDetail = () => {
     deleteScore, batchDeleteDetailScores,
     inlineSaveScore, toggleSel, toggleAll, toggleSort,
   } = useAdminContext();
+
+  // Actions dropdown state (hooks must be before any conditional return)
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsMounted, setActionsMounted] = useState(false);
+  const [actionsAnimating, setActionsAnimating] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+
+  // Score history filter panel state
+  const [scoreFilterOpen, setScoreFilterOpen] = useState(false);
+
+  const openActions = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (actionsOpen) {
+      closeActions();
+      return;
+    }
+    setActionsMounted(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setActionsAnimating(true)));
+    setActionsOpen(true);
+  };
+  const closeActions = () => {
+    setActionsAnimating(false);
+    setActionsOpen(false);
+    setTimeout(() => setActionsMounted(false), 200);
+  };
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) closeActions();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [actionsOpen]);
 
   if (!charDetail) return null;
 
@@ -90,19 +127,22 @@ export const CharacterDetail = () => {
   };
 
   return (
+    <>
     <div className="flex flex-col gap-6">
       {/* Back button */}
-      <button
+      <Button
+        variant="tertiary"
+        size="md"
         onClick={handleBack}
-        className="flex items-center gap-2 text-sm text-tertiary hover:text-white transition-colors self-start"
+        icon={<FaArrowLeft size={12} />}
+        className="self-start h-auto px-0 py-1"
       >
-        <FaArrowLeft size={12} />
         {`Back to ${backTargetLabel}`}
-      </button>
+      </Button>
 
       {/* Header — avatar panel */}
-      <div className="bg-panel rounded-xl flex overflow-hidden" style={{ minHeight: "110px" }}>
-        <div className="w-28 bg-panel flex items-center justify-center shrink-0 p-3">
+      <div className="bg-panel rounded-xl flex" style={{ minHeight: "110px" }}>
+        <div className="w-28 rounded-l-xl bg-panel flex items-center justify-center shrink-0 p-3">
           {avatarSrc ? (
             <img
               src={avatarSrc}
@@ -114,8 +154,8 @@ export const CharacterDetail = () => {
             <FaUserAlt size={36} className="text-tertiary/30" />
           )}
         </div>
-        <div className="flex-1 px-6 py-5 flex items-center justify-between min-w-0">
-          <div className="min-w-0">
+        <div className="flex-1 px-4 md:px-6 py-4 md:py-5 flex flex-wrap items-center gap-x-4 gap-y-3 min-w-0">
+          <div className="min-w-0 flex-1">
             <a
               href={rankingsUrl}
               target="_blank"
@@ -128,36 +168,87 @@ export const CharacterDetail = () => {
             </a>
             <p className="text-tertiary text-sm mt-0.5">{levelLine}</p>
           </div>
-          {charEditsDirty && (
-            <button
-              onClick={saveCharEdits}
-              className="text-xs px-3 py-1.5 bg-accent/15 text-accent border border-accent/30 rounded-lg hover:bg-accent/25 transition-colors shrink-0 ml-4"
-            >
-              Save
-            </button>
-          )}
-          <div className="flex items-center gap-3 ml-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); setRenameModal({ isOpen: true, char: charDetail }); }}
-              title="Rename character"
-              className="flex items-center gap-1.5 text-xs text-tertiary border border-tertiary/20 hover:border-tertiary/40 hover:text-white rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
-            >
-              <FaPencilAlt size={11} /> Rename
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setTransferModal({ isOpen: true, char: charDetail }); }}
-              title="Transfer character to another user"
-              className="flex items-center gap-1.5 text-xs text-tertiary border border-tertiary/20 hover:border-tertiary/40 hover:text-white rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
-            >
-              <FaExchangeAlt size={11} /> Transfer
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setUnlinkModal({ isOpen: true, char: charDetail }); }}
-              title="Unlink character"
-              className="flex items-center gap-1.5 text-xs text-[#A46666]/70 hover:text-[#A46666] border border-[#A46666]/20 hover:border-[#A46666]/40 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
-            >
-              <FaUnlink size={11} /> Unlink
-            </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {charEditsDirty && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={saveCharEdits}
+              >
+                Save
+              </Button>
+            )}
+            {/* Desktop: individual action buttons — no dropdown needed */}
+            <div className="hidden md:flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<FaPencilAlt size={10} />}
+                onClick={(e) => { e.stopPropagation(); setRenameModal({ isOpen: true, char: charDetail }); }}
+              >
+                Rename
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<FaExchangeAlt size={10} />}
+                onClick={(e) => { e.stopPropagation(); setTransferModal({ isOpen: true, char: charDetail }); }}
+              >
+                Transfer
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon={<FaUnlink size={10} />}
+                onClick={(e) => { e.stopPropagation(); setUnlinkModal({ isOpen: true, char: charDetail }); }}
+              >
+                Unlink
+              </Button>
+            </div>
+            {/* Mobile: three-dots dropdown */}
+            <div ref={actionsRef} className="relative md:hidden">
+              <Button
+                variant="secondary"
+                size="mobile"
+                onClick={openActions}
+                title="Actions"
+                className={cn(actionsOpen && "bg-tertiary/[8%] border-tertiary/40 text-white")}
+              >
+                <FaEllipsisV size={12} />
+              </Button>
+              {actionsMounted && (
+                <div
+                  onTransitionEnd={() => { if (!actionsOpen) setActionsMounted(false); }}
+                  className={cn(
+                    "absolute right-0 top-full mt-1.5 z-[60] bg-panel border border-tertiary/[10%] rounded-xl drop-shadow-[0_4px_20px_rgba(0,0,0,0.5)] p-1 min-w-[150px] transition-all duration-200 origin-top-right",
+                    actionsAnimating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
+                  )}
+                >
+                  <Button
+                    variant="tertiary"
+                    onClick={(e) => { e.stopPropagation(); closeActions(); setRenameModal({ isOpen: true, char: charDetail }); }}
+                    className="w-full justify-start h-auto px-4 py-2 text-sm gap-2.5"
+                  >
+                    <FaPencilAlt size={11} className="text-tertiary/60 flex-shrink-0" /> Rename
+                  </Button>
+                  <Button
+                    variant="tertiary"
+                    onClick={(e) => { e.stopPropagation(); closeActions(); setTransferModal({ isOpen: true, char: charDetail }); }}
+                    className="w-full justify-start h-auto px-4 py-2 text-sm gap-2.5"
+                  >
+                    <FaExchangeAlt size={11} className="text-tertiary/60 flex-shrink-0" /> Transfer
+                  </Button>
+                  <div className="mx-3 h-px bg-tertiary/[8%] my-1" />
+                  <Button
+                    variant="danger"
+                    onClick={(e) => { e.stopPropagation(); closeActions(); setUnlinkModal({ isOpen: true, char: charDetail }); }}
+                    className="w-full justify-start h-auto px-4 py-2 text-sm gap-2.5 bg-transparent hover:bg-[#A46666]/10 border-transparent"
+                  >
+                    <FaUnlink size={11} className="flex-shrink-0" /> Unlink
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -165,7 +256,7 @@ export const CharacterDetail = () => {
       {/* Info rows */}
       <div className="bg-panel rounded-xl divide-y divide-tertiary/[6%]">
         {/* Owner — clicking navigates to that user's detail page */}
-        <div className="px-6 py-4 flex items-center gap-4">
+        <div className="px-4 md:px-6 py-3.5 flex flex-wrap items-center gap-3">
           <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">User</span>
           <button
             onClick={() => {
@@ -192,13 +283,13 @@ export const CharacterDetail = () => {
               {ownerData ? (ownerData.nickname ?? ownerData.username ?? ownerData._id) : "—"}
             </span>
           </button>
-          <span className="text-xs text-tertiary/50 shrink-0 ml-1">
+          <span className="text-xs text-tertiary/50 shrink-0">
             <CopyId id={charDetail.userId} />
           </span>
         </div>
 
         {/* Member Since — subtle compact DatePicker with inline confirm/cancel */}
-        <div className="px-6 py-4 flex items-center gap-4">
+        <div className="px-4 md:px-6 py-3.5 flex flex-wrap items-center gap-3">
           <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Member Since</span>
           <DatePicker
             subtle
@@ -211,62 +302,62 @@ export const CharacterDetail = () => {
           />
           {memberSinceDirty && (
             <div className="flex items-center gap-3">
-              <button onClick={saveMemberSince} title="Confirm" className="text-[#669A68] hover:text-white transition-colors">
+              <Button variant="inline" onClick={saveMemberSince} title="Confirm" className="text-[#669A68] hover:text-white">
                 <FaCheck size={13} />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="inline"
                 onClick={() => {
                   setCharEdits((p) => ({ ...p, memberSince: toInputDate(charDetail.memberSince) }));
                   setMemberSinceDirty(false);
                 }}
                 title="Cancel"
-                className="text-[#A46666] hover:text-white transition-colors"
+                className="text-[#A46666] hover:text-white"
               >
                 <FaTimes size={16} />
-              </button>
+              </Button>
             </div>
           )}
         </div>
 
         {/* Graph Color */}
-        <div className="px-6 py-4 flex items-center gap-4">
+        <div className="px-4 md:px-6 py-3.5 flex flex-wrap items-center gap-3">
           <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Graph Color</span>
-          <div className="flex items-center gap-2.5 w-[126px]">
-            <Select
-              variant="color"
-              className="w-[126px]"
-              options={GRAPH_COLORS.map((c) => ({ label: c.name, value: c.value, color: rgbCss(c.value) }))}
-              value={charEdits.graphColor}
-              onChange={(v) => { setCharEdits((p) => ({ ...p, graphColor: v })); setGraphColorDirty(true); }}
-            />
-            {graphColorDirty && (
-              <>
-                <button onClick={saveGraphColor} title="Confirm" className="text-[#669A68] hover:text-white transition-colors">
-                  <FaCheck size={13} />
-                </button>
-                <button
-                  onClick={() => {
-                    setCharEdits((p) => ({ ...p, graphColor: charDetail!.graphColor ?? "255,189,213" }));
-                    setGraphColorDirty(false);
-                  }}
-                  title="Cancel"
-                  className="text-[#A46666] hover:text-white transition-colors"
-                >
-                  <FaTimes size={16} />
-                </button>
-              </>
-            )}
-          </div>
+          <Select
+            variant="color"
+            className="min-w-[126px] flex-shrink-0"
+            options={GRAPH_COLORS.map((c) => ({ label: c.name, value: c.value, color: rgbCss(c.value) }))}
+            value={charEdits.graphColor}
+            onChange={(v) => { setCharEdits((p) => ({ ...p, graphColor: v })); setGraphColorDirty(true); }}
+          />
+          {graphColorDirty && (
+            <div className="flex items-center gap-3">
+              <Button variant="inline" onClick={saveGraphColor} title="Confirm" className="text-[#669A68] hover:text-white">
+                <FaCheck size={13} />
+              </Button>
+              <Button
+                variant="inline"
+                onClick={() => {
+                  setCharEdits((p) => ({ ...p, graphColor: charDetail!.graphColor ?? "255,189,213" }));
+                  setGraphColorDirty(false);
+                }}
+                title="Cancel"
+                className="text-[#A46666] hover:text-white"
+              >
+                <FaTimes size={16} />
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Personal Best */}
-        <div className="px-6 py-4 flex items-center gap-4">
+        <div className="px-4 md:px-6 py-3.5 flex flex-wrap items-center gap-3">
           <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Personal Best</span>
           <span className="text-sm">{bestScore > 0 ? bestScore.toLocaleString() : "—"}</span>
         </div>
 
         {/* Participation */}
-        <div className="px-6 py-4 flex items-center gap-4">
+        <div className="px-4 md:px-6 py-3.5 flex flex-wrap items-center gap-3">
           <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Participation</span>
           <span className="text-sm">
             {participated}/{total}
@@ -279,28 +370,41 @@ export const CharacterDetail = () => {
 
       {/* Score history */}
       <div className="bg-panel rounded-xl flex-shrink-0">
-        <div className="px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="px-4 md:px-6 py-4 md:py-5 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <h3 className="text-lg">Score History</h3>
-            <span className="text-tertiary/60 text-sm mt-1">{total} entries</span>
+            <span className="text-tertiary/60 text-sm self-center">{total} entries</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Mobile: filter trigger opens sidebar */}
             {charDetail.scores.length > 0 && (
-              <DatePicker
-                mode="range"
-                from={detailDateFrom}
-                to={detailDateTo}
-                onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
-                clearable
-                placeholder="All Dates"
-                align="right"
-                subtle
-                compact
-                wednesdayOnly
-                dropUp
-              />
+              <div className="md:hidden">
+                <FilterTrigger
+                  onClick={() => setScoreFilterOpen(true)}
+                  hasActiveFilters={!!(detailDateFrom || detailDateTo)}
+                />
+              </div>
             )}
-            <button
+            {/* Desktop: inline date range picker */}
+            {charDetail.scores.length > 0 && (
+              <div className="hidden md:block">
+                <DatePicker
+                  mode="range"
+                  from={detailDateFrom}
+                  to={detailDateTo}
+                  onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
+                  clearable
+                  wednesdayOnly
+                  align="right"
+                  placeholder="Date Range"
+                  compact
+                  subtle
+                />
+              </div>
+            )}
+            <Button
+              variant="primary"
+              size="mobile"
               onClick={() =>
                 setDrawer({
                   isOpen: true,
@@ -309,11 +413,11 @@ export const CharacterDetail = () => {
                   data: { character: charDetail.name, _fromCharDetail: true },
                 })
               }
-              className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent text-sm rounded-lg px-3 py-1 transition-colors"
+              className="md:h-[30px] md:w-auto md:px-3"
             >
-              <FaPlus size={11} style={{ marginBottom: "1px" }} />
-              Add Score
-            </button>
+              <FaPlus size={11} className="mb-px shrink-0" />
+              <span className="hidden md:inline">Add Score</span>
+            </Button>
           </div>
         </div>
         <div className="bg-tertiary/20 h-px" />
@@ -324,12 +428,13 @@ export const CharacterDetail = () => {
           </div>
         ) : (
           <>
-            <BatchBar
+            <BatchPopup
               count={selDetailScores.size}
               onDelete={batchDeleteDetailScores}
               onClear={() => setSelDetailScores(new Set())}
             />
-            <table className="w-full table-fixed">
+            <div className="overflow-x-auto">
+            <table className="w-full table-auto">
               <SortableHead
                 cols={[
                   { label: "Date",  field: "date"  },
@@ -376,14 +481,14 @@ export const CharacterDetail = () => {
                         isEditing ? "bg-background/40" : "hover:bg-background/40"
                       )}
                     >
-                      <td className="pl-5 pr-2 py-4 w-10">
+                      <td className="pl-6 pr-2 py-3.5 w-10">
                         <Checkbox
                           checked={selDetailScores.has(entry.date)}
                           onChange={() => toggleSel(selDetailScores, entry.date, setSelDetailScores)}
                         />
                       </td>
                       {/* Date */}
-                      <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-6 py-3.5 text-sm" onClick={(e) => e.stopPropagation()}>
                         {isEditing ? (
                           <div className="flex flex-col gap-1">
                             <DatePicker
@@ -406,7 +511,7 @@ export const CharacterDetail = () => {
                         )}
                       </td>
                       {/* Score */}
-                      <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-6 py-3.5 text-sm" onClick={(e) => e.stopPropagation()}>
                         {isEditing ? (
                           <input
                             type="number"
@@ -426,48 +531,51 @@ export const CharacterDetail = () => {
                         )}
                       </td>
                       {/* Actions */}
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-6 py-3.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-4">
                           {isEditing ? (
                             <>
-                              <button
+                              <Button
+                                variant="inline"
                                 onClick={inlineSaveScore}
                                 disabled={!canConfirm}
                                 title="Confirm"
                                 className={cn(
-                                  "transition-colors",
                                   canConfirm ? "text-[#669A68] hover:text-white" : "text-[#669A68]/35 cursor-default"
                                 )}
                               >
-                                <FaCheck size={14} />
-                              </button>
-                              <button
+                                <FaCheck size={14} style={{ marginBottom: "2px" }} />
+                              </Button>
+                              <Button
+                                variant="inline"
                                 onClick={() => setScoreInlineEdit(null)}
                                 title="Cancel"
-                                className="text-[#A46666] hover:text-white transition-colors"
+                                className="text-[#A46666] hover:text-white"
                               >
-                                <FaTimes size={16} />
-                              </button>
+                                <FaTimes size={16} style={{ marginBottom: "2px" }} />
+                              </Button>
                             </>
                           ) : (
                             <>
-                              <button
+                              <Button
+                                variant="inline"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setScoreInlineEdit({ scoreId: entry._id, origDate: entry.date, dateValue: entry.date, scoreValue: String(entry.score) });
                                 }}
                                 title="Edit"
-                                className="text-tertiary hover:text-accent transition-colors"
+                                className="text-tertiary/40 hover:text-accent"
                               >
-                                <FaEdit size={14} />
-                              </button>
-                              <button
+                                <FaEdit size={14} style={{ marginBottom: "2px" }} />
+                              </Button>
+                              <Button
+                                variant="inline"
                                 onClick={(e) => { e.stopPropagation(); deleteScore(charDetail.name, entry.date, entry._id); }}
                                 title="Delete"
-                                className="text-tertiary hover:text-[#A46666] transition-colors"
+                                className="text-[#A46666]/40 hover:text-[#A46666]"
                               >
-                                <FaTrash size={14} />
-                              </button>
+                                <FaTrash size={14} style={{ marginBottom: "2px" }} />
+                              </Button>
                             </>
                           )}
                         </div>
@@ -478,6 +586,7 @@ export const CharacterDetail = () => {
                 )}
               </tbody>
             </table>
+            </div>
             <Pagination
               page={detailScorePage}
               total={detailScores.length}
@@ -489,5 +598,26 @@ export const CharacterDetail = () => {
         )}
       </div>
     </div>
+    <FilterSidebar
+      isOpen={scoreFilterOpen}
+      onClose={() => setScoreFilterOpen(false)}
+      hasActiveFilters={!!(detailDateFrom || detailDateTo)}
+      onClear={() => { setDetailDateFrom(""); setDetailDateTo(""); setDetailScorePage(1); }}
+    >
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-tertiary/70 uppercase tracking-wider font-medium">Date Range</label>
+        <DatePicker
+          mode="range"
+          from={detailDateFrom}
+          to={detailDateTo}
+          onRangeChange={(f, t) => { setDetailDateFrom(f); setDetailDateTo(t); setDetailScorePage(1); }}
+          clearable
+          wednesdayOnly
+          align="right"
+          placeholder="All Dates"
+        />
+      </div>
+    </FilterSidebar>
+  </>
   );
 };

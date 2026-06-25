@@ -71,8 +71,12 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
 
+          {/* Root redirects to admin */}
+          <Route path="/" element={<Navigate to="/admin" replace />} />
+
+          {/* Dashboard still accessible directly */}
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <AppLayout>
@@ -91,10 +95,10 @@ function App() {
           <Route path="/admin/exceptions"         element={<AdminRoute />} />
           <Route path="/admin/action-log"         element={<AdminRoute />} />
           <Route path="/admin/scanner"            element={<AdminRoute />} />
-          <Route path="/admin/backups"            element={<AdminRoute />} />
+          <Route path="/admin/scheduled-tasks"   element={<AdminRoute />} />
 
           {/* Catch-all redirect */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
         </BrowserRouter>
       </AuthProvider>

@@ -93,6 +93,20 @@ router.get("/character/:name", async (req, res) => {
   }
 });
 
+// Get all character names linked to a Discord user ID
+router.get("/user/:id", async (req, res) => {
+  try {
+    const userId = String(req.params.id ?? "").trim();
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    const user = await culvertSchema.findById(userId, { "characters.name": 1 }).lean();
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ characters: (user.characters ?? []).map((c) => c.name) });
+  } catch (error) {
+    console.error("Error fetching user characters:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // Get character info from MapleStory rankings
 router.get("/rankings/:name", async (req, res) => {
   try {
@@ -217,6 +231,50 @@ router.delete("/admin/action-log", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+// Scheduled Tasks
+
+router.get("/admin/scheduled-tasks", (req, res) => {
+  const registry = req.app.get("cronRegistry");
+  if (!registry) return res.status(503).json({ error: "Cron registry not available" });
+
+  const offset = registry.getDstOffset();
+  const tasks = registry.getDefinitions().map((def) => ({
+    id:           def.id,
+    name:         def.name,
+    channelName:  def.channelName,
+    category:     def.category,
+    description:  def.description,
+    baseHour:     def.baseHour,
+    baseMinute:   def.baseMinute ?? 0,
+    days:         def.days,
+    effectiveHour: def.baseHour + offset,
+    effectiveMinute: def.baseMinute ?? 0,
+    nextRun:      registry.computeNextRun(def),
+  }));
+
+  res.json({ dstOffset: offset, tasks });
+});
+
+router.patch("/admin/scheduled-tasks/dst", (req, res) => {
+  const registry = req.app.get("cronRegistry");
+  if (!registry) return res.status(503).json({ error: "Cron registry not available" });
+
+  const { dstOffset } = req.body;
+  if (dstOffset !== 0 && dstOffset !== 1) {
+    return res.status(400).json({ error: "dstOffset must be 0 or 1" });
+  }
+
+  const isOwnerFromProxy = String(req.headers["x-admin-is-owner"] ?? "").toLowerCase() === "true";
+  if (!isOwnerFromProxy) return res.status(403).json({ error: "Only the bot owner can change DST settings" });
+
+  registry.setDstOffset(dstOffset);
+  res.json({ dstOffset });
+});
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Users — culvertSchema documents (keyed by Discord user ID)
 
@@ -1062,12 +1120,19 @@ router.post("/admin/scanner/scan", async (req, res) => {
     }
 
     const { lastReset, reset } = getResetDates();
-    const selectedWeek = week === "this_week" ? reset : lastReset;
+    const selectedWeek = /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : (week === "this_week" ? reset : lastReset);
 
-    // Fetch all character data (with discordIds) and exceptions in parallel.
-    // Building in-memory lookup maps eliminates N individual DB queries per scan.
-    // getScanBaseData() caches the result briefly to serve all concurrent images from one DB read.
-    const [allUsers, exceptions] = await getScanBaseData();
+    // Fetch character/exception data and historical week snapshots in parallel.
+    const [[allUsers, exceptions], historicalWeeks] = await Promise.all([
+      getScanBaseData(),
+      weekSchema.find({}, { "scores.name": 1, _id: 0 }).lean(),
+    ]);
+
+    // Set of all character names that have appeared in any past finalized week snapshot.
+    // Used to flag not-found OCR names that were once active (renamed or left guild).
+    const historicalNames = new Set(
+      historicalWeeks.flatMap((w) => (w.scores ?? []).map((s) => s.name.toLowerCase()))
+    );
 
     // Flat list for name-matching loops (same shape as getAllCharacters())
     const characterList = [];
@@ -1090,7 +1155,7 @@ router.post("/admin/scanner/scan", async (req, res) => {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-flash-image-preview",
+      model: "gemini-3.1-flash-lite-preview",
       generationConfig: {
         temperature: 0.0,
       },
@@ -1134,8 +1199,10 @@ PlayerName3 0`;
     const NaNScores = [];
     const zeroScores = [];
     const notFoundChars = [];
+    const absentChars = [];
     let totalSuccess = 0;
     let totalFailure = 0;
+    let totalScanned = 0;
 
     for (const entry of entryArray) {
       const entryParts = entry.split(" ");
@@ -1280,7 +1347,8 @@ PlayerName3 0`;
         }
       }
 
-      if (character && dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, "week"))) {
+      if (character && (!character.memberSince || dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, "week")))) {
+        totalScanned++;
         totalSuccess++;
         const oldName = validCharacter.name;
         validCharacter.name = character.name;
@@ -1319,8 +1387,16 @@ PlayerName3 0`;
           validCharacter.personalBest = bestScore;
         }
       } else {
-        totalFailure++;
-        notFoundChars.push({ name: validCharacter.name, discordId: userDiscordId });
+        if (character) {
+          // Matched in DB but joined after the selected week — exclude from counts, surface as absent
+          const zeroIdx = zeroScores.findIndex((z) => z.name === validCharacter.name);
+          if (zeroIdx !== -1) zeroScores.splice(zeroIdx, 1);
+          absentChars.push({ name: character.name, score: validCharacter.score });
+        } else {
+          totalScanned++;
+          totalFailure++;
+          notFoundChars.push({ name: validCharacter.name, discordId: userDiscordId });
+        }
       }
     }
 
@@ -1343,12 +1419,16 @@ PlayerName3 0`;
     res.json({
       week: selectedWeek,
       success: successEntries,
-      notFound: notFoundChars.map((nf) => ({ name: nf.name })),
+      notFound: notFoundChars.map((nf) => ({
+        name: nf.name,
+        ...(historicalNames.has(nf.name.toLowerCase()) ? { previouslyScanned: true } : {}),
+      })),
       nanScores: NaNScores.map((n) => ({ name: n.name })),
       zeroScores: zeroScores.map((z) => ({ name: z.name })),
+      absentScores: absentChars.map((a) => ({ name: a.name, score: a.score })),
       totalSuccess,
       totalFailure,
-      totalScanned: validScores.length,
+      totalScanned,
     });
   } catch (error) {
     console.error("Scanner error:", error);
@@ -1370,8 +1450,19 @@ router.post("/admin/scanner/log", async (req, res) => {
     // in the action log modal; subsequent Key: Value pairs populate the Changes Made section.
     const parts = [`Scanned ${imageCount} image${imageCount !== 1 ? "s" : ""} for ${target}`];
 
+    // Build a lookup so anomaly entries can be emitted inline with each matched character,
+    // preserving the original scan order rather than pushing them to the bottom.
+    const anomalyMap = new Map(anomalies.map((a) => [a.name, a]));
+
     for (const m of matched) {
-      if (m.isNaN) {
+      const anomaly = anomalyMap.get(m.name);
+      if (anomaly) {
+        const detail =
+          anomaly.previousScore != null
+            ? `${m.score} above previous ${anomaly.previousScore}`
+            : String(m.score);
+        parts.push(`${m.name} (Score Anomaly): ${detail}`);
+      } else if (m.isNaN) {
         parts.push(`${m.name} (NaN Score): NaN`);
       } else if (m.sandbag) {
         parts.push(`${m.name} (Sandbag): ${m.score}`);
@@ -1384,10 +1475,6 @@ router.post("/admin/scanner/log", async (req, res) => {
 
     for (const nf of notFound) {
       parts.push(`${nf.name} (Not Found): —`);
-    }
-
-    for (const anomaly of anomalies) {
-      parts.push(`${anomaly.name} (Score Anomaly): ${anomaly.score} above previous ${anomaly.previousScore}`);
     }
 
     await writeActionLog(req, {
@@ -1411,7 +1498,7 @@ router.post("/admin/scanner/finalize", async (req, res) => {
   try {
     const { week, override } = req.body;
     const { reset, lastReset } = getResetDates();
-    const selectedWeek = week === "this_week" ? reset : lastReset;
+    const selectedWeek = /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : (week === "this_week" ? reset : lastReset);
 
     const charactersData = await culvertSchema.find({}, "characters");
     const allCharacters = charactersData.flatMap((list) => list.characters);
@@ -1449,7 +1536,7 @@ router.post("/admin/scanner/finalize", async (req, res) => {
 
     const summaryLine = `${submitted}/${total} scores submitted for week of ${selectedWeek}`;
 
-    const weekLabel = week === "this_week" ? `This Week (${selectedWeek})` : `Last Week (${selectedWeek})`;
+    const weekLabel = `Week of ${selectedWeek}`;
     const overrideUsed = missedCharacters.length > 0 && !!override;
 
     await writeActionLog(req, {
@@ -1522,99 +1609,6 @@ router.get("/admin/weeks/:date(\\d{4}-\\d{2}-\\d{2})", async (req, res) => {
   } catch (error) {
     console.error("Week detail error:", error);
     res.status(500).json({ error: "Failed to get week" });
-  }
-});
-
-// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-// Backups routes
-
-/**
- * GET /admin/backups
- * Returns a list of all saved backup files.
- */
-router.get("/admin/backups", (req, res) => {
-  try {
-    if (!fs.existsSync(BACKUPS_DIR)) return res.json({ backups: [] });
-
-    const backups = fs
-      .readdirSync(BACKUPS_DIR)
-      .filter((f) => f.endsWith(".json"))
-      .map((filename) => {
-        const stat = fs.statSync(path.join(BACKUPS_DIR, filename));
-        return { filename, createdAt: stat.mtime.toISOString(), size: stat.size };
-      })
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    res.json({ backups });
-  } catch (error) {
-    console.error("Backups list error:", error);
-    res.status(500).json({ error: "Failed to list backups" });
-  }
-});
-
-/**
- * POST /admin/backups
- * Creates a manual culvert backup.
- */
-router.post("/admin/backups", async (req, res) => {
-  try {
-    const data = await culvertSchema.find({});
-    const jsonData = JSON.stringify(data, null, 2);
-    const backupFilename = `saku_culvert_manual_${Date.now()}.json`;
-    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
-    fs.writeFileSync(path.join(BACKUPS_DIR, backupFilename), jsonData, "utf-8");
-    const stat = fs.statSync(path.join(BACKUPS_DIR, backupFilename));
-    res.json({ success: true, filename: backupFilename, createdAt: stat.mtime.toISOString(), size: stat.size });
-  } catch (error) {
-    console.error("Manual backup error:", error);
-    res.status(500).json({ error: "Failed to create backup" });
-  }
-});
-
-/**
- * POST /admin/backups/import
- * Saves an imported JSON backup to disk.
- */
-router.post("/admin/backups/import", (req, res) => {
-  try {
-    const { content } = req.body;
-    if (!content || typeof content !== "object") {
-      return res.status(400).json({ error: "Invalid backup content" });
-    }
-    const importFilename = `saku_culvert_import_${Date.now()}.json`;
-    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
-    fs.writeFileSync(path.join(BACKUPS_DIR, importFilename), JSON.stringify(content, null, 2), "utf-8");
-    const stat = fs.statSync(path.join(BACKUPS_DIR, importFilename));
-    writeActionLog(req, {
-      action: "Import Backup",
-      target: importFilename,
-      details: null,
-      category: "finalize",
-    });
-    res.json({ success: true, filename: importFilename, createdAt: stat.mtime.toISOString(), size: stat.size });
-  } catch (error) {
-    console.error("Import backup error:", error);
-    res.status(500).json({ error: "Failed to import backup" });
-  }
-});
-
-/**
- * GET /admin/backups/:filename
- * Returns the parsed JSON content of a single backup file.
- */
-router.get("/admin/backups/:filename", (req, res) => {
-  try {
-    const { filename } = req.params;
-    if (!/^saku_culvert_[^/\\<>:"|?*]+\.json$/.test(filename)) {
-      return res.status(400).json({ error: "Invalid filename" });
-    }
-    const filePath = path.join(BACKUPS_DIR, filename);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Backup not found" });
-    const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-    res.json({ filename, content });
-  } catch (error) {
-    console.error("Backup read error:", error);
-    res.status(500).json({ error: "Failed to read backup" });
   }
 });
 

@@ -6,8 +6,6 @@ import {
   FaExclamationTriangle,
   FaRedo,
   FaDownload,
-  FaChevronUp,
-  FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
   FaClock,
@@ -18,7 +16,10 @@ import { BOT_API } from "../constants";
 import { useAdminContext } from "../context";
 import { useNotifications } from "../../../context/NotificationContext";
 import AutocompleteInput from "../../../components/AutocompleteInput";
+import DatePicker from "../../../components/DatePicker";
 import Divider from "../../../components/Divider";
+import { TableSortHead } from "../components/TableSortHead";
+import { Button } from "../../../components/Button";
 import type { ScanResultEntry, ScanImageResult, FinalizeResult } from "../types";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -31,8 +32,6 @@ type ImageFile = {
 
 type ScanPhase = "idle" | "scanning" | "done";
 
-type WeekOption = "this_week" | "last_week";
-
 type AnomalyEntry = {
   name: string;
   score: number;
@@ -42,9 +41,10 @@ type AnomalyEntry = {
 
 type AggregatedResult = {
   success: ScanResultEntry[];
-  notFound: { name: string }[];
+  notFound: { name: string; previouslyScanned?: boolean }[];
   nanScores: { name: string }[];
   zeroScores: { name: string }[];
+  absentScores: ScanResultEntry[];
   totalSuccess: number;
   totalFailure: number;
   totalScanned: number;
@@ -54,6 +54,11 @@ type AggregatedResult = {
 
 type TableSort = { field: "name" | "score" | "status"; dir: "asc" | "desc" } | null;
 
+// SavedScan stores the last completed scan result for later review
+type SavedScan = {
+  result: AggregatedResult;
+  duration: number | null;
+};
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -92,8 +97,9 @@ function statusRank(entry: ScanResultEntry, isAnomaly: boolean): number {
   if (entry.isNaN) return 0;
   if (isAnomaly) return 1;
   if (entry.sandbag) return 2;
-  if (entry.score === 0) return 3;
-  return 4;
+  if (entry.absent) return 3;
+  if (entry.score === 0) return 4;
+  return 5;
 }
 
 /** Small floating tooltip that follows our panel design. */
@@ -118,6 +124,20 @@ const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }
   </div>
 );
 
+/** Returns the culvert week date (Wednesday UTC) at the given offset (0 = this week, -1 = last week, etc.).
+ *  The bot identifies each culvert week by the Wednesday before Thursday's reset. */
+function getCulvertWednesday(weekOffset = 0): string {
+  const now = new Date();
+  const daysSinceThursday = (now.getUTCDay() + 7 - 4) % 7;
+  // Most recent Thursday (culvert week boundary)
+  const thursdayMs = Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceThursday
+  );
+  // The week date is the Wednesday immediately before that Thursday
+  return new Date(thursdayMs - 24 * 60 * 60 * 1000 + weekOffset * 7 * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
+}
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 export const ScannerTab = () => {
@@ -125,7 +145,7 @@ export const ScannerTab = () => {
   const { notify } = useNotifications();
 
   const [images, setImages] = useState<ImageFile[]>([]);
-  const [week, setWeek] = useState<WeekOption>("last_week");
+  const [week, setWeek] = useState<string>(() => getCulvertWednesday(-1));
   const [phase, setPhase] = useState<ScanPhase>("idle");
   const [progress, setProgress] = useState({ current: 0, total: 0, message: "", imageName: "" });
   const [results, setResults] = useState<AggregatedResult | null>(null);
@@ -146,6 +166,8 @@ export const ScannerTab = () => {
   const [exceptionSaving, setExceptionSaving] = useState(false);
   const [finalizeWarnModal, setFinalizeWarnModal] = useState<{ notFound: string[]; anomalies: string[]; missing: string[] } | null>(null);
   const [lightboxVisible, setLightboxVisible] = useState(false);
+  const [lastScan, setLastScan] = useState<SavedScan | null>(null);
+  const [viewingLastScan, setViewingLastScan] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -273,7 +295,7 @@ export const ScannerTab = () => {
   // Reset week selector to default when returning to scanner while idle
   useEffect(() => {
     if (activeToolSection === "scanner" && phase === "idle") {
-      setWeek("last_week");
+      setWeek(getCulvertWednesday(-1));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeToolSection]);
@@ -296,6 +318,7 @@ export const ScannerTab = () => {
       notFound: [],
       nanScores: [],
       zeroScores: [],
+      absentScores: [],
       totalSuccess: 0,
       totalFailure: 0,
       totalScanned: 0,
@@ -341,6 +364,7 @@ export const ScannerTab = () => {
         }
         aggregated.nanScores.push(...data.nanScores);
         aggregated.zeroScores.push(...data.zeroScores);
+        aggregated.absentScores.push(...(data.absentScores ?? []).map((e) => ({ ...e, sandbag: false, isNaN: false, absent: true as const })));
         aggregated.totalSuccess += data.totalSuccess;
         aggregated.totalFailure += data.totalFailure;
         aggregated.totalScanned += data.totalScanned;
@@ -351,17 +375,29 @@ export const ScannerTab = () => {
     }
 
     // Detect score-order anomalies — culvert screenshots should be submitted in descending order,
-    // so each score should be ≤ the previous non-zero, non-NaN, non-sandbag score. A score that
-    // goes UP is a likely OCR misread (added/removed digit, misread number).
-    // Sandbag entries are excluded from tracking so they don't cause false positives for
-    // legitimate scores that come after them.
-    let prevScore: number | null = null;
+    // so each score should be ≤ the previous score. When an entry is LOWER than the one that
+    // follows it, that entry is the anomaly (not the one that's higher). For sandbag sequences
+    // (Karrot → RevHero sandbag → cebi), the sandbag is flagged because it broke the chain.
+    // For plain non-sandbag sequences (A → B → C where C > B), C is flagged as before.
+    let lastScore: number | null = null;
+    let lastNonSandbagScore: number | null = null;
+    let prevEntry: (typeof aggregated.success)[0] | null = null;
+    let prevEntryRefScore: number | null = null; // lastNonSandbagScore at the time prevEntry was processed
     for (const entry of aggregated.success) {
-      if (!entry.isNaN && entry.score > 0 && !entry.sandbag) {
-        if (prevScore !== null && entry.score > prevScore) {
-          aggregated.anomalies.push({ name: entry.name, score: entry.score, previousScore: prevScore });
+      if (!entry.isNaN && entry.score > 0) {
+        if (!entry.sandbag && lastScore !== null && entry.score > lastScore) {
+          if (prevEntry?.sandbag) {
+            // The sandbag entry before this one is lower than what follows — flag the sandbag
+            aggregated.anomalies.push({ name: prevEntry.name, score: prevEntry.score, previousScore: prevEntryRefScore ?? lastScore });
+          } else {
+            // Standard forward anomaly: current non-sandbag is higher than its predecessor
+            aggregated.anomalies.push({ name: entry.name, score: entry.score, previousScore: lastNonSandbagScore ?? lastScore });
+          }
         }
-        prevScore = entry.score;
+        prevEntryRefScore = lastNonSandbagScore;
+        prevEntry = entry;
+        lastScore = entry.score;
+        if (!entry.sandbag) lastNonSandbagScore = entry.score;
       }
     }
 
@@ -397,10 +433,14 @@ export const ScannerTab = () => {
     const elapsed = parseFloat(((Date.now() - scanStartRef.current) / 1000).toFixed(2));
     setScanDuration(elapsed);
 
+    const thisWeekDate = getCulvertWednesday(0);
+    const lastWeekDate = getCulvertWednesday(-1);
     const weekLabel =
-      week === "this_week"
+      aggregated.week === thisWeekDate
         ? `This Week (${aggregated.week})`
-        : `Last Week (${aggregated.week})`;
+        : aggregated.week === lastWeekDate
+          ? `Last Week (${aggregated.week})`
+          : `Week of ${aggregated.week}`;
 
     // Log the aggregate scan with full detail payload for the action log
     if (aggregated.totalScanned > 0) {
@@ -516,6 +556,13 @@ export const ScannerTab = () => {
           if (!mergedZero.some((x) => x.name === z.name)) mergedZero.push(z);
         }
 
+        // Merge absent entries — replace existing by name, add new ones
+        const newAbsentNames = new Set((data.absentScores ?? []).map((e: { name: string }) => e.name));
+        const mergedAbsent = [
+          ...(prev.absentScores ?? []).filter((e) => !newAbsentNames.has(e.name)),
+          ...(data.absentScores ?? []).map((e: { name: string; score: number }) => ({ ...e, sandbag: false, isNaN: false, absent: true as const })),
+        ];
+
         // Recompute totals from the merged arrays rather than accumulating,
         // so rescanning an image never inflates the displayed counts.
         return {
@@ -524,6 +571,7 @@ export const ScannerTab = () => {
           notFound: mergedNotFound,
           nanScores: mergedNan,
           zeroScores: mergedZero,
+          absentScores: mergedAbsent,
           totalSuccess: mergedSuccess.length,
           totalFailure: mergedNotFound.length,
           totalScanned: mergedSuccess.length + mergedNotFound.length,
@@ -575,8 +623,10 @@ export const ScannerTab = () => {
       // Give the backend cache and db a tiny moment to cleanly flip
       await new Promise(r => setTimeout(r, 600));
 
-      // Auto-rescan all images that had not-found entries so the exception is applied immediately
-      const imagesToRescan = images.filter((img) => imageHasNotFound.has(img.fingerprint));
+      // Rescan only the image(s) that contained this specific OCR name
+      const imagesToRescan = images.filter((img) =>
+        imageNotFoundNamesRef.current.get(img.fingerprint)?.includes(resolvedOcrName)
+      );
       for (const img of imagesToRescan) {
         rescanSingle(img);
       }
@@ -656,11 +706,16 @@ export const ScannerTab = () => {
   // Reset
 
   const resetAll = () => {
+    // Save this scan's data for later review — skip if we're already viewing a saved scan
+    if (results && !viewingLastScan) {
+      setLastScan({ result: results, duration: scanDuration });
+    }
     images.forEach((img) => URL.revokeObjectURL(img.preview));
     fingerprintsRef.current.clear();
     setImages([]);
     setPhase("idle");
     setResults(null);
+    setViewingLastScan(false);
     setFailedImages([]);
     setFinalizeResult(null);
     setScanDuration(null);
@@ -695,11 +750,15 @@ export const ScannerTab = () => {
 
   const anomalyNames = new Set((results?.anomalies ?? []).map((a) => a.name));
 
+  const allTableEntries: ScanResultEntry[] = results
+    ? [...results.success, ...(results.absentScores ?? [])]
+    : [];
+
   const sortedSuccess = results
     ? (() => {
-        if (!tableSort) return results.success;
+        if (!tableSort) return allTableEntries;
         const dir = tableSort.dir === "asc" ? 1 : -1;
-        return [...results.success].sort((a, b) => {
+        return [...allTableEntries].sort((a, b) => {
           if (tableSort.field === "name") return dir * a.name.localeCompare(b.name);
           if (tableSort.field === "score") return dir * (a.score - b.score);
           if (tableSort.field === "status") return dir * (statusRank(a, anomalyNames.has(a.name)) - statusRank(b, anomalyNames.has(b.name)));
@@ -708,72 +767,47 @@ export const ScannerTab = () => {
       })()
     : [];
 
-  const TableSortHead = ({ label, field }: { label: string; field: "name" | "score" | "status" }) => (
-    <button
-      type="button"
-      onClick={() => toggleTableSort(field)}
-      className="inline-flex items-center gap-1.5 hover:text-white/80 transition-colors"
-    >
-      {label}
-      <span
-        className={cn(
-          "inline-flex items-center text-accent transition-opacity duration-150",
-          tableSort?.field === field ? "opacity-100" : "opacity-0"
-        )}
-      >
-        {tableSort?.field === field && tableSort.dir === "asc"
-          ? <FaChevronUp size={9} />
-          : <FaChevronDown size={9} />}
-      </span>
-    </button>
-  );
-
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Render
 
   return (
+    <>
+      {/* Mobile unsupported */}
+      <div className="md:hidden flex flex-col items-center justify-center text-center py-20 px-8 gap-5 text-tertiary/50">
+        <FaCamera size={40} />
+        <div>
+          <h3 className="text-lg font-medium text-white/80">Unsupported Viewport</h3>
+          <p className="text-sm mt-1.5 leading-relaxed max-w-[280px]">
+            Image scanning is not supported on smaller screens. Use a computer or maximize the window to scan culvert images.
+          </p>
+        </div>
+      </div>
+      <div className="hidden md:contents">
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center px-6 py-5 gap-5">
+      <div className="flex items-center justify-between px-6 py-5">
         <h2 className="text-2xl font-medium">Culvert Scanner</h2>
-        {phase === "done" && scanDuration !== null && (
-          <span className="text-xs text-tertiary/50 flex items-center gap-1.5 mt-1.5">
-            <FaClock size={10} className="-mt-px" />
-            Done in {scanDuration.toFixed(2)}s
-          </span>
+        {phase === "done" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FaChevronLeft size={10} />}
+            onClick={resetAll}
+            disabled={rescanningSingle.size > 0}
+          >
+            {viewingLastScan ? "Back to Scanner" : "New Scan"}
+          </Button>
         )}
       </div>
 
       <div className="flex-1 px-6 pb-6">
         {/* Upload area — hidden once scan is done */}
         {phase !== "done" && (
-          <div className="bg-panel/70 border border-tertiary/[8%] rounded-xl p-6">
+          <div className="flex gap-5 items-stretch">
+          <div className="flex-1 bg-panel border border-tertiary/[8%] rounded-xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-medium text-white">New Scan</h3>
-              <div className="flex rounded-lg overflow-hidden border border-tertiary/20">
-                <button
-                  onClick={() => setWeek("last_week")}
-                  className={cn(
-                    "px-4 py-1.5 text-xs transition-colors",
-                    week === "last_week"
-                      ? "bg-accent/15 text-accent border-r border-accent/30"
-                      : "bg-background/60 text-tertiary hover:text-white border-r border-tertiary/20"
-                  )}
-                >
-                  Last Week
-                </button>
-                <button
-                  onClick={() => setWeek("this_week")}
-                  className={cn(
-                    "px-4 py-1.5 text-xs transition-colors",
-                    week === "this_week"
-                      ? "bg-accent/15 text-accent"
-                      : "bg-background/60 text-tertiary hover:text-white"
-                  )}
-                >
-                  This Week
-                </button>
-              </div>
+              <h3 className="text-sm font-medium text-white">Scanning for <span className="font-mono text-white/70">{week}</span></h3>
+              <DatePicker value={week} onChange={setWeek} allowedDays={[3]} compact align="right" />
             </div>
 
             {/* Shared hidden file input */}
@@ -852,13 +886,15 @@ export const ScannerTab = () => {
             {/* Scan button + progress */}
             {images.length > 0 && phase === "idle" && (
               <div className="flex border-t border-tertiary/[8%] pt-4 mt-6">
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon={<FaCamera size={13} />}
                   onClick={startScan}
-                  className="flex items-center gap-2 bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent text-sm rounded-lg px-5 py-2 transition-colors ml-auto"
+                  className="ml-auto"
                 >
-                  <FaCamera size={13} />
                   Scan {images.length} Image{images.length !== 1 ? "s" : ""}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -896,11 +932,46 @@ export const ScannerTab = () => {
               </div>
             )}
           </div>
+
+          <CoveragePanel
+            liveCharacters={liveCharacters}
+            liveScores={liveScores}
+            selectedWeek={week}
+            lastScan={lastScan}
+            onViewLastScan={() => {
+              if (!lastScan) return;
+              setResults(lastScan.result);
+              setScanDuration(lastScan.duration);
+              setPhase("done");
+              setViewingLastScan(true);
+            }}
+          />
+          </div>
         )}
 
         {/* Results */}
         {phase === "done" && results && (
           <div className="space-y-5">
+
+            {/* Summary bar */}
+            {(() => {
+              const weekStart = new Date(results.week);
+              const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+              const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+              return (
+                <div className="bg-panel border border-tertiary/[8%] rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-tertiary/50 uppercase tracking-wide">Week</span>
+                    <span className="text-sm text-white/80 tabular-nums">{fmt(weekStart)} – {fmt(weekEnd)}</span>
+                  </div>
+                  <div className="h-3.5 w-px bg-tertiary/15" />
+                  <StatChip label="Scanned" value={results.totalScanned} color="text-white/70" />
+                  <StatChip label="Matched" value={results.totalSuccess} color="text-[#669A68]" />
+                  <StatChip label="Not Found" value={results.totalFailure} color="text-[#C87070]" />
+                  <StatChip label="Zero Scores" value={results.zeroScores.length} color="text-[#C8A855]" />
+                </div>
+              );
+            })()}
 
             {/* Main result area: table (left half) + stats panel (right half) */}
             <div className="flex gap-5 items-stretch">
@@ -919,13 +990,13 @@ export const ScannerTab = () => {
                         <thead>
                           <tr>
                             <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-3 select-none">
-                              <TableSortHead label="CHARACTER" field="name" />
+                              <TableSortHead label="CHARACTER" field="name" activeSort={tableSort} onToggle={toggleTableSort} />
                             </th>
-                            <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-3 select-none w-36">
-                              <TableSortHead label="SCORE" field="score" />
+                            <th className="text-center text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-3 select-none w-36">
+                              <TableSortHead label="SCORE" field="score" activeSort={tableSort} onToggle={toggleTableSort} />
                             </th>
-                            <th className="text-center text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-3 select-none w-20">
-                              <TableSortHead label="STATUS" field="status" />
+                            <th className="text-center text-xs text-tertiary font-medium uppercase tracking-wide px-4 pr-6 py-3 select-none w-24">
+                              <TableSortHead label="STATUS" field="status" activeSort={tableSort} onToggle={toggleTableSort} />
                             </th>
                           </tr>
                         </thead>
@@ -936,7 +1007,7 @@ export const ScannerTab = () => {
                   {/* Scrollable body */}
                   <div className="flex-1 overflow-y-auto bg-panel min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
                     <table className="w-full text-sm table-fixed">
-                      <colgroup><col /><col className="w-36" /><col className="w-20" /></colgroup>
+                      <colgroup><col /><col className="w-36" /><col className="w-24" /></colgroup>
                       <tbody>
                         {sortedSuccess.map((entry, i) => (
                           <tr key={i} className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors">
@@ -951,16 +1022,18 @@ export const ScannerTab = () => {
                                 {entry.name}
                               </button>
                             </td>
-                            <td className={cn("px-4 py-3 text-left text-sm tabular-nums", entry.score === 0 && !entry.isNaN ? "text-[#C87070]" : "text-white")}>
+                            <td className={cn("px-4 py-3 text-center text-sm tabular-nums", entry.score === 0 && !entry.isNaN ? "text-[#C87070]" : "text-white")}>
                               {isNaN(entry.score) ? "—" : entry.score.toLocaleString()}
                             </td>
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-4 pr-6 py-3 text-center">
                               {entry.isNaN ? (
                                 <span className="text-xs text-[#D4915E]">NaN</span>
                               ) : anomalyNames.has(entry.name) ? (
                                 <span className="text-xs text-[#D4915E]">Anomaly</span>
                               ) : entry.sandbag ? (
                                 <span className="text-xs text-[#C8A855]">Sandbag</span>
+                              ) : entry.absent ? (
+                                <span className="text-xs text-[#C87070]">Absent</span>
                               ) : entry.score === 0 ? (
                                 <span className="text-xs text-tertiary/50">Zero</span>
                               ) : (
@@ -974,7 +1047,7 @@ export const ScannerTab = () => {
                   </div>
 
                   {/* Fixed bottom: scanned images section */}
-                  {images.length > 0 && (
+                  {images.length > 0 && !viewingLastScan && (
                     <div className="border-t border-tertiary/[8%] p-3 flex-shrink-0">
                       <p className="text-xs font-medium text-tertiary/60 uppercase tracking-wider mb-2">Scanned Images</p>
                       <div className="flex gap-2 overflow-x-auto">
@@ -1023,9 +1096,17 @@ export const ScannerTab = () => {
 
                 {/* Fixed top: Scan Overview summary cards */}
                 <div className="flex flex-col gap-3 p-4 pb-3 flex-shrink-0">
-                  <h3 className="text-xs font-medium text-tertiary/60 uppercase tracking-wider">
-                    Scan Overview
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-medium text-tertiary/60 uppercase tracking-wider">
+                      Scan Overview
+                    </h3>
+                    {scanDuration !== null && (
+                      <span className="flex items-center gap-1.5 text-xs text-tertiary/40">
+                        <FaClock size={9} />
+                        {scanDuration.toFixed(2)}s
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-2.5">
                     <SummaryCard label="Total Scanned" value={results.totalScanned} color="text-white" className="flex-1" />
                     <SummaryCard label="Matched" value={results.totalSuccess} color="text-[#669A68]" className="flex-1" />
@@ -1055,12 +1136,14 @@ export const ScannerTab = () => {
                               ? <>: {a.score > 0 ? a.score.toLocaleString() : "0"} &mdash; {a.reason}</>
                               : <>: {a.score.toLocaleString()} &mdash; expected &le; {a.previousScore!.toLocaleString()}</>}
                           </p>
+                          {!viewingLastScan && (
                           <button
                             onClick={() => { setCorrectModal({ name: a.name, week: results.week, currentScore: a.score }); setCorrectInput(""); }}
                             className="flex-shrink-0 text-[10px] text-[#D4915E] hover:text-white border border-[#D4915E]/30 hover:border-white/20 rounded px-1.5 py-0.5 transition-colors"
                           >
                             Correct
                           </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1107,13 +1190,20 @@ export const ScannerTab = () => {
                     <div className="space-y-1.5">
                       {results.notFound.map((nf, i) => (
                         <div key={i} className="flex items-center justify-between gap-3">
-                          <span className="text-xs text-white/80">{nf.name}</span>
+                          <span className="text-xs text-white/80">
+                            {nf.name}
+                            {nf.previouslyScanned && (
+                              <span className="ml-1.5 text-tertiary/40">(renamed or unlinked)</span>
+                            )}
+                          </span>
+                          {!viewingLastScan && (
                           <button
                             onClick={() => { setExceptionModal({ exception: nf.name }); setExceptionCharInput(""); }}
                             className="flex-shrink-0 text-[10px] text-accent hover:text-white border border-accent/30 hover:border-white/20 rounded px-1.5 py-0.5 transition-colors"
                           >
                             Add Exception
                           </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1133,53 +1223,102 @@ export const ScannerTab = () => {
                 {(() => {
                   const scoredThisWeek = new Set(liveScores.filter(s => s.date === results.week).map(s => s.character));
                   const submittedCount = scoredThisWeek.size;
+                  const weekEnd = new Date(new Date(results.week).getTime() + 7 * 24 * 60 * 60 * 1000);
+                  const eligibleChars = liveCharacters.filter(c => !c.memberSince || new Date(c.memberSince) < weekEnd);
                   return (
                 <div className="border-t border-tertiary/[8%] px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
-                  <span className={cn(
-                    "text-xs",
-                    submittedCount >= liveCharacters.length ? "text-[#669A68]" : "text-[#C87070]"
-                  )}>
-                    {submittedCount}
-                    <span className="opacity-50"> / </span>
-                    {liveCharacters.length} scores submitted
-                  </span>
+                  {viewingLastScan ? (
+                    <span className="text-xs text-tertiary/40">Saved scan — read only</span>
+                  ) : (
+                    <span className={cn(
+                      "text-xs",
+                      submittedCount >= eligibleChars.length ? "text-[#669A68]" : "text-[#C87070]"
+                    )}>
+                      {submittedCount}
+                      <span className="opacity-50"> / </span>
+                      {eligibleChars.length} scores submitted
+                    </span>
+                  )}
+                  {!viewingLastScan && (
                   <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={resetAll}
-                      className="flex items-center gap-1.5 text-sm text-tertiary hover:text-white border border-tertiary/[10%] hover:border-tertiary/30 rounded-lg px-4 py-2 transition-colors"
-                    >
-                      <FaRedo size={10} />
-                      New Scan
-                    </button>
-                    <button
+                    <Button
+                      variant="success"
+                      size="sm"
+                      icon={<FaDownload size={10} />}
+                      loading={finalizing}
+                      disabled={finalizing || rescanningSingle.size > 0}
                       onClick={() => {
                         const unresolvedNotFound = results.notFound.map(nf => nf.name);
                         const unresolvedAnomalies = results.anomalies.map(a => a.name);
-                        const missing = liveCharacters.filter(c => !scoredThisWeek.has(c.name)).map(c => c.name);
+                        const missing = eligibleChars.filter(c => !scoredThisWeek.has(c.name)).map(c => c.name);
                         if (unresolvedNotFound.length > 0 || unresolvedAnomalies.length > 0 || missing.length > 0) {
                           setFinalizeWarnModal({ notFound: unresolvedNotFound, anomalies: unresolvedAnomalies, missing });
                         } else {
                           handleFinalize();
                         }
                       }}
-                      disabled={finalizing}
-                      className={cn(
-                        "flex items-center gap-1.5 text-sm rounded-lg px-4 py-2 transition-colors",
-                        finalizing
-                          ? "bg-tertiary/10 text-tertiary/40 cursor-not-allowed"
-                          : "bg-[#669A68]/10 hover:bg-[#669A68]/15 border border-[#669A68]/40 text-[#669A68]"
-                      )}
                     >
-                      <FaDownload size={10} />
-                      {finalizing ? "Finalizing..." : "Finalize"}
-                    </button>
+                      Finalize
+                    </Button>
                   </div>
+                  )}
                 </div>
                   );
                 })()}
 
               </div>
             </div>
+
+            {/* DB Week Coverage */}
+            {(() => {
+              const weekEnd = new Date(new Date(results.week).getTime() + 7 * 24 * 60 * 60 * 1000);
+              const eligibleChars = liveCharacters.filter(c => !c.memberSince || new Date(c.memberSince) < weekEnd);
+              const dbWeekScores = liveScores
+                .filter(s => s.date === results.week)
+                .sort((a, b) => b.score - a.score);
+              const missingFromDb = eligibleChars.filter(c => !dbWeekScores.some(s => s.character === c.name));
+              return (
+                <div className="bg-panel border border-tertiary/[8%] rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-tertiary/[8%] bg-background/30">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xs font-medium text-tertiary/60 uppercase tracking-wider">DB Week Coverage</h3>
+                      <span className={cn("text-xs tabular-nums", dbWeekScores.length >= eligibleChars.length ? "text-[#669A68]" : "text-[#C8A855]")}>
+                        {dbWeekScores.length} / {eligibleChars.length} submitted
+                      </span>
+                    </div>
+                    {missingFromDb.length > 0 && (
+                      <span className="text-xs text-tertiary/40">{missingFromDb.length} still missing — continue scanning to fill gaps</span>
+                    )}
+                  </div>
+                  <div className="flex max-h-44">
+                    <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                      {dbWeekScores.length === 0 ? (
+                        <p className="px-4 py-3 text-xs text-tertiary/40">No scores submitted for this week yet</p>
+                      ) : (
+                        <table className="w-full text-sm table-fixed">
+                          <tbody>
+                            {dbWeekScores.map((s, i) => (
+                              <tr key={i} className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors">
+                                <td className="px-4 py-1.5 text-sm text-white/80">{s.character}</td>
+                                <td className="px-4 py-1.5 text-sm text-tertiary/60 tabular-nums text-right">{s.score.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                    {missingFromDb.length > 0 && (
+                      <div className="w-52 border-l border-tertiary/[8%] overflow-y-auto flex-shrink-0 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                        <p className="px-3 pt-2 pb-1 text-[10px] text-[#C87070] uppercase tracking-wider font-medium">Missing ({missingFromDb.length})</p>
+                        {missingFromDb.map((c, i) => (
+                          <p key={i} className="px-3 py-1 text-xs text-white/50">{c.name}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
         )}
@@ -1223,24 +1362,22 @@ export const ScannerTab = () => {
               />
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="primary"
+                loading={exceptionSaving}
+                disabled={!exceptionCharInput.trim()}
                 onClick={handleCreateException}
-                disabled={exceptionSaving || !exceptionCharInput.trim()}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 text-sm rounded-lg py-2 transition-colors",
-                  exceptionSaving || !exceptionCharInput.trim()
-                    ? "bg-tertiary/10 text-tertiary/40 cursor-not-allowed"
-                    : "bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent"
-                )}
+                className="flex-1 h-auto py-2"
               >
                 {exceptionSaving ? "Saving..." : "Save"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => { setExceptionModal(null); setExceptionCharInput(""); }}
-                className="flex-1 text-sm text-tertiary hover:text-white border border-tertiary/20 hover:border-tertiary/40 rounded-lg py-2 transition-colors"
+                className="flex-1 h-auto py-2"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1284,24 +1421,22 @@ export const ScannerTab = () => {
               />
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="primary"
+                loading={correcting}
+                disabled={correctInput === ""}
                 onClick={handleCorrect}
-                disabled={correcting || correctInput === ""}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 text-sm rounded-lg py-2 transition-colors",
-                  correcting || correctInput === ""
-                    ? "bg-tertiary/10 text-tertiary/40 cursor-not-allowed"
-                    : "bg-accent/10 hover:bg-accent/15 border border-accent/40 text-accent"
-                )}
+                className="flex-1 h-auto py-2"
               >
                 {correcting ? "Saving..." : "Save"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => { setCorrectModal(null); setCorrectInput(""); }}
-                className="flex-1 text-sm text-tertiary hover:text-white border border-tertiary/20 hover:border-tertiary/40 rounded-lg py-2 transition-colors"
+                className="flex-1 h-auto py-2"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1361,25 +1496,23 @@ export const ScannerTab = () => {
             </div>
             {/* Buttons */}
             <div className="flex gap-2 p-5 pt-3 border-t border-tertiary/[8%]">
-              <button
-                onClick={() => { setFinalizeWarnModal(null); handleFinalize(); }}
+              <Button
+                variant="success"
+                loading={finalizing}
                 disabled={finalizing}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 text-sm rounded-lg py-2 transition-colors",
-                  finalizing
-                    ? "bg-tertiary/10 text-tertiary/40 cursor-not-allowed"
-                    : "bg-[#669A68]/10 hover:bg-[#669A68]/15 border border-[#669A68]/40 text-[#669A68]"
-                )}
+                icon={<FaDownload size={10} />}
+                onClick={() => { setFinalizeWarnModal(null); handleFinalize(); }}
+                className="flex-1 h-auto py-2"
               >
-                <FaDownload size={10} />
-                {finalizing ? "Finalizing..." : "Finalize Anyway"}
-              </button>
-              <button
+                Finalize Anyway
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => setFinalizeWarnModal(null)}
-                className="flex-1 text-sm text-tertiary hover:text-white border border-tertiary/20 hover:border-tertiary/40 rounded-lg py-2 transition-colors"
+                className="flex-1 h-auto py-2"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1404,18 +1537,20 @@ export const ScannerTab = () => {
             </div>
             <p className="text-sm text-tertiary/70">This image will be removed from the upload queue.</p>
             <div className="flex gap-2 justify-end">
-              <button
+              <Button
+                variant="tertiary"
+                size="sm"
                 onClick={() => setRemoveConfirmIdx(null)}
-                className="text-sm text-tertiary hover:text-white transition-colors px-3 py-1.5"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => { removeImage(removeConfirmIdx!); setRemoveConfirmIdx(null); }}
-                className="flex items-center gap-2 text-sm bg-[#C87070]/10 hover:bg-[#C87070]/15 border border-[#C87070]/40 text-[#C87070] rounded-lg px-4 py-1.5 transition-colors"
               >
                 Remove
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1443,12 +1578,14 @@ export const ScannerTab = () => {
           >
             {/* Prev arrow */}
             {images.length > 1 ? (
-              <button
+              <Button
+                variant="primary"
+                size="mobile"
                 onClick={(e) => { e.stopPropagation(); lightboxPrev(); }}
-                className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-panel/80 border border-accent/30 hover:border-accent/70 hover:bg-panel text-accent hover:text-white transition-all shadow-lg"
+                className="flex-shrink-0 w-10 h-10 rounded-full shadow-lg"
               >
                 <FaChevronLeft size={16} className="mr-0.5"/>
-              </button>
+              </Button>
             ) : <div className="w-10 flex-shrink-0" />}
 
             {/* Image + counter */}
@@ -1468,17 +1605,21 @@ export const ScannerTab = () => {
 
             {/* Next arrow */}
             {images.length > 1 ? (
-              <button
+              <Button
+                variant="primary"
+                size="mobile"
                 onClick={(e) => { e.stopPropagation(); lightboxNext(); }}
-                className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-panel/80 border border-accent/30 hover:border-accent/70 hover:bg-panel text-accent hover:text-white transition-all shadow-lg"
+                className="flex-shrink-0 w-10 h-10 rounded-full shadow-lg"
               >
                 <FaChevronRight size={16} className="ml-0.5"/>
-              </button>
+              </Button>
             ) : <div className="w-10 flex-shrink-0" />}
           </div>
         </div>
       )}
     </div>
+      </div>
+    </>
   );
 };
 
@@ -1490,3 +1631,91 @@ const SummaryCard = ({ label, value, color, className }: { label: string; value:
     <p className="text-xs text-tertiary/50 mt-1">{label}</p>
   </div>
 );
+
+const StatChip = ({ label, value, color }: { label: string; value: number; color: string }) => (
+  <div className="flex items-center gap-1.5">
+    <span className={cn("text-sm font-medium tabular-nums", color)}>{value}</span>
+    <span className="text-xs text-tertiary/40">{label}</span>
+  </div>
+);
+
+type CoveragePanelProps = {
+  liveCharacters: import("../types").CharDetail[];
+  liveScores: import("../types").LiveScore[];
+  selectedWeek: string;
+  lastScan: SavedScan | null;
+  onViewLastScan: () => void;
+};
+
+const CoveragePanel = ({ liveCharacters, liveScores, selectedWeek, lastScan, onViewLastScan }: CoveragePanelProps) => {
+  const weekDate = selectedWeek;
+  const weekEnd = new Date(new Date(weekDate).getTime() + 7 * 24 * 60 * 60 * 1000);
+  const eligibleChars = liveCharacters.filter(c => !c.memberSince || new Date(c.memberSince) < weekEnd);
+  const scoredInWeek = new Set(liveScores.filter(s => s.date === weekDate).map(s => s.character));
+  const missingCount = eligibleChars.filter(c => !scoredInWeek.has(c.name)).length;
+
+  return (
+    <div className="w-60 flex-shrink-0 flex flex-col gap-3 h-full">
+      <div className="bg-panel border border-tertiary/[8%] rounded-xl p-4 flex-1">
+        <p className="text-xs font-medium text-tertiary/60 uppercase tracking-wider mb-3">Week Summary</p>
+        <p className="text-xs text-tertiary/40 mb-3 tabular-nums font-mono">{weekDate}</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-tertiary/60">Eligible</span>
+            <span className="text-sm font-medium text-white tabular-nums">{eligibleChars.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-tertiary/60">Submitted</span>
+            <span className={cn("text-sm font-medium tabular-nums", scoredInWeek.size >= eligibleChars.length ? "text-[#669A68]" : "text-white")}>{scoredInWeek.size}</span>
+          </div>
+          {missingCount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-tertiary/60">Missing</span>
+              <span className="text-sm font-medium text-[#C87070] tabular-nums">{missingCount}</span>
+            </div>
+          )}
+          <div className="h-2.5 rounded-full bg-tertiary/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[#669A68]/70 transition-all duration-500"
+              style={{ width: eligibleChars.length > 0 ? `${Math.min(100, (scoredInWeek.size / eligibleChars.length) * 100)}%` : "0%" }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {lastScan && (
+        <div className="bg-panel border border-tertiary/[8%] rounded-xl p-4">
+          <p className="text-xs font-medium text-tertiary/60 uppercase tracking-wider mb-3">Last Scan</p>
+          <div className="space-y-1.5 mb-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-tertiary/60">Week</span>
+              <span className="text-xs text-white/70 tabular-nums font-mono">{lastScan.result.week}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-tertiary/60">Matched</span>
+              <span className="text-xs text-[#669A68] tabular-nums">{lastScan.result.totalSuccess}</span>
+            </div>
+            {lastScan.result.totalFailure > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-tertiary/60">Not Found</span>
+                <span className="text-xs text-[#C87070] tabular-nums">{lastScan.result.totalFailure}</span>
+              </div>
+            )}
+            {lastScan.duration !== null && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-tertiary/60">Duration</span>
+                <span className="text-xs text-tertiary/40 tabular-nums">{lastScan.duration.toFixed(2)}s</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onViewLastScan}
+            className="w-full text-xs text-accent hover:text-white border border-accent/30 hover:border-white/20 rounded-lg py-1.5 transition-colors"
+          >
+            View Results
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};

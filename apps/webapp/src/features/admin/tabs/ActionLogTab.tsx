@@ -1,15 +1,18 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { FaSearch, FaHistory, FaTrash, FaTimes, FaChevronUp, FaChevronDown } from "react-icons/fa";
+import { FaSearch, FaHistory, FaTrash, FaTimes, FaChevronUp, FaChevronDown, FaCheck, FaEye } from "react-icons/fa";
 import { cn } from "../../../lib/utils";
-import Select from "../../../components/Select";
 import DatePicker from "../../../components/DatePicker";
+import Dropdown from "../../../components/Dropdown";
+import Badge, { type BadgeProps } from "../../../components/Badge";
+import { FilterSidebar, FilterTrigger } from "../components/FilterSidebar";
 import { Pagination } from "../components/Pagination";
+import { Button } from "../../../components/Button";
 import { useAdminContext } from "../context";
 import { useNotifications } from "../../../context/NotificationContext";
 import useAuth from "../../../hooks/useAuth";
 import type { ActionLogCategory } from "../types";
 
-// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const LOG_PAGE_SIZE = 10;
 
@@ -25,22 +28,23 @@ const CATEGORY_LABEL: Record<ActionLogCategory, string> = {
   scan:     "Scan",
 };
 
-// Pill styles used in table rows and the dropdown accent indicator
-const CATEGORY_PILL: Record<ActionLogCategory, string> = {
-  create:   "bg-[#669A68]/15 text-[#669A68] border-[#669A68]/30",
-  edit:     "bg-orange-900/40 text-[#D4915E] border-orange-800/40",
-  delete:   "bg-red-900/40 text-[#C87070] border-red-800/40",
-  transfer: "bg-sky-900/40 text-[#6EB3D8] border-sky-800/40",
-  rename:   "bg-yellow-900/40 text-[#C8A855] border-yellow-800/40",
-  finalize: "bg-teal-900/40 text-[#4ECDC4] border-teal-800/40",
-  scan:     "bg-purple-900/40 text-[#B49FDA] border-purple-800/40",
+// Badge variant per category
+const CATEGORY_BADGE_VARIANT: Record<ActionLogCategory, BadgeProps["variant"]> = {
+  create:   "green",
+  edit:     "primary",
+  delete:   "red",
+  transfer: "primary",
+  rename:   "primary",
+  finalize: "green",
+  scan:     "green",
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const formatTimestamp = (iso: string): string => {
   const d = new Date(iso);
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-US", {
+    timeZone: "America/New_York",
     year: "numeric",
     month: "short",
     day: "2-digit",
@@ -152,6 +156,7 @@ export const ActionLogTab = () => {
   const [selectedEntry, setSelectedEntry] = useState<(typeof actionLog)[number] | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [detailsAnimating, setDetailsAnimating] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const openDetails = (entry: (typeof actionLog)[number]) => {
     setSelectedEntry(entry);
@@ -181,14 +186,21 @@ export const ActionLogTab = () => {
   const resolveActorName = useCallback(
     (actorId?: string | null): string => {
       if (!actorId) return "Unknown";
+      if (user?.id === actorId && user?.username) return user.username;
       const found = liveUsers.find((u) => u.id === actorId);
-      return found?.username ?? actorId;
+      return found?.username ?? found?.nickname ?? actorId;
     },
-    [liveUsers]
+    [liveUsers, user]
   );
 
   const actorOptions = useMemo(() => {
     const actorMap = new Map<string, string>();
+
+    // Seed the logged-in user first — the owner has no DB entry so they won't
+    // appear in liveUsers and would otherwise fall back to showing a raw ID.
+    if (user?.id && user?.username) {
+      actorMap.set(user.id, user.username);
+    }
 
     liveUsers
       .filter((u) => u.role === "bee" || (!!ownerId && u.id === ownerId))
@@ -206,7 +218,7 @@ export const ActionLogTab = () => {
         .sort((a, b) => a[1].localeCompare(b[1]))
         .map(([id, name]) => ({ value: id, label: name })),
     ];
-  }, [actionLog, liveUsers, ownerId]);
+  }, [actionLog, liveUsers, ownerId, user]);
 
   const filtered = useMemo(() => {
     const next = actionLog.filter((entry) => {
@@ -271,9 +283,9 @@ export const ActionLogTab = () => {
   const handleClear = () =>
     confirm({
       variant: "confirm",
-      confirmDanger: true,
+      colorVariant: "owner",
       title: "Clear action log",
-      description: "This will remove all entries from the action log. This cannot be undone.",
+      description: "This will remove all entries from the action log.",
       onConfirm: async () => {
         try {
           await clearActionLog();
@@ -306,10 +318,11 @@ export const ActionLogTab = () => {
   };
 
   return (
-    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0">
+    <>
+    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
 
       {/* ⎯ Header ⎯ */}
-      <div className="flex justify-between items-center px-6 py-5">
+      <div className="flex justify-between items-center px-6 h-[70px] flex-shrink-0">
         <div className="flex items-center gap-3">
           <h2 className="text-xl">Action Log</h2>
           <span className="bg-background text-tertiary text-xs rounded-full px-2.5 py-0.5 border border-tertiary/20">
@@ -317,40 +330,53 @@ export const ActionLogTab = () => {
           </span>
         </div>
         {isOwner && (
-          <button
+          <Button
+            variant="owner"
+            size="mobile"
             onClick={handleClear}
             disabled={actionLog.length === 0}
-            className="w-[115px] flex items-center justify-center gap-2 bg-[#A46666]/15 border border-[#A46666]/30 text-[#C87070] hover:text-white hover:bg-[#A46666]/25 text-sm rounded-lg px-3 py-1 transition-colors disabled:opacity-30 disabled:cursor-default disabled:hover:text-[#C87070] disabled:hover:bg-[#A46666]/15"
+            className="md:h-[30px] md:w-auto md:px-3"
           >
-            <FaTrash size={11} style={{ marginBottom: "1px" }} />
-            Clear Log
-          </button>
+            <FaTrash size={11} className="mb-px shrink-0" />
+            <span className="hidden md:inline">Clear Log</span>
+          </Button>
         )}
       </div>
 
-      <div className="bg-tertiary/20 h-px" />
+      <div className="bg-tertiary/20 h-px flex-shrink-0" />
 
       {/* ⎯ Filters ⎯ */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-tertiary/[6%] flex-wrap">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0" />
+      <div className="md:hidden flex items-center gap-2 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
+        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
         <input
           type="text"
           placeholder="Filter by action, target, or details..."
           value={search}
           onChange={(e) => resetPage(() => setSearch(e.target.value))}
-          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-[160px]"
+          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1"
         />
-        <Select
+        <FilterTrigger onClick={() => setFiltersOpen(true)} hasActiveFilters={!!(actorFilter || categoryFilter || dateFrom || dateTo)} />
+      </div>
+      <div className="hidden md:flex flex-wrap items-center gap-x-2 gap-y-2 px-6 py-3 md:h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
+        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
+        <input
+          type="text"
+          placeholder="Filter by action, target, or details..."
+          value={search}
+          onChange={(e) => resetPage(() => setSearch(e.target.value))}
+          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-[120px]"
+        />
+        <Dropdown
           variant="plain"
           align="right"
           options={actorOptions}
           value={actorFilter ?? "all"}
-          onChange={(v) => resetPage(() => setActorFilter(v === "all" ? null : String(v)))}
-          className="w-[150px] flex-shrink-0"
+          onChange={(v) => resetPage(() => setActorFilter(v === "all" ? null : v))}
+          className="w-[115px] flex-shrink-0"
           compact
           subtle
         />
-        <Select
+        <Dropdown
           variant="plain"
           align="right"
           options={categoryOptions}
@@ -365,7 +391,7 @@ export const ActionLogTab = () => {
           from={dateFrom}
           to={dateTo}
           onRangeChange={(f, t) => resetPage(() => { setDateFrom(f); setDateTo(t); })}
-          placeholder="Date range"
+          placeholder="Date Range"
           align="right"
           subtle
           compact
@@ -376,57 +402,58 @@ export const ActionLogTab = () => {
 
       {/* ⎯ Body ⎯ */}
       {actionLog.length === 0 ? (
-        <div className="px-6 py-16 flex flex-col items-center gap-3 text-tertiary/50">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-tertiary/50">
           <FaHistory size={24} />
           <p className="text-sm">No actions recorded yet.</p>
         </div>
       ) : paged.length === 0 ? (
-        <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-tertiary/50">
           <FaHistory size={24} />
           <p className="text-sm">No entries match your filters</p>
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-b-xl">
-          <table className="w-full table-fixed">
-            <thead>
-              <tr className="border-b border-tertiary/[8%]">
-                <th onClick={() => toggleSort("actor")} className="w-[16%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+          <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <div>
+          <table className="w-full table-auto min-w-[700px]">
+            <thead className="sticky top-0 bg-panel z-10">
+              <tr className="border-y border-tertiary/[6%]">
+                <th onClick={() => toggleSort("actor")} className="px-6 py-[11.5px] text-left cursor-pointer text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none hover:text-white transition-colors duration-150 align-middle group">
                   <span className="inline-flex items-center gap-1.5">User
-                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "actor" ? "opacity-100" : "opacity-0")}>
+                    <span className={cn("inline-flex items-center leading-none transition-all duration-150", sort?.field === "actor" ? "opacity-100" : "opacity-0")}>
                       {sort?.field === "actor" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
                     </span>
                   </span>
                 </th>
-                <th onClick={() => toggleSort("category")} className="w-[13%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                <th onClick={() => toggleSort("category")} className="px-6 py-[11.5px] text-left cursor-pointer text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none hover:text-white transition-colors duration-150 align-middle group">
                   <span className="inline-flex items-center gap-1.5">Category
-                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "category" ? "opacity-100" : "opacity-0")}>
+                    <span className={cn("inline-flex items-center leading-none transition-all duration-150", sort?.field === "category" ? "opacity-100" : "opacity-0")}>
                       {sort?.field === "category" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
                     </span>
                   </span>
                 </th>
-                <th onClick={() => toggleSort("action")} className="w-[22%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                <th onClick={() => toggleSort("action")} className="px-6 py-[11.5px] text-left cursor-pointer text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none hover:text-white transition-colors duration-150 align-middle group">
                   <span className="inline-flex items-center gap-1.5">Action
-                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "action" ? "opacity-100" : "opacity-0")}>
+                    <span className={cn("inline-flex items-center leading-none transition-all duration-150", sort?.field === "action" ? "opacity-100" : "opacity-0")}>
                       {sort?.field === "action" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
                     </span>
                   </span>
                 </th>
-                <th onClick={() => toggleSort("target")} className="w-[20%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
+                <th onClick={() => toggleSort("target")} className="px-6 py-[11.5px] text-left cursor-pointer text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none hover:text-white transition-colors duration-150 align-middle group">
                   <span className="inline-flex items-center gap-1.5">Target
-                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "target" ? "opacity-100" : "opacity-0")}>
+                    <span className={cn("inline-flex items-center leading-none transition-all duration-150", sort?.field === "target" ? "opacity-100" : "opacity-0")}>
                       {sort?.field === "target" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
                     </span>
                   </span>
                 </th>
-                <th onClick={() => toggleSort("timestamp")} className="w-[18%] px-4 py-3 text-left cursor-pointer text-xs text-tertiary font-medium uppercase tracking-wider select-none hover:text-white transition-colors">
-                  <span className="inline-flex items-center gap-1.5">Date &amp; Time
-                    <span className={cn("inline-flex items-center leading-none transition-opacity duration-150 text-accent", sort?.field === "timestamp" ? "opacity-100" : "opacity-0")}>
+                <th onClick={() => toggleSort("timestamp")} className="px-6 py-[11.5px] text-left cursor-pointer text-xs text-tertiary/50 font-medium uppercase tracking-wider select-none hover:text-white transition-colors duration-150 align-middle group">
+                  <span className="inline-flex items-center gap-1.5">Date &amp; Time (EST)
+                    <span className={cn("inline-flex items-center leading-none transition-all duration-150", sort?.field === "timestamp" ? "opacity-100" : "opacity-0")}>
                       {sort?.field === "timestamp" && sort?.dir === "asc" ? <FaChevronUp size={9} /> : <FaChevronDown size={9} />}
                     </span>
                   </span>
                 </th>
-                <th className="w-[16%] px-4 py-3 text-left text-xs text-tertiary font-medium uppercase tracking-wider select-none">Details</th>
+                <th className="w-[48px] px-6 align-middle" />
               </tr>
             </thead>
             <tbody>
@@ -437,40 +464,44 @@ export const ActionLogTab = () => {
                     key={entry.id}
                     className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors"
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-3.5 align-middle">
                       <span className="text-sm text-white">{resolveActorName(entry.actorId)}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={cn("text-xs rounded-full px-2 py-0.5 border", CATEGORY_PILL[entry.category])}>
+                    <td className="px-6 py-3.5 align-middle">
+                      <Badge variant={CATEGORY_BADGE_VARIANT[entry.category]}>
                         {CATEGORY_LABEL[entry.category]}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-3.5 align-middle">
                       <span className="text-sm text-white">{entry.action}</span>
                     </td>
-                    <td className="px-4 py-4 overflow-hidden">
+                    <td className="px-6 py-3.5 align-middle overflow-hidden">
                       <span className="text-sm text-tertiary truncate block">{entry.target}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-3.5 align-middle">
                       <span className="text-xs text-tertiary/50 tabular-nums">{dateTime}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      {entry.action === "Delete User" || (entry.action === "Unlink Character" && !entry.details) ? (
-                        <span className="text-sm text-tertiary/50">—</span>
-                      ) : (
-                        <button
-                          onClick={() => openDetails(entry)}
-                          className="text-xs bg-background/70 border border-tertiary/20 hover:border-accent/40 text-tertiary hover:text-white rounded-lg px-2.5 py-1 transition-colors"
-                        >
-                          View Details
-                        </button>
-                      )}
+                    <td className="px-6 py-3.5 align-middle">
+                      <div className="flex items-center justify-center w-[14px] ml-auto">
+                        {entry.action === "Delete User" || (entry.action === "Unlink Character" && !entry.details) ? (
+                          <span className="text-tertiary/30 leading-none select-none" style={{ fontSize: 14, lineHeight: 1 }}>—</span>
+                        ) : (
+                          <Button
+                            variant="inline"
+                            onClick={() => openDetails(entry)}
+                            className="text-tertiary/40 hover:text-white leading-none"
+                          >
+                            <FaEye size={14} />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          </div>
           </div>
 
           <Pagination
@@ -501,16 +532,24 @@ export const ActionLogTab = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg">{selectedEntry.action}</h3>
-                  <p className="text-sm text-tertiary mt-1">Target: {selectedEntry.target}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <Badge variant={CATEGORY_BADGE_VARIANT[selectedEntry.category]}>
+                      {CATEGORY_LABEL[selectedEntry.category]}
+                    </Badge>
+                    <h3 className="text-lg">{selectedEntry.action}</h3>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-0.5 mt-1.5">
+                    <p className="text-sm text-tertiary/50">User: <span className="text-white/40">{resolveActorName(selectedEntry.actorId)}</span></p>
+                    <p className="text-sm text-tertiary/50">Target: <span className="text-white/40">{selectedEntry.target}</span></p>
+                  </div>
                 </div>
                 <button
                   onClick={closeDetails}
-                  className="text-tertiary/50 hover:text-white transition-colors"
                   aria-label="Close"
+                  className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-tertiary/40 hover:text-[#C87070] hover:bg-[#C87070]/10 transition-all duration-200"
                 >
-                  <FaTimes size={13} />
+                  <FaTimes size={11} />
                 </button>
               </div>
 
@@ -538,18 +577,18 @@ export const ActionLogTab = () => {
                       <thead className="sticky top-0 bg-panel border-b border-tertiary/[6%]">
                         <tr>
                           <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2">Character</th>
-                          <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2 w-28">Score</th>
-                          <th className="text-left text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2 w-24">Status</th>
+                          <th className="text-center text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2 w-28">Score</th>
+                          <th className="text-center text-xs text-tertiary font-medium uppercase tracking-wide px-4 py-2 w-24">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {parseScanEntries(selectedEntry.details).map((row, idx) => (
                           <tr key={idx} className="border-t border-tertiary/[6%]">
                             <td className="px-4 py-2.5 text-sm text-white">{row.name}</td>
-                            <td className="px-4 py-2.5 text-sm tabular-nums text-white">{row.score}</td>
-                            <td className="px-4 py-2.5 text-xs">
+                            <td className="px-4 py-2.5 text-sm text-center tabular-nums text-white">{row.score}</td>
+                            <td className="px-4 py-2.5 text-xs text-center">
                               {row.status === "ok" ? (
-                                <span className="text-[#669A68]">&#10003;</span>
+                                <FaCheck size={11} className="inline text-[#669A68]" />
                               ) : row.status === "Anomaly" ? (
                                 <span className="text-[#D4915E]">Anomaly</span>
                               ) : row.status === "Sandbag" ? (
@@ -598,11 +637,47 @@ export const ActionLogTab = () => {
         </>
       )}
     </div>
+    <FilterSidebar isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} hasActiveFilters={!!(actorFilter || categoryFilter || dateFrom || dateTo)} onClear={() => resetPage(() => { setActorFilter(null); setCategoryFilter(null); setDateFrom(""); setDateTo(""); })}>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-tertiary/70 uppercase tracking-wider font-medium">User</label>
+        <Dropdown
+          variant="plain"
+          options={actorOptions}
+          value={actorFilter ?? "all"}
+          onChange={(v) => resetPage(() => setActorFilter(v === "all" ? null : v))}
+          subtle
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-tertiary/70 uppercase tracking-wider font-medium">Category</label>
+        <Dropdown
+          variant="plain"
+          options={categoryOptions}
+          value={categoryFilter ?? "all"}
+          onChange={(v) => resetPage(() => setCategoryFilter(v === "all" ? null : (v as ActionLogCategory)))}
+          subtle
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-tertiary/70 uppercase tracking-wider font-medium">Date Range</label>
+        <DatePicker
+          mode="range"
+          from={dateFrom}
+          to={dateTo}
+          onRangeChange={(f, t) => resetPage(() => { setDateFrom(f); setDateTo(t); })}
+          placeholder="All Dates"
+          subtle
+          clearable
+          align="right"
+        />
+      </div>
+    </FilterSidebar>
+    </>
   );
 };
 
 // TODO: make so all members are listed as users, probably remove the Delete User from deleting characters.
-// TODO: implement culvertping, finalize, export, backup system,
+// TODO: implement culvertping, export, backup system,
 // TODO: maybe owner tab that shows all commands and stuff, lets you reload from here too etc.
 // todo: action log differ pamel vs command. make admin buttons purple
 // todo: Make sure that the scan bot command also logs this the same way. Same with the finalize command from the bot. Also, druu should always be excempt from scan results and finalization

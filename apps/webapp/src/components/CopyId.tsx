@@ -6,7 +6,7 @@ import { cn } from "../lib/utils";
 
 // Inline copyable Discord ID — clicking copies the id to clipboard.
 // Shows ✓ checkmark with a fade-out on copy, then the copy icon fades back in.
-const CopyId = ({ id }: { id: string }) => {
+const CopyId = ({ id, hideText }: { id: string; hideText?: boolean }) => {
   const [copied, setCopied] = useState(false);
   const [fading, setFading] = useState(false);
   const [copyFadingIn, setCopyFadingIn] = useState(false);
@@ -35,7 +35,7 @@ const CopyId = ({ id }: { id: string }) => {
         copied && !fading ? "text-white" : "hover:text-white"
       )}
     >
-      {id}
+      {hideText ? <span className="hidden md:inline">{id}</span> : id}
       {copied ? (
         <span className={cn(
           "inline-flex items-center transition-opacity duration-200",

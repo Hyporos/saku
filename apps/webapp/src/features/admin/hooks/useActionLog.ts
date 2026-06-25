@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import { BOT_API } from "../constants";
-import type { ActionLogEntry, ActionLogCategory } from "../types";
+import type { ActionLogEntry } from "../types";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -27,19 +27,11 @@ export const useActionLog = () => {
     refreshActionLog();
   }, [refreshActionLog]);
 
-  const logAction = useCallback(
-    async (entry: { action: string; target: string; details?: string; category: ActionLogCategory }) => {
-      void entry;
-      await refreshActionLog();
-    },
-    [refreshActionLog]
-  );
-
   const clearActionLog = useCallback(() => {
     return axios
       .delete(`${BOT_API}/bot/api/admin/action-log`)
       .then(() => setActionLog([]));
   }, []);
 
-  return { actionLog, logAction, clearActionLog, refreshActionLog };
+  return { actionLog, clearActionLog, refreshActionLog };
 };

@@ -1,7 +1,30 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import axios from "axios";
 import { BOT_API } from "../constants";
 import type { UserDoc, ExceptionDoc, CharDetail, LiveUser, LiveScore } from "../types";
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const usersCacheKey = "admin_users_cache_v1";
+const exceptionsCacheKey = "admin_exceptions_cache_v1";
+
+const readCache = <T,>(key: string): T | null => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeCache = <T,>(key: string, value: T) => {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore cache write failures
+  }
+};
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -11,59 +34,45 @@ import type { UserDoc, ExceptionDoc, CharDetail, LiveUser, LiveScore } from "../
  * every other tab.
  */
 export function useDataFetching() {
-  const usersCacheKey = "admin_users_cache_v1";
-  const exceptionsCacheKey = "admin_exceptions_cache_v1";
-
-  const readCache = <T,>(key: string): T | null => {
-    try {
-      const raw = sessionStorage.getItem(key);
-      if (!raw) return null;
-      return JSON.parse(raw) as T;
-    } catch {
-      return null;
-    }
-  };
-
-  const writeCache = <T,>(key: string, value: T) => {
-    try {
-      sessionStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore cache write failures
-    }
-  };
-
   const [userData, setUserData] = useState<UserDoc[]>(() => readCache<UserDoc[]>(usersCacheKey) ?? []);
   const [usersLoading, setUsersLoading] = useState(false);
   const [exceptionsData, setExceptionsData] = useState<ExceptionDoc[]>(() => readCache<ExceptionDoc[]>(exceptionsCacheKey) ?? []);
   const [exceptionsLoading, setExceptionsLoading] = useState(false);
 
+  // Refs track whether data has been loaded so refreshX(false) can short-circuit
+  // without closing over state (which would cause new callback refs on every load).
+  const usersLoadedRef = useRef((readCache<UserDoc[]>(usersCacheKey)?.length ?? 0) > 0);
+  const exceptionsLoadedRef = useRef((readCache<ExceptionDoc[]>(exceptionsCacheKey)?.length ?? 0) > 0);
+
   const refreshUsers = useCallback((force = true): Promise<void> => {
-    if (!force && userData.length > 0) return Promise.resolve();
+    if (!force && usersLoadedRef.current) return Promise.resolve();
     setUsersLoading(true);
     return axios
       .get<UserDoc[]>(`${BOT_API}/bot/api/admin/users`)
       .then((res) => {
         const next = Array.isArray(res.data) ? res.data : [];
         setUserData(next);
+        usersLoadedRef.current = true;
         writeCache(usersCacheKey, next);
       })
       .catch(console.error)
       .finally(() => setUsersLoading(false)) as Promise<void>;
-  }, [userData]);
+  }, []);
 
   const refreshExceptions = useCallback((force = true): Promise<void> => {
-    if (!force && exceptionsData.length > 0) return Promise.resolve();
+    if (!force && exceptionsLoadedRef.current) return Promise.resolve();
     setExceptionsLoading(true);
     return axios
       .get<ExceptionDoc[]>(`${BOT_API}/bot/api/admin/exceptions`)
       .then((res) => {
         const next = Array.isArray(res.data) ? res.data : [];
         setExceptionsData(next);
+        exceptionsLoadedRef.current = true;
         writeCache(exceptionsCacheKey, next);
       })
       .catch(console.error)
       .finally(() => setExceptionsLoading(false)) as Promise<void>;
-  }, [exceptionsData]);
+  }, []);
 
   // ⎯⎯ Derived flat views ⎯⎯ //
 

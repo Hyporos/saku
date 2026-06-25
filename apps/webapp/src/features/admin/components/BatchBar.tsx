@@ -1,4 +1,5 @@
 import { FaTrash } from "react-icons/fa";
+import { Button } from "../../../components/Button";
 
 interface BatchBarProps {
   count: number;
@@ -10,14 +11,20 @@ export const BatchBar = ({ count, onDelete, onClear }: BatchBarProps) =>
   count > 0 ? (
     <div className="flex items-center gap-6 px-6 py-3 bg-accent/[3%] border-b border-accent/10">
       <span className="text-sm text-accent">{count} selected</span>
-      <button
+      <Button
+        variant="danger"
         onClick={onDelete}
-        className="ml-auto text-sm text-[#A46666] hover:text-red-400 transition-colors flex items-center gap-1.5"
+        icon={<FaTrash size={11} />}
+        className="ml-auto h-auto py-0 border-0 bg-transparent text-sm hover:bg-transparent active:bg-transparent"
       >
-        <FaTrash size={11} style={{ marginBottom: "1px" }} /> Delete Selected
-      </button>
-      <button onClick={onClear} className="text-sm text-tertiary hover:text-white transition-colors">
+        Delete Selected
+      </Button>
+      <Button
+        variant="tertiary"
+        onClick={onClear}
+        className="h-auto py-0 border-0 text-sm"
+      >
         Clear
-      </button>
+      </Button>
     </div>
   ) : null;

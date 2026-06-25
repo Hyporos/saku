@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import { cn } from "../lib/utils";
 import { useNotifications, type NotificationItem, type NotificationType } from "../context/NotificationContext";
+import { Button } from "./Button";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -71,13 +72,14 @@ const Toast = ({ item, onDismiss }: { item: NotificationItem; onDismiss: () => v
       <p className="text-sm text-white/90 leading-relaxed flex-1 pt-0.5 pr-4">{item.message}</p>
 
       {/* Close button */}
-      <button
+      <Button
+        variant="tertiary"
         onClick={onDismiss}
-        className="absolute top-3 right-3 text-tertiary/40 hover:text-tertiary/80 transition-colors"
         aria-label="Dismiss"
+        className="absolute top-3 right-3 h-auto w-auto p-0 border-0 text-tertiary/40 hover:text-tertiary/80"
       >
         <FaTimes size={10} />
-      </button>
+      </Button>
     </div>
   );
 };

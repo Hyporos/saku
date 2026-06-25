@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { cn } from "../../../lib/utils";
 import { FaSearch, FaEdit, FaCheck, FaTimes, FaTrash, FaExclamationCircle } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import AutocompleteInput from "../../../components/AutocompleteInput";
 import { SortableHead } from "../components/SortableHead";
-import { BatchBar } from "../components/BatchBar";
+import { BatchPopup } from "../components/BatchPopup";
 import { Pagination } from "../components/Pagination";
 import { SectionHeader } from "../components/SectionHeader";
 import { useAdminContext } from "../context";
+import { Button } from "../../../components/Button";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -22,16 +24,21 @@ export const ExceptionsTab = () => {
     inlineSaveException,
   } = useAdminContext();
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  void filtersOpen; void setFiltersOpen;
+
   return (
-    <div className="bg-panel rounded-xl overflow-hidden flex-shrink-0">
+    <>
+    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
       <SectionHeader
         title="Exceptions"
         count={filteredExceptions.length}
         createSection="exceptions"
       />
-      <div className="bg-tertiary/20 h-px" />
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-tertiary/[6%]">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0" />
+      <div className="bg-tertiary/20 h-px flex-shrink-0" />
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
+        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
         <input
           type="text"
           placeholder="Filter by character or exception..."
@@ -41,32 +48,36 @@ export const ExceptionsTab = () => {
         />
       </div>
       {exceptionsLoading ? (
-        <p className="px-6 py-8 text-sm text-tertiary/50 text-center">Loading...</p>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-tertiary/50">Loading...</p>
+        </div>
       ) : (
         <>
-          <BatchBar
+          <BatchPopup
             count={selExcs.size}
             onDelete={batchDeleteExcs}
             onClear={() => setSelExcs(new Set())}
           />
-          {pagedExcs.length === 0 ? (
-            <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
-              <FaExclamationCircle size={24} />
-              <p className="text-sm">{excSearch ? `No exceptions matching "${excSearch}"` : "No exceptions found"}</p>
-            </div>
-          ) : (
-            <table className="w-full table-fixed">
-              <SortableHead
-                cols={[
-                  { label: "Character", field: "name",      className: "w-[42%]" },
-                  { label: "Exception", field: "exception", className: "w-[42%]" },
-                ]}
-                sort={excSort}
-                onSort={(f) => { toggleSort(excSort, f, setExcSort); setExcPage(1); }}
-                onSelectAll={() => toggleAll(pagedExcs.map((e) => e._id), selExcs, setSelExcs)}
-                allSelected={pagedExcs.length > 0 && pagedExcs.every((e) => selExcs.has(e._id))}
-                someSelected={pagedExcs.some((e) => selExcs.has(e._id))}
-              />
+          <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+            {pagedExcs.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-tertiary/50">
+                <FaExclamationCircle size={24} />
+                <p className="text-sm">{excSearch ? `No exceptions matching "${excSearch}"` : "No exceptions found"}</p>
+              </div>
+            ) : (
+              <table className="w-full table-auto">
+                <SortableHead
+                  theadClassName="sticky top-0 bg-panel z-10"
+                  cols={[
+                    { label: "Character", field: "name"      },
+                    { label: "Exception", field: "exception" },
+                  ]}
+                  sort={excSort}
+                  onSort={(f) => { toggleSort(excSort, f, setExcSort); setExcPage(1); }}
+                  onSelectAll={() => toggleAll(pagedExcs.map((e) => e._id), selExcs, setSelExcs)}
+                  allSelected={pagedExcs.length > 0 && pagedExcs.every((e) => selExcs.has(e._id))}
+                  someSelected={pagedExcs.some((e) => selExcs.has(e._id))}
+                />
               <tbody>
                 {pagedExcs.map((exc) => {
                 const isEditing = excInlineEdit?.id === exc._id;
@@ -81,7 +92,7 @@ export const ExceptionsTab = () => {
                       isEditing ? "bg-background/40" : "hover:bg-background/40"
                     )}
                   >
-                    <td className="pl-5 pr-2 py-4 w-10">
+                    <td className="pl-6 pr-2 py-4 w-10">
                       <Checkbox
                         checked={selExcs.has(exc._id)}
                         onChange={() => toggleSel(selExcs, exc._id, setSelExcs)}
@@ -102,15 +113,16 @@ export const ExceptionsTab = () => {
                           requireSelection
                         />
                       ) : (
-                        <button
-                          className="text-accent hover:text-white transition-colors text-left"
+                        <Button
+                          variant="tertiary"
                           onClick={() => {
                             const c = liveCharacters.find((x) => x.name === exc.name);
                             if (c) openCharDetail(c, undefined, undefined, "exceptions");
                           }}
+                          className="h-auto px-0 py-0 border-0 text-accent hover:text-white text-left"
                         >
                           {exc.name}
-                        </button>
+                        </Button>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
@@ -132,54 +144,58 @@ export const ExceptionsTab = () => {
                       <div className="flex items-center justify-end gap-4">
                         {isEditing ? (
                           <>
-                            <button
+                            <Button
+                              variant="inline"
                               onClick={inlineSaveException}
                               disabled={!canConfirm}
                               title="Confirm"
                               className={cn(
-                                "transition-colors",
                                 canConfirm ? "text-[#669A68] hover:text-white" : "text-[#669A68]/35 cursor-default"
                               )}
                             >
-                              <FaCheck size={14} />
-                            </button>
-                            <button
+                              <FaCheck size={14} style={{ marginBottom: "2px" }} />
+                            </Button>
+                            <Button
+                              variant="inline"
                               onClick={() => setExcInlineEdit(null)}
                               title="Cancel"
-                              className="text-[#A46666] hover:text-white transition-colors"
+                              className="text-[#A46666] hover:text-white"
                             >
-                              <FaTimes size={16} />
-                            </button>
+                              <FaTimes size={16} style={{ marginBottom: "2px" }} />
+                            </Button>
                           </>
                         ) : (
                           <>
-                            <button
+                            <Button
+                              variant="inline"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setExcInlineEdit({ id: exc._id, name: exc.name, exception: exc.exception });
                               }}
                               title="Edit"
-                              className="text-tertiary hover:text-accent transition-colors"
+                              className="text-tertiary/40 hover:text-accent"
                             >
-                              <FaEdit size={14} />
-                            </button>
-                            <button
+                              <FaEdit size={14} style={{ marginBottom: "2px" }} />
+                            </Button>
+                            <Button
+                              variant="inline"
                               onClick={(e) => { e.stopPropagation(); deleteException(exc._id, exc.name); }}
                               title="Delete"
-                              className="text-tertiary hover:text-[#A46666] transition-colors"
+                              className="text-[#A46666]/40 hover:text-[#A46666]"
                             >
-                              <FaTrash size={14} />
-                            </button>
+                              <FaTrash size={14} style={{ marginBottom: "2px" }} />
+                            </Button>
                           </>
                         )}
                       </div>
                     </td>
                   </tr>
                 );
-                })}
+              })}
               </tbody>
-            </table>
-          )}
+              </table>
+            )}
+          </div>
           <Pagination
             page={excPage}
             total={filteredExceptions.length}
@@ -190,5 +206,6 @@ export const ExceptionsTab = () => {
         </>
       )}
     </div>
+    </>
   );
 };

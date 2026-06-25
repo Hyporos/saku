@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { cn } from "../../../lib/utils";
 import { FaSearch, FaEdit, FaCheck, FaTimes, FaHistory, FaTrash } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import DatePicker from "../../../components/DatePicker";
 import { SortableHead } from "../components/SortableHead";
-import { BatchBar } from "../components/BatchBar";
+import { BatchPopup } from "../components/BatchPopup";
+import { FilterSidebar, FilterTrigger } from "../components/FilterSidebar";
 import { Pagination } from "../components/Pagination";
 import { SectionHeader } from "../components/SectionHeader";
 import { useAdminContext } from "../context";
+import { Button } from "../../../components/Button";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -22,16 +25,20 @@ export const ScoresTab = () => {
     inlineSaveScoreTab,
   } = useAdminContext();
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   return (
-    <div className="bg-panel rounded-xl overflow-hidden flex-shrink-0">
+    <>
+    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
       <SectionHeader
         title="Scores"
         count={filteredScores.length}
         createSection="scores"
       />
-      <div className="bg-tertiary/20 h-px" />
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-tertiary/[6%]">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0" />
+      <div className="bg-tertiary/20 h-px flex-shrink-0" />
+      {/* Filter bar — search + date picker inline, filter icon on mobile opens sidebar */}
+      <div className="flex items-center gap-3 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
+        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
         <input
           type="text"
           placeholder="Filter by character name..."
@@ -39,46 +46,59 @@ export const ScoresTab = () => {
           onChange={(e) => { setScoreSearch(e.target.value); setScorePage(1); }}
           className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-0"
         />
-        <DatePicker
-          mode="single"
-          value={scoreDateFilter}
-          onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
-          clearable
-          wednesdayOnly
-          subtle
-          compact
-          placeholder="All Dates"
-          align="right"
+        {/* Desktop: date picker inline */}
+        <div className="hidden md:block">
+          <DatePicker
+            mode="single"
+            value={scoreDateFilter}
+            onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
+            clearable
+            wednesdayOnly
+            subtle
+            compact
+            placeholder="All Dates"
+            align="right"
+          />
+        </div>
+        {/* Mobile: filter icon opens sidebar */}
+        <FilterTrigger
+          onClick={() => setFiltersOpen(true)}
+          hasActiveFilters={!!scoreSearch || !!scoreDateFilter}
+          className="md:hidden"
         />
       </div>
       {usersLoading ? (
-        <p className="px-6 py-8 text-sm text-tertiary/50 text-center">Loading...</p>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-tertiary/50">Loading...</p>
+        </div>
       ) : (
         <>
-          <BatchBar
+          <BatchPopup
             count={selScores.size}
             onDelete={batchDeleteScores}
             onClear={() => setSelScores(new Set())}
           />
-          {pagedScores.length === 0 ? (
-            <div className="px-6 py-12 flex flex-col items-center gap-3 text-tertiary/50">
-              <FaHistory size={24} />
-              <p className="text-sm">{scoreSearch ? `No scores matching "${scoreSearch}"` : "No scores found"}</p>
-            </div>
-          ) : (
-            <table className="w-full table-fixed">
-              <SortableHead
-                cols={[
-                  { label: "Character", field: "character", className: "w-[38%]" },
-                  { label: "Date",      field: "date",      className: "w-[30%]" },
-                  { label: "Score",     field: "score",     className: "w-[22%]" },
-                ]}
-                sort={scoreSort}
-                onSort={(f) => { toggleSort(scoreSort, f, setScoreSort); setScorePage(1); }}
-                onSelectAll={() => toggleAll(pagedScores.map((s) => `${s.character}|${s.date}`), selScores, setSelScores)}
-                allSelected={pagedScores.length > 0 && pagedScores.every((s) => selScores.has(`${s.character}|${s.date}`))}
-                someSelected={pagedScores.some((s) => selScores.has(`${s.character}|${s.date}`))}
-              />
+          <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+            {pagedScores.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-tertiary/50">
+                <FaHistory size={24} />
+                <p className="text-sm">{scoreSearch ? `No scores matching "${scoreSearch}"` : "No scores found"}</p>
+              </div>
+            ) : (
+              <table className="w-full table-auto">
+                <SortableHead
+                  theadClassName="sticky top-0 bg-panel z-10"
+                  cols={[
+                    { label: "Character", field: "character" },
+                    { label: "Date",      field: "date"      },
+                    { label: "Score",     field: "score"     },
+                  ]}
+                  sort={scoreSort}
+                  onSort={(f) => { toggleSort(scoreSort, f, setScoreSort); setScorePage(1); }}
+                  onSelectAll={() => toggleAll(pagedScores.map((s) => `${s.character}|${s.date}`), selScores, setSelScores)}
+                  allSelected={pagedScores.length > 0 && pagedScores.every((s) => selScores.has(`${s.character}|${s.date}`))}
+                  someSelected={pagedScores.some((s) => selScores.has(`${s.character}|${s.date}`))}
+                />
               <tbody>
                 {pagedScores.map((score, i) => {
                 const isEditing =
@@ -101,7 +121,7 @@ export const ScoresTab = () => {
                       isEditing ? "bg-background/40" : "hover:bg-background/40"
                     )}
                   >
-                    <td className="pl-5 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
+                    <td className="pl-6 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selScores.has(`${score.character}|${score.date}`)}
                         onChange={() => toggleSel(selScores, `${score.character}|${score.date}`, setSelScores)}
@@ -109,15 +129,16 @@ export const ScoresTab = () => {
                     </td>
                     {/* Character — always read-only, clickable to open char detail */}
                     <td className="px-6 py-4 text-sm">
-                      <button
-                        className="text-accent hover:text-white transition-colors text-left"
+                      <Button
+                        variant="tertiary"
                         onClick={() => {
                           const c = liveCharacters.find((x) => x.name === score.character);
                           if (c) openCharDetail(c, undefined, undefined, "scores");
                         }}
+                        className="h-auto px-0 py-0 border-0 text-accent hover:text-white text-left"
                       >
                         {score.character}
-                      </button>
+                      </Button>
                     </td>
                     {/* Date — editable when in edit mode */}
                     <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
@@ -166,24 +187,25 @@ export const ScoresTab = () => {
                       <div className="flex items-center justify-end gap-4">
                         {isEditing ? (
                           <>
-                            <button
+                            <Button
+                              variant="inline"
                               onClick={inlineSaveScoreTab}
                               disabled={!canConfirm}
                               title="Confirm"
                               className={cn(
-                                "transition-colors",
                                 canConfirm ? "text-[#669A68] hover:text-white" : "text-[#669A68]/35 cursor-default"
                               )}
                             >
-                              <FaCheck size={14} />
-                            </button>
-                            <button onClick={() => setScoreTabInlineEdit(null)} title="Cancel" className="text-[#A46666] hover:text-white transition-colors">
-                              <FaTimes size={16} />
-                            </button>
+                              <FaCheck size={14} style={{ marginBottom: "2px" }} />
+                            </Button>
+                            <Button variant="inline" onClick={() => setScoreTabInlineEdit(null)} title="Cancel" className="text-[#A46666] hover:text-white">
+                              <FaTimes size={16} style={{ marginBottom: "2px" }} />
+                            </Button>
                           </>
                         ) : (
                           <>
-                            <button
+                            <Button
+                              variant="inline"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setScoreTabInlineEdit({
@@ -195,17 +217,18 @@ export const ScoresTab = () => {
                                 });
                               }}
                               title="Edit"
-                              className="text-tertiary hover:text-accent transition-colors"
+                              className="text-tertiary/40 hover:text-accent"
                             >
-                              <FaEdit size={14} />
-                            </button>
-                            <button
+                              <FaEdit size={14} style={{ marginBottom: "2px" }} />
+                            </Button>
+                            <Button
+                              variant="inline"
                               onClick={(e) => { e.stopPropagation(); deleteScore(score.character, score.date, score._id); }}
                               title="Delete"
-                              className="text-tertiary hover:text-[#A46666] transition-colors"
+                              className="text-[#A46666]/40 hover:text-[#A46666]"
                             >
-                              <FaTrash size={14} />
-                            </button>
+                              <FaTrash size={14} style={{ marginBottom: "2px" }} />
+                            </Button>
                           </>
                         )}
                       </div>
@@ -214,8 +237,9 @@ export const ScoresTab = () => {
                 );
                 })}
               </tbody>
-            </table>
-          )}
+              </table>
+            )}
+          </div>
           <Pagination
             page={scorePage}
             total={filteredScores.length}
@@ -226,5 +250,27 @@ export const ScoresTab = () => {
         </>
       )}
     </div>
+    <FilterSidebar
+      isOpen={filtersOpen}
+      onClose={() => setFiltersOpen(false)}
+      hasActiveFilters={!!scoreDateFilter}
+      onClear={() => { setScoreDateFilter(""); setScorePage(1); }}
+    >
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-tertiary/70 uppercase tracking-wider font-medium">Date</label>
+        <DatePicker
+          mode="single"
+          value={scoreDateFilter}
+          onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
+          clearable
+          wednesdayOnly
+          subtle
+          compact
+          placeholder="All Dates"
+          align="right"
+        />
+      </div>
+    </FilterSidebar>
+    </>
   );
 };

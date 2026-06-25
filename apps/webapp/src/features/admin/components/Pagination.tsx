@@ -1,3 +1,5 @@
+import { Button } from "../../../components/Button";
+
 interface PaginationProps {
   page: number;
   total: number;
@@ -8,24 +10,26 @@ interface PaginationProps {
 
 export const Pagination = ({ page, total, pageCount, onPrev, onNext }: PaginationProps) => (
   <div className="flex items-center justify-between px-6 py-3 border-t border-tertiary/[6%]">
-    <span className="text-xs text-tertiary">
+    <span className="text-xs text-tertiary/40">
       {total === 0 ? "No results" : `Page ${page} of ${pageCount}`}
     </span>
-    <div className="flex gap-3">
-      <button
+    <div className="flex gap-2">
+      <Button
+        variant={page <= 1 ? "tertiary" : "secondary"}
+        size="sm"
         disabled={page <= 1}
         onClick={onPrev}
-        className="text-xs text-tertiary hover:text-white disabled:opacity-30 disabled:hover:text-tertiary transition-colors px-3 py-1.5 rounded-lg bg-background/60 border border-tertiary/20 hover:bg-background/100 hover:border-accent/40 disabled:hover:bg-background/60 disabled:hover:border-tertiary/20"
       >
         Prev
-      </button>
-      <button
+      </Button>
+      <Button
+        variant={page >= pageCount ? "tertiary" : "secondary"}
+        size="sm"
         disabled={page >= pageCount}
         onClick={onNext}
-        className="text-xs text-tertiary hover:text-white disabled:opacity-30 disabled:hover:text-tertiary transition-colors px-3 py-1.5 rounded-lg bg-background/60 border border-tertiary/20 hover:bg-background/100 hover:border-accent/40 disabled:hover:bg-background/60 disabled:hover:border-tertiary/20"
       >
         Next
-      </button>
+      </Button>
     </div>
   </div>
 );

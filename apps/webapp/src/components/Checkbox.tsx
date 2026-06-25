@@ -25,7 +25,7 @@ const Checkbox = ({ checked, onChange, indeterminate = false, className }: Check
     className={cn(
       "w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all duration-200 ease-out focus:outline-none focus:ring-1 focus:ring-accent/40",
       checked || indeterminate
-        ? "bg-accent/20 border-accent/60 shadow-[0_0_0_3px_rgba(var(--accent-raw,145,68,207),0.08)]"
+        ? "bg-accent border-accent"
         : "bg-transparent border-tertiary/25 hover:border-tertiary/50 hover:bg-white/[3%]",
       className
     )}
@@ -37,8 +37,8 @@ const Checkbox = ({ checked, onChange, indeterminate = false, className }: Check
       )}
     >
       {indeterminate
-        ? <FaMinus size={7} className="text-accent" />
-        : <FaCheck size={7} className="text-accent" />}
+        ? <FaMinus size={8} className="text-panel" />
+        : <FaCheck size={8} className="text-panel" />}
     </span>
   </button>
 );

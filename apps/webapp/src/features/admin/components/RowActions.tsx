@@ -1,4 +1,5 @@
 import { FaEdit, FaTrash } from "react-icons/fa";
+import { Button } from "../../../components/Button";
 
 interface RowActionsProps {
   onEdit?: () => void;
@@ -10,21 +11,23 @@ export const RowActions = ({ onEdit, onDelete }: RowActionsProps) => (
   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
     <div className="flex items-center justify-end gap-4">
       {onEdit && (
-        <button
+        <Button
+          variant="inline"
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
           title="Edit"
-          className="text-tertiary hover:text-accent transition-colors"
+          className="text-tertiary/40 hover:text-accent"
         >
-          <FaEdit size={14} />
-        </button>
+          <FaEdit size={14} style={{ marginBottom: "2px" }} />
+        </Button>
       )}
-      <button
+      <Button
+        variant="inline"
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         title="Delete"
-        className="text-tertiary hover:text-[#A46666] transition-colors"
+        className="text-[#A46666]/40 hover:text-[#A46666]"
       >
-        <FaTrash size={14} />
-      </button>
+        <FaTrash size={14} style={{ marginBottom: "2px" }} />
+      </Button>
     </div>
   </td>
 );

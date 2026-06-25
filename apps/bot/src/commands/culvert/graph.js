@@ -13,7 +13,7 @@ module.exports = {
       option
         .setName("character")
         .setDescription("The character's graph to be rendered")
-        .setRequired(true)
+        .setRequired(false)
         .setAutocomplete(true)
     )
     .addIntegerOption((option) =>
@@ -62,8 +62,20 @@ module.exports = {
 
   async execute(interaction) {
     // Parse the command arguments
-    const characterOption = interaction.options.getString("character");
+    let characterOption = interaction.options.getString("character");
     const weeksOption = interaction.options.getInteger("number_of_weeks") ?? 8;
+
+    // If no character was specified, auto-select if the user only has one linked
+    if (!characterOption) {
+      const user = await culvertSchema.findById(interaction.user.id, "characters");
+      if (!user || user.characters.length === 0) {
+        return interaction.reply("Error - You have no characters linked yet.");
+      }
+      if (user.characters.length > 1) {
+        return interaction.reply("Error - You have multiple characters linked. Please specify which character to view the graph for");
+      }
+      characterOption = user.characters[0].name;
+    }
     const omitOption = interaction.options.getBoolean("omit_unsubmitted");
 
     // Check if the user entered an invalid amount of weeks

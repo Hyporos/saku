@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import updateLocale from "dayjs/plugin/updateLocale";
@@ -5,12 +7,42 @@ import { PreviousScore } from "../components/PreviousScore";
 import Graph from "../components/Graph";
 import { ChatMessage } from "../components/ChatMessage";
 import useCharacter from "../hooks/useCharacter";
+import useAuth from "../hooks/useAuth";
+import { apiBase } from "../config/apiBase";
 dayjs.extend(utc);
 dayjs.extend(updateLocale);
 
+// The owner has no linked character — show Rally's data instead
+const OWNER_FALLBACK_CHAR = "Rally";
+
 const Dashboard = () => {
+  const { user, isLoading } = useAuth();
+  const ownerId = import.meta.env.VITE_OWNER_ID as string | undefined;
+
+  // Resolved character name (empty until auth + lookup complete)
+  const [charName, setCharName] = useState("");
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+
+    // Owner has no character — fall back to Rally
+    if (user.id === ownerId) {
+      setCharName(OWNER_FALLBACK_CHAR);
+      return;
+    }
+
+    // Look up which characters are linked to the logged-in Discord user
+    axios
+      .get(`${apiBase}/bot/api/user/${user.id}`)
+      .then((res) => {
+        const names: string[] = res.data.characters ?? [];
+        setCharName(names[0] ?? OWNER_FALLBACK_CHAR);
+      })
+      .catch(() => setCharName(OWNER_FALLBACK_CHAR));
+  }, [user, isLoading, ownerId]);
+
   // Character object
-  const characterData = useCharacter("dánnis");
+  const characterData = useCharacter(charName);
 
   // Set the day of the week that the culvert score gets reset (Sunday)
   dayjs.updateLocale("en", {
