@@ -28,7 +28,7 @@ interface DrawerProps {
  * Manages its own mount/animate lifecycle so consumers only need to toggle `isOpen`.
  * Footer is rendered in a fixed-height strip at the bottom; body scrolls independently.
  */
-export const Drawer = ({ isOpen, onClose, title, subtitle, children, footer }: DrawerProps) => {
+const Drawer = ({ isOpen, onClose, title, subtitle, children, footer }: DrawerProps) => {
   const [mounted, setMounted] = useState(false);
   const [animating, setAnimating] = useState(false);
 

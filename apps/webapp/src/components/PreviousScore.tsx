@@ -40,4 +40,4 @@ const PreviousScore = ({ state, date, score }: PreviousScoreProps) => {
   );
 };
 
-export { PreviousScore, previousScoreVariants };
+export { PreviousScore };

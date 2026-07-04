@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FaPlus, FaTrash, FaSyncAlt, FaCheck, FaStar, FaEye } from "react-icons/fa";
 import { Button } from "../components/Button";
 

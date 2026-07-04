@@ -52,7 +52,7 @@ import type {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-export type ScheduledTask = {
+type ScheduledTask = {
   id: string;
   name: string;
   channelName: string;
@@ -303,26 +303,26 @@ export const useAdminContext = () => {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Navigation / sidebar constants (module-level — no component closure needed)
 
-export const navItems: Array<{ id: Section; label: string; icon: React.ElementType }> = [
+const navItems: Array<{ id: Section; label: string; icon: React.ElementType }> = [
   { id: "users",      label: "Users",      icon: FaUsers },
   { id: "characters", label: "Characters", icon: FaUserAlt },
   { id: "scores",     label: "Scores",     icon: FaChartBar },
   { id: "exceptions", label: "Exceptions", icon: FaExclamationCircle },
 ];
 
-export const monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
+const monitoringItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
   { id: "action-log",       label: "Action Log",       icon: FaHistory },
   { id: "scheduled-tasks", label: "Scheduled Tasks", icon: FaCalendarAlt },
 ];
 
-export const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
+const toolItems: Array<{ id: ToolSection; label: string; icon: React.ElementType }> = [
   { id: "scanner", label: "Culvert Scanner", icon: FaCamera },
 ];
 
 // ⎯⎯ Path ↔ section helpers ⎯⎯ //
 
 /** Maps a URL path to its admin tab section. */
-export const sectionForPath = (path: string): Section => {
+const sectionForPath = (path: string): Section => {
   if (path.startsWith("/admin/users")) return "users";
   if (path.startsWith("/admin/characters")) return "characters";
   if (path.startsWith("/admin/scores")) return "scores";
@@ -331,7 +331,7 @@ export const sectionForPath = (path: string): Section => {
 };
 
 /** Maps a URL path to its tool section, or null if not on a tool route. */
-export const toolSectionForPath = (path: string): ToolSection | null => {
+const toolSectionForPath = (path: string): ToolSection | null => {
   if (path.startsWith("/admin/scanner")) return "scanner";
   if (path.startsWith("/admin/action-log")) return "action-log";
   if (path.startsWith("/admin/scheduled-tasks")) return "scheduled-tasks";

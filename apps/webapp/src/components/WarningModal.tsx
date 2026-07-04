@@ -8,7 +8,7 @@ import { Button } from "./Button";
 // "red"     — destructive actions (delete, remove)
 // "primary" — miscellaneous confirmations
 // "owner"   — owner-only actions (clear log, etc.)
-export type DialogColorVariant = "red" | "primary" | "owner";
+type DialogColorVariant = "red" | "primary" | "owner";
 
 const colorVariantStyles: Record<
   DialogColorVariant,

@@ -23,7 +23,7 @@ const variantClasses: Record<BadgeVariant, string> = {
  *
  * Variants: green | red | primary
  */
-export const Badge = ({ variant, children, className }: BadgeProps) => (
+const Badge = ({ variant, children, className }: BadgeProps) => (
   <span
     className={cn(
       "inline-flex items-center text-xs rounded-full px-2 py-0.5 border",

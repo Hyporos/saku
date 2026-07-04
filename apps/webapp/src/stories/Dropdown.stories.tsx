@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import Dropdown from "../components/Dropdown";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -105,7 +105,6 @@ export const PlainSubtle: Story = {
 
 /** Each option shows a colored dot. Used for graph color pickers. */
 export const ColorVariant: Story = {
-  name: "Color Variant",
   render: () => {
     const [value, setValue] = useState("crimson");
     return <Dropdown options={COLOR_OPTIONS} value={value} onChange={setValue} variant="color" />;
@@ -114,7 +113,6 @@ export const ColorVariant: Story = {
 
 /** Each option shows a small character icon. Used for actor/character filters. */
 export const IconVariant: Story = {
-  name: "Icon Variant",
   render: () => {
     const [value, setValue] = useState("kopptop");
     return <Dropdown options={ICON_OPTIONS} value={value} onChange={setValue} variant="icon" />;

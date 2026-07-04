@@ -54,25 +54,21 @@ export const Default: Story = {
 
 /** Prev is disabled — can't go before page 1. */
 export const FirstPage: Story = {
-  name: "First Page",
   args: { page: 1, total: 97, pageCount: 10, onPrev: () => {}, onNext: () => {} },
 };
 
 /** Both buttons enabled. */
 export const MiddlePage: Story = {
-  name: "Middle Page",
   args: { page: 5, total: 97, pageCount: 10, onPrev: () => {}, onNext: () => {} },
 };
 
 /** Next is disabled — already on the last page. */
 export const LastPage: Story = {
-  name: "Last Page",
   args: { page: 10, total: 97, pageCount: 10, onPrev: () => {}, onNext: () => {} },
 };
 
 /** Both buttons disabled and "No results" shown. */
 export const NoResults: Story = {
-  name: "No Results",
   args: { page: 1, total: 0, pageCount: 0, onPrev: () => {}, onNext: () => {} },
 };
 
