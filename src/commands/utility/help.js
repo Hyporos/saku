@@ -89,7 +89,7 @@ module.exports = {
           case "profile":
             return "View the culvert profile of a user. It will show a variety of stats such as rankings, past scores, and character info (level, class)";
           case "graph":
-            return "View the progression graph of a character. It will show a history of past culvert scores, up to any amount of weeks";
+            return "View the interactive progression graph of a character. Switch between Score, Score + Median, and Rank views, adjust the number of weeks, hide missed weeks, and browse your characters — or view anyone else's.";
           case "graphcolor":
             return "Change the color of your progression graph area. Your graph will also be displayed to other users in the color you choose";
           case "rankings":
@@ -139,7 +139,7 @@ module.exports = {
           case "profile":
             return "`[character]` - The character's profile to be viewed";
           case "graph":
-            return "`[character]` - The character's graph to be rendered\n`[number_of_weeks]` - The number of weeks to display (default: 8)\n`[omit_unsubmitted]` - Prevent unsubmitted scores (missed weeks) from displaying";
+            return "`[character]` - The character to graph (optional; defaults to your own, and you can view anyone's)";
           case "graphcolor":
             return "`[color]` - The new color of the graph area (default: pink)";
           case "rankings":

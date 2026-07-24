@@ -1,166 +1,317 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+} = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const { findCharacter } = require("../../utility/culvertUtils.js");
+const { ACCENT, GRAPH_COLOR, computeStats, loadScoreIndex, buildLineChart, textPanel } = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Interactive per-character culvert progression graph (Components V2).
+
+const GUILD_LINE = "255,255,255"; // neutral white for the guild-median line
+const FOOTER = "-# Change your graph color with `/graphcolor`";
+const RANK_LABEL_MAX = 16; // beyond this many weeks the per-point rank labels overlap, so hide them
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// "R,G,B" (stored graph color) → 0xRRGGBB integer for the container accent bar
+function rgbToInt(rgb) {
+  const parts = (rgb || "").split(",").map((n) => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  return (parts[0] << 16) | (parts[1] << 8) | parts[2];
+}
+
+// datalabels formatter (spliced into the chart as a real function by QuickChart): shows
+// "N/A" for weeks the character didn't submit, otherwise the rank number.
+const RANK_NA_FORMATTER =
+  "function(value, context){return (context.dataset.naFlags && context.dataset.naFlags[context.dataIndex]) ? 'N/A' : value;}";
+
+const VIEWS = { score: "Score", scoremedian: "Score + Median", rank: "Rank" };
+
+// The character's most recent `weeks` score entries (oldest→newest), optionally dropping
+// missed (0) weeks.
+function selectCharWeeks(char, weeks, omit) {
+  const sorted = [...(char.scores ?? [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const filtered = omit ? sorted.filter((s) => s.score > 0) : sorted;
+  return filtered.slice(-weeks);
+}
+
+// getScoreIndex lazily loads the guild score index (only the Median/Rank views need it).
+async function renderCharGraph(state, char, getScoreIndex) {
+  const selected = selectCharWeeks(char, state.weeks, state.omit);
+  if (selected.length < 2) {
+    return { error: `**${char.name}** needs at least 2 scores${state.omit ? " (with missed weeks hidden)" : ""} to graph.` };
+  }
+
+  const labels = selected.map((s) => dayjs(s.date).format("MM/DD"));
+  const color = char.graphColor || GRAPH_COLOR;
+
+  // Placement among all non-zero submitted scores that week (1 = top). Axis reversed so the
+  // best rank sits at the top; unsubmitted weeks drop to the bottom labelled "N/A".
+  if (state.view === "rank") {
+    const scoreIndex = await getScoreIndex();
+    const perWeek = selected.map((s) => {
+      if (s.score <= 0) return null;
+      const guild = (scoreIndex.get(s.date) ?? []).filter((x) => x > 0).sort((a, b) => b - a);
+      return guild.indexOf(s.score) + 1 || null;
+    });
+    const ranks = perWeek.filter((r) => r != null);
+    const bottom = ranks.length ? Math.max(...ranks) : 1;
+    const data = perWeek.map((r) => (r == null ? bottom : r));
+    const naFlags = perWeek.map((r) => r == null);
+    return {
+      url: await buildLineChart(labels, [{ label: "Rank", data, color, fill: "start", naFlags }], {
+        yTicks: { reverse: true, precision: 0 },
+        datalabels:
+          selected.length <= RANK_LABEL_MAX
+            ? { display: true, align: "top", anchor: "end", color: "rgba(255,255,255,0.9)", font: { size: 12, weight: "bold" }, formatter: RANK_NA_FORMATTER }
+            : null,
+      }),
+    };
+  }
+
+  const series = [{ label: char.name, data: selected.map((s) => s.score), color, fill: true }];
+
+  // Score + the guild median overlaid as a faint dashed line
+  if (state.view === "scoremedian") {
+    const scoreIndex = await getScoreIndex();
+    const median = selected.map((s) => {
+      const g = computeStats(scoreIndex.get(s.date) ?? []);
+      return g ? g.p50 : null;
+    });
+    series.push({ label: "Guild median", data: median, color: GUILD_LINE, dashed: true, dim: true, points: false });
+    return { url: await buildLineChart(labels, series, { legend: true }) };
+  }
+
+  // Raw score
+  return { url: await buildLineChart(labels, series) };
+}
+
+// ⎯⎯ Panel ⎯⎯ //
+
+function buildCharPanel(state, characters, { imageUrl, note, disabled = false }) {
+  const char = characters[state.charIndex];
+
+  const container = new ContainerBuilder()
+    .setAccentColor(rgbToInt(char.graphColor) ?? ACCENT)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${char.name}'s Culvert Graph`));
+
+  if (imageUrl) {
+    container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl)));
+  } else {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(note ?? "No data."));
+  }
+
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  // Character switcher (only when the roster has more than one)
+  if (characters.length > 1) {
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("graph_char")
+          .setDisabled(disabled)
+          .addOptions(characters.map((c, idx) => ({ label: c.name, value: String(idx), default: idx === state.charIndex })))
+      )
+    );
+  }
+
+  // View toggle
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      ...Object.entries(VIEWS).map(([value, label]) =>
+        new ButtonBuilder()
+          .setCustomId(`graph_view_${value}`)
+          .setLabel(label)
+          .setStyle(value === state.view ? ButtonStyle.Primary : ButtonStyle.Secondary)
+          .setDisabled(disabled)
+      )
+    )
+  );
+
+  // Context controls
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("graph_weeks")
+        .setLabel(state.weeksSet ? `${state.weeks} weeks` : "# of Weeks")
+        .setStyle(state.weeksSet ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId("graph_omit")
+        .setLabel("Hide Missed Weeks")
+        .setStyle(state.omit ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setDisabled(disabled)
+    )
+  );
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(FOOTER));
+
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+}
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("graph")
-    .setDescription("View the progression graph of a character")
-    .addStringOption((option) =>
-      option
+    .setDescription("View the interactive progression graph of a character")
+    .addStringOption((opt) =>
+      opt
         .setName("character")
-        .setDescription("The character's graph to be rendered")
-        .setRequired(false)
+        .setDescription("The character to graph (defaults to your own; you can view anyone's)")
         .setAutocomplete(true)
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName("number_of_weeks")
-        .setDescription("The number of weeks to display (default: 8)")
-    )
-    .addBooleanOption((option) =>
-      option
-        .setName("omit_unsubmitted")
-        .setDescription(
-          "Prevent unsubmitted scores (missed weeks) from displaying"
-        )
     ),
 
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-
   async autocomplete(interaction) {
-    const user = await culvertSchema.findById(
-      interaction.user.id,
-      "characters"
-    );
-
     const value = interaction.options.getFocused().toLowerCase();
-
-    let choices = [];
-
-    user.characters.forEach((character) => {
-      choices.push(character.name);
-    });
-
-    const filtered = choices
-      .filter((choice) => choice.toLowerCase().includes(value))
+    const docs = await culvertSchema.find({}, { "characters.name": 1 }).lean();
+    const names = docs.flatMap((d) => (d.characters ?? []).map((c) => c.name));
+    const filtered = names
+      .filter((n) => n.toLowerCase().includes(value))
+      .sort((a, b) => a.localeCompare(b))
       .slice(0, 25);
-
     try {
-      await interaction.respond(
-        filtered.map((choice) => ({ name: choice, value: choice }))
-      );
-    } catch (error) {
-      if (error.code !== 10062) throw error;
+      await interaction.respond(filtered.map((n) => ({ name: n, value: n })));
+    } catch (e) {
+      if (e.code !== 10062) throw e;
     }
   },
 
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-
   async execute(interaction) {
-    // Parse the command arguments
-    let characterOption = interaction.options.getString("character");
-    const weeksOption = interaction.options.getInteger("number_of_weeks") ?? 8;
+    const charOption = interaction.options.getString("character");
 
-    // If no character was specified, auto-select if the user only has one linked
-    if (!characterOption) {
-      const user = await culvertSchema.findById(interaction.user.id, "characters");
-      if (!user || user.characters.length === 0) {
-        return interaction.reply("Error - You have no characters linked yet.");
+    // With a character given, graph that character (anyone's) and its owner's roster in the
+    // switcher; otherwise default to the invoker's own characters.
+    let characters;
+    let startIndex = 0;
+    if (charOption) {
+      const doc = await culvertSchema
+        .findOne({ "characters.name": { $regex: `^${escapeRegex(charOption)}$`, $options: "i" } }, { characters: 1 })
+        .lean();
+      if (!doc) {
+        return interaction.reply({ content: `Error - No character named **${charOption}** was found.`, ephemeral: true });
       }
-      if (user.characters.length > 1) {
-        return interaction.reply("Error - You have multiple characters linked. Please specify which character to view the graph for");
+      characters = doc.characters;
+      startIndex = Math.max(0, characters.findIndex((c) => c.name.toLowerCase() === charOption.toLowerCase()));
+    } else {
+      const doc = await culvertSchema.findById(interaction.user.id, "characters").lean();
+      if (!doc || !doc.characters || doc.characters.length === 0) {
+        return interaction.reply({ content: "Error - You have no characters linked yet.", ephemeral: true });
       }
-      characterOption = user.characters[0].name;
-    }
-    const omitOption = interaction.options.getBoolean("omit_unsubmitted");
-
-    // Check if the user entered an invalid amount of weeks
-    if (weeksOption <= 1) {
-      return interaction.reply(
-        "Error - The number of weeks to display must be greater than 1"
-      );
+      characters = doc.characters;
     }
 
-    // Check if the user entered an invalid amount of weeks
-    if (weeksOption > 1000) {
-      return interaction.reply(
-        "Error - The number of weeks to display must be less than 1,000"
-      );
+    const startChar = characters[startIndex];
+    if ((startChar.scores?.length ?? 0) < 2) {
+      return interaction.reply({ content: `Error - **${startChar.name}** needs at least 2 scores to graph.`, ephemeral: true });
     }
 
-    // Find the specified character
-    const character = await findCharacter(interaction, characterOption);
-    if (!character) return;
+    await interaction.reply(textPanel("Rendering graph…"));
 
-    // Check if the character has at least two scores submitted
-    if (character.scores.length < 2) {
-      return interaction.reply(
-        `Error - The character **${characterOption}** must have at least two scores submitted`
-      );
-    }
+    // Guild scores are only needed by the Median/Rank views — load once, on first use.
+    let scoreCache = null;
+    const getScoreIndex = async () => {
+      if (!scoreCache) scoreCache = await loadScoreIndex();
+      return scoreCache;
+    };
 
-    // Fetch the x and y axis labels for the graph
-    function getLabels(axis) {
-      const scores = character.scores || [];
+    const state = { charIndex: startIndex, weeks: 8, weeksSet: false, omit: false, view: "score" };
+    const render = () => renderCharGraph(state, characters[state.charIndex], getScoreIndex);
 
-      // Sort all scores by date, from oldest to newest
-      scores.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let lastUrl = null;
+    const first = await render();
+    lastUrl = first.url ?? null;
+    const message = await interaction.editReply(buildCharPanel(state, characters, { imageUrl: lastUrl, note: first.error }));
 
-      let weekCount = weeksOption || 8;
-      let content = "";
+    const collector = message.createMessageComponentCollector({ idle: 300_000 });
 
-      for (let i = scores.length - 1; i >= scores.length - weekCount; i--) {
-        if (!scores[i]) continue;
-
-        if (omitOption && scores[i].score === 0) {
-          weekCount++; // Get the exact amount of scores requested, when omitting unsubmitted scores
-        } else {
-          content = content.concat(
-            axis === "x"
-              ? dayjs(scores[i].date).format("MM/DD") // For the x axis, grab the date
-              : scores[i].score, // For the y axis, grab the score
-            ","
-          );
+    collector.on("collect", async (i) => {
+      try {
+        if (i.user.id !== interaction.user.id) {
+          return i.reply({ content: "This isn't your graph panel — run `/graph` for your own.", ephemeral: true });
         }
+
+        // # of Weeks modal — showModal must be the first response, so no deferUpdate here
+        if (i.customId === "graph_weeks") {
+          const maxWeeks = characters[state.charIndex].scores.length;
+          const modal = new ModalBuilder()
+            .setCustomId("graph_weeks_modal")
+            .setTitle("Set Week Count")
+            .addComponents(
+              new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                  .setCustomId("value")
+                  .setLabel(`Number of weeks (2-${maxWeeks})`)
+                  .setStyle(TextInputStyle.Short)
+                  .setValue(String(state.weeks))
+                  .setRequired(true)
+              )
+            );
+          await i.showModal(modal);
+
+          let submit;
+          try {
+            submit = await i.awaitModalSubmit({
+              time: 120_000,
+              filter: (m) => m.customId === "graph_weeks_modal" && m.user.id === i.user.id,
+            });
+          } catch {
+            return;
+          }
+
+          try {
+            await submit.deferUpdate();
+          } catch {
+            return; // interaction expired in transit; user can retry
+          }
+
+          const n = parseInt(submit.fields.getTextInputValue("value").trim(), 10);
+          if (!Number.isInteger(n) || n < 2 || n > maxWeeks) {
+            return submit.followUp({ content: `Error - weeks must be a whole number between 2 and ${maxWeeks}.`, ephemeral: true });
+          }
+          state.weeks = n;
+          state.weeksSet = true;
+
+          const r = await render();
+          if (r.url) lastUrl = r.url;
+          return submit.editReply(buildCharPanel(state, characters, { imageUrl: r.url, note: r.error }));
+        }
+
+        await i.deferUpdate();
+        if (i.customId === "graph_char") state.charIndex = Number(i.values[0]);
+        else if (i.customId.startsWith("graph_view_")) state.view = i.customId.slice("graph_view_".length);
+        else if (i.customId === "graph_omit") state.omit = !state.omit;
+
+        const r = await render();
+        if (r.url) lastUrl = r.url;
+        await i.editReply(buildCharPanel(state, characters, { imageUrl: r.url, note: r.error }));
+      } catch (err) {
+        console.error("Error - /graph interaction failed:", err);
       }
+    });
 
-      return content.slice(0, -1); // Remove the unnecessary comma at the end
-    }
-
-    // Get the total number of weeks rendered (to display as information)
-    const renderedWeeks = Math.min(weeksOption, character.scores.length);
-
-    // QuickChart Template Values & Link
-    const xLabels = getLabels("x");
-    const yLabels = getLabels("y");
-    const graphColor = character.graphColor || "255,189,213";
-    const borderColorAlpha = graphColor !== "255,189,213" ? 0.7 : 0.6;
-
-    const graphTemplate =
-      "https://quickchart.io/chart/render/zm-c2f6cd67-0740-44d6-a023-649110e22db9";
-
-    const url = `${graphTemplate}?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${graphColor},${borderColorAlpha})&backgroundColor1=rgba(${graphColor},0.4)`;
-
-    // Create the graph embed
-    const graph = new EmbedBuilder()
-      .setColor(0x202222)
-      .setAuthor({ name: "Culvert Graph" })
-      .setImage(url)
-      .setTitle(character.name)
-      .setURL(
-        `https://maplestory.nexon.net/rankings/overall-ranking/legendary?rebootIndex=1&character_name=${character.name}&search=true`
-      )
-      .setFooter({
-        text: `Rendering the last ${renderedWeeks} weeks • ${
-          omitOption ? "Omitting" : "Displaying"
-        } unsubmitted scores`,
-      });
-
-    // Handle responses
-    interaction.reply({ embeds: [graph] });
+    collector.on("end", async () => {
+      try {
+        await interaction.editReply(
+          buildCharPanel(state, characters, { imageUrl: lastUrl, note: lastUrl ? null : "Panel expired.", disabled: true })
+        );
+      } catch {
+        // message may have been deleted
+      }
+    });
   },
 };

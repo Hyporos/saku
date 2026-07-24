@@ -14,159 +14,24 @@ const {
   TextInputStyle,
   MessageFlags,
 } = require("discord.js");
-const axios = require("axios");
 const weekSchema = require("../../schemas/weekSchema.js");
-const culvertSchema = require("../../schemas/culvertSchema.js");
 const { getResetDates } = require("../../utility/culvertUtils.js");
+const {
+  ACCENT,
+  GRAPH_COLOR,
+  computeStats,
+  loadScoreIndex,
+  weekTotal,
+  buildLineChart,
+  buildSpreadUrl,
+  textPanel,
+} = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const BEE_ROLE_ID = "720001044746076181";
 const OWNER_ID = "631337640754675725";
-const GRAPH_COLOR = "255,189,213";
-
-// Returns the Nth percentile of a pre-sorted ascending array
-function percentile(sorted, p) {
-  if (sorted.length === 0) return 0;
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo];
-  return Math.round(sorted[lo] + (idx - lo) * (sorted[hi] - sorted[lo]));
-}
-
-// Compute stats from a list of raw scores, excluding 0-scores
-function computeStats(scores) {
-  const values = (scores ?? []).filter((s) => s > 0).sort((a, b) => a - b);
-  if (values.length === 0) return null;
-  const total = values.reduce((a, b) => a + b, 0);
-  return {
-    total,
-    count: values.length,
-    mean: Math.round(total / values.length),
-    p25: percentile(values, 25),
-    p50: percentile(values, 50),
-    p75: percentile(values, 75),
-  };
-}
-
-// Indexes every character score by week date: Map<"YYYY-MM-DD", number[]>. Built once
-// from culvertData so each week lookup is O(1) instead of re-scanning all characters.
-function buildScoreIndex(culvertData) {
-  const index = new Map();
-  for (const user of culvertData) {
-    for (const char of user.characters ?? []) {
-      for (const s of char.scores ?? []) {
-        const bucket = index.get(s.date);
-        if (bucket) bucket.push(s.score);
-        else index.set(s.date, [s.score]);
-      }
-    }
-  }
-  return index;
-}
-
-// Total of a week's non-zero scores — the single-line graph value
-function weekTotal(scores) {
-  const stats = computeStats(scores);
-  return stats ? stats.total : 0;
-}
-
-// Loads all character scores and indexes them by week date, in a single round-trip.
-async function loadScoreIndex() {
-  const culvertData = await culvertSchema.find({}, { "characters.scores": 1 }).lean();
-  return buildScoreIndex(culvertData);
-}
-
-const METRIC_TITLES = {
-  total: "Guild Culvert Total",
-  spread: "Guild Culvert Spread",
-};
-
-const GRAPH_RGBA = (a) => `rgba(${GRAPH_COLOR},${a})`;
-const GRID = "rgba(255,255,255,0.06)";
-const AXIS_TEXT = "rgba(255,255,255,0.5)";
-
-// Shared dark-theme axis styling; yTicks lets a chart add bounds (suggestedMin/Max, etc.)
-function chartScales(yTicks = {}) {
-  return {
-    xAxes: [{ gridLines: { color: GRID }, ticks: { fontColor: AXIS_TEXT } }],
-    yAxes: [{ gridLines: { color: GRID }, ticks: { fontColor: AXIS_TEXT, ...yTicks } }],
-  };
-}
-
-// Renders a QuickChart config to an image URL. Uses the inline URL directly when it's
-// short enough (avoids an extra round-trip), only falling back to the short-URL API when
-// the inline config would exceed Discord's 2048-char image URL limit (large spread ranges).
-async function createChartUrl(config) {
-  const inline = `https://quickchart.io/chart?w=600&h=350&bkg=%23202222&c=${encodeURIComponent(JSON.stringify(config))}`;
-  if (inline.length <= 1900) return inline;
-  try {
-    const { data } = await axios.post("https://quickchart.io/chart/create", {
-      width: 600,
-      height: 350,
-      backgroundColor: "#202222",
-      chart: config,
-    });
-    if (data?.success && data.url) return data.url;
-  } catch {
-    // Fall through to the inline URL below (may be truncated by Discord if very long)
-  }
-  return inline;
-}
-
-// Single-series line graph with the y-axis fit to the data (not anchored at zero),
-// so high, tightly-clustered values fill the chart instead of hugging the top.
-function buildLineUrl(labels, values) {
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  const pad = hi > lo ? Math.round((hi - lo) * 0.2) : Math.max(1, Math.round(hi * 0.1));
-  const config = {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        {
-          data: values,
-          borderColor: GRAPH_RGBA(0.9),
-          backgroundColor: GRAPH_RGBA(0.2),
-          borderWidth: 2,
-          pointRadius: 2,
-          pointBackgroundColor: GRAPH_RGBA(1),
-          fill: true,
-          lineTension: 0.3,
-        },
-      ],
-    },
-    options: {
-      legend: { display: false },
-      scales: chartScales({ maxTicksLimit: 8, suggestedMin: Math.max(0, lo - pad), suggestedMax: hi + pad }),
-    },
-  };
-  return createChartUrl(config);
-}
-
-// p25–p75 spread band: a median line with a shaded ribbon between the 25th and 75th
-// percentiles, showing how tightly the guild is clustered each week.
-function buildSpreadUrl(labels, p25, p50, p75) {
-  const config = {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "25th %ile", data: p25, borderColor: GRAPH_RGBA(0.35), backgroundColor: GRAPH_RGBA(0.18), borderWidth: 1, pointRadius: 0, fill: false },
-        { label: "75th %ile", data: p75, borderColor: GRAPH_RGBA(0.35), backgroundColor: GRAPH_RGBA(0.18), borderWidth: 1, pointRadius: 0, fill: "-1" },
-        { label: "Median", data: p50, borderColor: GRAPH_RGBA(0.9), borderWidth: 2, pointRadius: 0, fill: false },
-      ],
-    },
-    options: {
-      legend: { labels: { fontColor: "rgba(255,255,255,0.6)" } },
-      scales: chartScales(),
-    },
-  };
-  return createChartUrl(config);
-}
 
 // Renders a stat with a bracketed week-over-week delta, e.g. "1,234 (🔺 56)"
 function statField(current, prev) {
@@ -181,10 +46,10 @@ function statField(current, prev) {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Interactive graph panel (Components V2)
 
-const METRIC_OPTIONS = [
-  { label: "Total Score", value: "total" },
-  { label: "Score Spread", value: "spread" },
-];
+const METRICS = {
+  total: { label: "Total Score", title: "Guild Culvert Total" },
+  spread: { label: "Score Spread", title: "Guild Culvert Spread" },
+};
 
 // Renders the chosen metric over the last `weeks` finalized weeks to an image URL.
 // weeksAsc (finalized week dates, oldest→newest) and scoreIndex are built once per panel
@@ -198,39 +63,38 @@ async function renderWeeklyGraph({ weeks, metric }, weeksAsc, scoreIndex) {
   const labels = selected.map((w) => dayjs(w).format("MM/DD"));
   const scoresPerWeek = selected.map((w) => scoreIndex.get(w) ?? []);
 
-  let url;
   if (metric === "spread") {
     const per = scoresPerWeek.map((s) => computeStats(s));
-    url = await buildSpreadUrl(
-      labels,
-      per.map((s) => (s ? s.p25 : 0)),
-      per.map((s) => (s ? s.p50 : 0)),
-      per.map((s) => (s ? s.p75 : 0))
-    );
-  } else {
-    url = await buildLineUrl(labels, scoresPerWeek.map((s) => weekTotal(s)));
+    return {
+      url: await buildSpreadUrl(
+        labels,
+        per.map((s) => (s ? s.p25 : 0)),
+        per.map((s) => (s ? s.p50 : 0)),
+        per.map((s) => (s ? s.p75 : 0))
+      ),
+    };
   }
-  return { url };
+  return {
+    url: await buildLineChart(labels, [
+      { label: "Total", data: scoresPerWeek.map((s) => weekTotal(s)), color: GRAPH_COLOR, fill: true },
+    ]),
+  };
 }
 
 // Builds the Components V2 message: the graph image and its controls inside one container.
 function buildGraphPanel({ metric, weeks, weeksSet, imageUrl, disabled = false }) {
   const container = new ContainerBuilder()
-    .setAccentColor(0xffc3c5)
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${METRIC_TITLES[metric]}`)
-    )
-    .addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl))
-    )
+    .setAccentColor(ACCENT)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${METRICS[metric].title}`))
+    .addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl)))
     .addSeparatorComponents(new SeparatorBuilder())
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(
-        ...METRIC_OPTIONS.map((o) =>
+        ...Object.entries(METRICS).map(([value, { label }]) =>
           new ButtonBuilder()
-            .setCustomId(`weekly_metric_${o.value}`)
-            .setLabel(o.label)
-            .setStyle(o.value === metric ? ButtonStyle.Primary : ButtonStyle.Secondary)
+            .setCustomId(`weekly_metric_${value}`)
+            .setLabel(label)
+            .setStyle(value === metric ? ButtonStyle.Primary : ButtonStyle.Secondary)
             .setDisabled(disabled)
         ),
         new ButtonBuilder()
@@ -241,18 +105,6 @@ function buildGraphPanel({ metric, weeks, weeksSet, imageUrl, disabled = false }
       )
     );
   return { components: [container], flags: MessageFlags.IsComponentsV2 };
-}
-
-// A minimal Components V2 message carrying a single line of text (loading / error states).
-function textPanel(text) {
-  return {
-    components: [
-      new ContainerBuilder()
-        .setAccentColor(0xffc3c5)
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(text)),
-    ],
-    flags: MessageFlags.IsComponentsV2,
-  };
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
