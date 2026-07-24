@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaEdit, FaCheck, FaTimes, FaHistory, FaTrash } from "react-icons/fa";
+import { FaEdit, FaCheck, FaTimes, FaHistory, FaTrash } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import DatePicker from "../../../components/DatePicker";
 import { SortableHead } from "../components/SortableHead";
@@ -8,6 +8,9 @@ import { BatchPopup } from "../components/BatchPopup";
 import { FilterSidebar, FilterTrigger } from "../components/FilterSidebar";
 import { Pagination } from "../components/Pagination";
 import { SectionHeader } from "../components/SectionHeader";
+import { SearchInput } from "../components/SearchInput";
+import { EmptyState } from "../components/EmptyState";
+import { ListPanel } from "../components/ListPanel";
 import { useAdminContext } from "../context";
 import { Button } from "../../../components/Button";
 
@@ -29,63 +32,69 @@ export const ScoresTab = () => {
 
   return (
     <>
-    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
-      <SectionHeader
-        title="Scores"
-        count={filteredScores.length}
-        createSection="scores"
-      />
-      <div className="bg-tertiary/20 h-px flex-shrink-0" />
-      {/* Filter bar — search + date picker inline, filter icon on mobile opens sidebar */}
-      <div className="flex items-center gap-3 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
-        <input
-          type="text"
-          placeholder="Filter by character name..."
-          value={scoreSearch}
-          onChange={(e) => { setScoreSearch(e.target.value); setScorePage(1); }}
-          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-0"
+    <ListPanel
+      header={
+        <SectionHeader
+          title="Scores"
+          count={filteredScores.length}
+          createSection="scores"
         />
-        {/* Desktop: date picker inline */}
-        <div className="hidden md:block">
-          <DatePicker
-            mode="single"
-            value={scoreDateFilter}
-            onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
-            clearable
-            wednesdayOnly
-            subtle
-            compact
-            placeholder="All Dates"
-            align="right"
-          />
-        </div>
-        {/* Mobile: filter icon opens sidebar */}
-        <FilterTrigger
-          onClick={() => setFiltersOpen(true)}
-          hasActiveFilters={!!scoreSearch || !!scoreDateFilter}
-          className="md:hidden"
-        />
-      </div>
-      {usersLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-tertiary/50">Loading...</p>
-        </div>
-      ) : (
+      }
+      filter={
         <>
-          <BatchPopup
-            count={selScores.size}
-            onDelete={batchDeleteScores}
-            onClear={() => setSelScores(new Set())}
+          <SearchInput
+            value={scoreSearch}
+            onChange={(v) => { setScoreSearch(v); setScorePage(1); }}
+            placeholder="Filter by character name..."
           />
-          <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-            {pagedScores.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3 text-tertiary/50">
-                <FaHistory size={24} />
-                <p className="text-sm">{scoreSearch ? `No scores matching "${scoreSearch}"` : "No scores found"}</p>
-              </div>
-            ) : (
-              <table className="w-full table-auto">
+          {/* Desktop: date picker inline */}
+          <div className="hidden md:block">
+            <DatePicker
+              mode="single"
+              value={scoreDateFilter}
+              onChange={(v) => { setScoreDateFilter(scoreDateFilter === v ? "" : v); setScorePage(1); }}
+              clearable
+              wednesdayOnly
+              subtle
+              compact
+              placeholder="All Dates"
+              align="right"
+            />
+          </div>
+          {/* Mobile: filter icon opens sidebar */}
+          <FilterTrigger
+            onClick={() => setFiltersOpen(true)}
+            hasActiveFilters={!!scoreSearch || !!scoreDateFilter}
+            className="md:hidden"
+          />
+        </>
+      }
+      loading={usersLoading}
+      isEmpty={pagedScores.length === 0}
+      empty={
+        <EmptyState
+          icon={<FaHistory size={24} />}
+          message={scoreSearch ? `No scores matching "${scoreSearch}"` : "No scores found"}
+        />
+      }
+      batchBar={
+        <BatchPopup
+          count={selScores.size}
+          onDelete={batchDeleteScores}
+          onClear={() => setSelScores(new Set())}
+        />
+      }
+      pagination={
+        <Pagination
+          page={scorePage}
+          total={filteredScores.length}
+          pageCount={scorePageCount}
+          onPrev={() => setScorePage((p) => p - 1)}
+          onNext={() => setScorePage((p) => p + 1)}
+        />
+      }
+    >
+      <table className="w-full table-auto">
                 <SortableHead
                   theadClassName="sticky top-0 bg-panel z-10"
                   cols={[
@@ -237,19 +246,8 @@ export const ScoresTab = () => {
                 );
                 })}
               </tbody>
-              </table>
-            )}
-          </div>
-          <Pagination
-            page={scorePage}
-            total={filteredScores.length}
-            pageCount={scorePageCount}
-            onPrev={() => setScorePage((p) => p - 1)}
-            onNext={() => setScorePage((p) => p + 1)}
-          />
-        </>
-      )}
-    </div>
+      </table>
+    </ListPanel>
     <FilterSidebar
       isOpen={filtersOpen}
       onClose={() => setFiltersOpen(false)}

@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { FaCalendarAlt, FaSun, FaMoon, FaSpinner, FaSearch, FaChevronUp, FaChevronDown } from "react-icons/fa";
+import { FaCalendarAlt, FaSun, FaMoon, FaChevronUp, FaChevronDown } from "react-icons/fa";
 import { cn } from "../../../lib/utils";
 import { Pagination } from "../components/Pagination";
+import { SectionHeader } from "../components/SectionHeader";
+import { SearchInput } from "../components/SearchInput";
+import { EmptyState } from "../components/EmptyState";
+import { ListPanel } from "../components/ListPanel";
 import { useAdminContext } from "../context";
 import useAuth from "../../../hooks/useAuth";
 import { Button } from "../../../components/Button";
@@ -68,8 +72,6 @@ export const ScheduledTasksTab = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  void filtersOpen; void setFiltersOpen;
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Render
@@ -99,6 +101,7 @@ export const ScheduledTasksTab = () => {
     : filteredTasks;
   const pageCount = Math.ceil(filteredTasks.length / PAGE_SIZE);
   const pagedTasks = sortedTasks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const isFullPage = pagedTasks.length >= PAGE_SIZE;
 
   const handleSort = (field: string) => {
     setSort((prev) => {
@@ -111,60 +114,56 @@ export const ScheduledTasksTab = () => {
 
 
   return (
-    <>
-    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
-
-      {/* Header */}
-      <div className="flex justify-between items-center px-4 md:px-6 h-[70px] flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl">Scheduled Tasks</h2>
-          <span className="bg-background text-tertiary text-xs rounded-full px-2.5 py-0.5 border border-tertiary/20">
-            {filteredTasks.length}
-          </span>
-          {loading && <FaSpinner size={13} className="animate-spin text-tertiary/40 mt-0.5" />}
-        </div>
-        {isOwner && (
-          <Button
-            variant="primary"
-            size="mobile"
-            loading={toggling}
-            onClick={toggleScheduledTasksDst}
-            className="md:h-[30px] md:w-auto md:gap-2 md:px-3"
-          >
-            {isDst ? <FaSun size={11} style={{ marginBottom: "1px" }} /> : <FaMoon size={11} style={{ marginBottom: "1px" }} />}
-            <span className="hidden md:inline">{isDst ? "Disable DST" : "Enable DST"}</span>
-          </Button>
-        )}
-      </div>
-
-      <div className="bg-tertiary/20 h-px flex-shrink-0" />
-
-      {/* Search filter */}
-      <div className="flex items-center gap-3 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
-        <input
-          type="text"
-          placeholder="Filter by name, channel, or description..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-[120px]"
+    <ListPanel
+      header={
+        <SectionHeader
+          title="Scheduled Tasks"
+          count={filteredTasks.length}
+          loading={loading}
+          canCreate={false}
+          extra={
+            isOwner && (
+              <Button
+                variant="primary"
+                size="mobile"
+                loading={toggling}
+                onClick={toggleScheduledTasksDst}
+                className="md:h-[30px] md:w-auto md:gap-2 md:px-3"
+              >
+                {isDst ? <FaSun size={11} style={{ marginBottom: "1px" }} /> : <FaMoon size={11} style={{ marginBottom: "1px" }} />}
+                <span className="hidden md:inline">{isDst ? "Disable DST" : "Enable DST"}</span>
+              </Button>
+            )
+          }
         />
-      </div>
-
-      {/* Jobs table */}
-      {loading && tasks.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <FaSpinner size={20} className="animate-spin text-tertiary/30" />
-        </div>
-      ) : !loading && filteredTasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-tertiary/30">
-          <FaCalendarAlt size={26} />
-          <p className="text-sm">{search ? `No tasks matching "${search}"` : "No scheduled tasks found"}</p>
-        </div>
-      ) : (
-        <>
-        <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-          <table className="w-full text-sm min-w-[600px] md:h-full">
+      }
+      filter={
+        <SearchInput
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1); }}
+          placeholder="Filter by name, channel, or description..."
+          inputClassName="flex-1 min-w-[120px]"
+        />
+      }
+      loading={loading && tasks.length === 0}
+      isEmpty={filteredTasks.length === 0}
+      empty={
+        <EmptyState
+          icon={<FaCalendarAlt size={26} />}
+          message={search ? `No tasks matching "${search}"` : "No scheduled tasks found"}
+        />
+      }
+      pagination={
+        <Pagination
+          page={page}
+          total={filteredTasks.length}
+          pageCount={pageCount}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
+      }
+    >
+          <table className={cn("w-full text-sm min-w-[600px]", isFullPage && "md:h-full")}>
             <thead className="sticky top-0 bg-panel z-10">
               <tr className="border-y border-tertiary/[6%]">
                 <th
@@ -230,7 +229,7 @@ export const ScheduledTasksTab = () => {
                   <tr
                     key={task.id}
                     className="border-t border-tertiary/[6%] hover:bg-background/40 transition-colors"
-                    style={pagedTasks.length >= PAGE_SIZE ? { height: `calc(100% / ${pagedTasks.length})` } : undefined}
+                    style={isFullPage ? { height: `calc(100% / ${pagedTasks.length})` } : undefined}
                   >
                     <td className="px-6 py-3.5 align-top">
                       <p className="text-white/90 font-medium leading-snug">{task.name}</p>
@@ -256,18 +255,6 @@ export const ScheduledTasksTab = () => {
               ))}
             </tbody>
           </table>
-        </div>
-        <Pagination
-          page={page}
-          total={filteredTasks.length}
-          pageCount={pageCount}
-          onPrev={() => setPage((p) => p - 1)}
-          onNext={() => setPage((p) => p + 1)}
-        />
-      </>
-      )}
-
-    </div>
-    </>
+    </ListPanel>
   );
 };

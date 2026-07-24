@@ -1,11 +1,15 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { FaSearch, FaHistory, FaTrash, FaTimes, FaChevronUp, FaChevronDown, FaCheck, FaEye } from "react-icons/fa";
+import { FaHistory, FaTrash, FaTimes, FaChevronUp, FaChevronDown, FaCheck, FaEye } from "react-icons/fa";
 import { cn } from "../../../lib/utils";
 import DatePicker from "../../../components/DatePicker";
 import Dropdown from "../../../components/Dropdown";
 import Badge, { type BadgeProps } from "../../../components/Badge";
 import { FilterSidebar, FilterTrigger } from "../components/FilterSidebar";
 import { Pagination } from "../components/Pagination";
+import { SectionHeader } from "../components/SectionHeader";
+import { SearchInput } from "../components/SearchInput";
+import { EmptyState } from "../components/EmptyState";
+import { ListPanel } from "../components/ListPanel";
 import { Button } from "../../../components/Button";
 import { useAdminContext } from "../context";
 import { useNotifications } from "../../../context/NotificationContext";
@@ -319,52 +323,61 @@ export const ActionLogTab = () => {
 
   return (
     <>
-    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
-
-      {/* ⎯ Header ⎯ */}
-      <div className="flex justify-between items-center px-6 h-[70px] flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl">Action Log</h2>
-          <span className="bg-background text-tertiary text-xs rounded-full px-2.5 py-0.5 border border-tertiary/20">
-            {filtered.length}
-          </span>
-        </div>
-        {isOwner && (
-          <Button
-            variant="owner"
-            size="mobile"
-            onClick={handleClear}
-            disabled={actionLog.length === 0}
-            className="md:h-[30px] md:w-auto md:px-3"
-          >
-            <FaTrash size={11} className="mb-px shrink-0" />
-            <span className="hidden md:inline">Clear Log</span>
-          </Button>
-        )}
-      </div>
-
-      <div className="bg-tertiary/20 h-px flex-shrink-0" />
-
-      {/* ⎯ Filters ⎯ */}
+    <ListPanel
+      header={
+        <SectionHeader
+          title="Action Log"
+          count={filtered.length}
+          canCreate={false}
+          extra={
+            isOwner && (
+              <Button
+                variant="owner"
+                size="mobile"
+                onClick={handleClear}
+                disabled={actionLog.length === 0}
+                className="md:h-[30px] md:w-auto md:px-3"
+              >
+                <FaTrash size={11} className="mb-px shrink-0" />
+                <span className="hidden md:inline">Clear Log</span>
+              </Button>
+            )
+          }
+        />
+      }
+      isEmpty={paged.length === 0}
+      empty={
+        <EmptyState
+          icon={<FaHistory size={24} />}
+          message={actionLog.length === 0 ? "No actions recorded yet." : "No entries match your filters"}
+        />
+      }
+      pagination={
+        <Pagination
+          page={page}
+          total={filtered.length}
+          pageCount={pageCount}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
+      }
+      filterBar={
+        <>
       <div className="md:hidden flex items-center gap-2 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
-        <input
-          type="text"
-          placeholder="Filter by action, target, or details..."
+        <SearchInput
           value={search}
-          onChange={(e) => resetPage(() => setSearch(e.target.value))}
-          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1"
+          onChange={(v) => resetPage(() => setSearch(v))}
+          placeholder="Filter by action, target, or details..."
+          inputClassName="flex-1"
         />
         <FilterTrigger onClick={() => setFiltersOpen(true)} hasActiveFilters={!!(actorFilter || categoryFilter || dateFrom || dateTo)} />
       </div>
       <div className="hidden md:flex flex-wrap items-center gap-x-2 gap-y-2 px-6 py-3 md:h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
-        <input
-          type="text"
-          placeholder="Filter by action, target, or details..."
+        <SearchInput
           value={search}
-          onChange={(e) => resetPage(() => setSearch(e.target.value))}
-          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none flex-1 min-w-[120px]"
+          onChange={(v) => resetPage(() => setSearch(v))}
+          placeholder="Filter by action, target, or details..."
+          inputClassName="flex-1 min-w-[120px]"
         />
         <Dropdown
           variant="plain"
@@ -399,22 +412,9 @@ export const ActionLogTab = () => {
           className="flex-shrink-0"
         />
       </div>
-
-      {/* ⎯ Body ⎯ */}
-      {actionLog.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-tertiary/50">
-          <FaHistory size={24} />
-          <p className="text-sm">No actions recorded yet.</p>
-        </div>
-      ) : paged.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-tertiary/50">
-          <FaHistory size={24} />
-          <p className="text-sm">No entries match your filters</p>
-        </div>
-      ) : (
-        <>
-          <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-          <div>
+        </>
+      }
+    >
           <table className="w-full table-auto min-w-[700px]">
             <thead className="sticky top-0 bg-panel z-10">
               <tr className="border-y border-tertiary/[6%]">
@@ -501,18 +501,7 @@ export const ActionLogTab = () => {
               })}
             </tbody>
           </table>
-          </div>
-          </div>
-
-          <Pagination
-            page={page}
-            total={filtered.length}
-            pageCount={pageCount}
-            onPrev={() => setPage((p) => p - 1)}
-            onNext={() => setPage((p) => p + 1)}
-          />
-        </>
-      )}
+    </ListPanel>
 
       {detailsVisible && selectedEntry && (
         <>
@@ -636,7 +625,6 @@ export const ActionLogTab = () => {
           </div>
         </>
       )}
-    </div>
     <FilterSidebar isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} hasActiveFilters={!!(actorFilter || categoryFilter || dateFrom || dateTo)} onClear={() => resetPage(() => { setActorFilter(null); setCategoryFilter(null); setDateFrom(""); setDateTo(""); })}>
       <div className="flex flex-col gap-1.5">
         <label className="text-xs text-tertiary/70 uppercase tracking-wider font-medium">User</label>

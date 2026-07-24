@@ -1,12 +1,14 @@
-import { useState } from "react";
 import { cn } from "../../../lib/utils";
-import { FaSearch, FaEdit, FaCheck, FaTimes, FaTrash, FaExclamationCircle } from "react-icons/fa";
+import { FaEdit, FaCheck, FaTimes, FaTrash, FaExclamationCircle } from "react-icons/fa";
 import Checkbox from "../../../components/Checkbox";
 import AutocompleteInput from "../../../components/AutocompleteInput";
 import { SortableHead } from "../components/SortableHead";
 import { BatchPopup } from "../components/BatchPopup";
 import { Pagination } from "../components/Pagination";
 import { SectionHeader } from "../components/SectionHeader";
+import { SearchInput } from "../components/SearchInput";
+import { EmptyState } from "../components/EmptyState";
+import { ListPanel } from "../components/ListPanel";
 import { useAdminContext } from "../context";
 import { Button } from "../../../components/Button";
 
@@ -24,48 +26,49 @@ export const ExceptionsTab = () => {
     inlineSaveException,
   } = useAdminContext();
 
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  void filtersOpen; void setFiltersOpen;
-
   return (
-    <>
-    <div className="bg-panel rounded-xl overflow-visible flex-shrink-0 flex flex-col md:h-[760px]">
-      <SectionHeader
-        title="Exceptions"
-        count={filteredExceptions.length}
-        createSection="exceptions"
-      />
-      <div className="bg-tertiary/20 h-px flex-shrink-0" />
-      {/* Filter bar */}
-      <div className="flex items-center gap-3 px-6 h-[63px] border-b border-tertiary/[6%] flex-shrink-0">
-        <FaSearch size={13} className="text-tertiary/50 flex-shrink-0 mb-0.5" />
-        <input
-          type="text"
-          placeholder="Filter by character or exception..."
-          value={excSearch}
-          onChange={(e) => { setExcSearch(e.target.value); setExcPage(1); }}
-          className="bg-transparent text-sm text-white placeholder-tertiary/40 focus:outline-none w-full max-w-xs"
+    <ListPanel
+      header={
+        <SectionHeader
+          title="Exceptions"
+          count={filteredExceptions.length}
+          createSection="exceptions"
         />
-      </div>
-      {exceptionsLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-tertiary/50">Loading...</p>
-        </div>
-      ) : (
-        <>
-          <BatchPopup
-            count={selExcs.size}
-            onDelete={batchDeleteExcs}
-            onClear={() => setSelExcs(new Set())}
-          />
-          <div className="overflow-y-auto overflow-x-auto md:flex-1 md:min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-panel [&::-webkit-scrollbar-thumb]:bg-tertiary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-            {pagedExcs.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3 text-tertiary/50">
-                <FaExclamationCircle size={24} />
-                <p className="text-sm">{excSearch ? `No exceptions matching "${excSearch}"` : "No exceptions found"}</p>
-              </div>
-            ) : (
-              <table className="w-full table-auto">
+      }
+      filter={
+        <SearchInput
+          value={excSearch}
+          onChange={(v) => { setExcSearch(v); setExcPage(1); }}
+          placeholder="Filter by character or exception..."
+          inputClassName="w-full max-w-xs"
+        />
+      }
+      loading={exceptionsLoading}
+      isEmpty={pagedExcs.length === 0}
+      empty={
+        <EmptyState
+          icon={<FaExclamationCircle size={24} />}
+          message={excSearch ? `No exceptions matching "${excSearch}"` : "No exceptions found"}
+        />
+      }
+      batchBar={
+        <BatchPopup
+          count={selExcs.size}
+          onDelete={batchDeleteExcs}
+          onClear={() => setSelExcs(new Set())}
+        />
+      }
+      pagination={
+        <Pagination
+          page={excPage}
+          total={filteredExceptions.length}
+          pageCount={excPageCount}
+          onPrev={() => setExcPage((p) => p - 1)}
+          onNext={() => setExcPage((p) => p + 1)}
+        />
+      }
+    >
+      <table className="w-full table-auto">
                 <SortableHead
                   theadClassName="sticky top-0 bg-panel z-10"
                   cols={[
@@ -193,19 +196,7 @@ export const ExceptionsTab = () => {
                 );
               })}
               </tbody>
-              </table>
-            )}
-          </div>
-          <Pagination
-            page={excPage}
-            total={filteredExceptions.length}
-            pageCount={excPageCount}
-            onPrev={() => setExcPage((p) => p - 1)}
-            onNext={() => setExcPage((p) => p + 1)}
-          />
-        </>
-      )}
-    </div>
-    </>
+      </table>
+    </ListPanel>
   );
 };
