@@ -91,7 +91,7 @@ module.exports = {
           case "graph":
             return "View the interactive progression graph of a character. Switch between Score, Score + Median, and Rank views, adjust the number of weeks, hide missed weeks, and browse your characters — or view anyone else's.";
           case "graphcolor":
-            return "Change the color of your progression graph area. Your graph will also be displayed to other users in the color you choose";
+            return "Change the color of your progression graph area using an interactive picker — choose from the dropdown to preview each color on your own graph, then apply it. Your graph is shown to other users in the color you choose";
           case "rankings":
             return "View the culvert leaderboard. You can choose between displaying weekly or yearly scores";
           case "link":
@@ -141,7 +141,7 @@ module.exports = {
           case "graph":
             return "`[character]` - The character to graph (optional; defaults to your own, and you can view anyone's)";
           case "graphcolor":
-            return "`[color]` - The new color of the graph area (default: pink)";
+            return "None - pick a color from the interactive dropdown, preview it live on your graph, then press Apply Color";
           case "rankings":
             return "`[timeframe]` - The timeframe that the leaderboard will display";
           case "link":

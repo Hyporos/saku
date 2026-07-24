@@ -112,7 +112,7 @@ const Select = ({
       {visible && (
         <div
           className={cn(
-            "absolute top-full mt-1 z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] py-1 min-w-full transition-all duration-[180ms]",
+            "absolute top-full mt-1 z-50 bg-panel border border-tertiary/[8%] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] py-1 min-w-full max-h-64 overflow-y-auto transition-all duration-[180ms]",
             align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left",
             animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1"
           )}

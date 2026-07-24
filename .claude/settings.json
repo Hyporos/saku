@@ -19,7 +19,12 @@
       "Bash(node -e \"const d=require\\('dayjs'\\); console.log\\('2025-12-10', d\\('2025-12-10'\\).day\\(\\)\\); console.log\\('2025-12-17', d\\('2025-12-17'\\).day\\(\\)\\);\")",
       "Bash(node backfill-1210.js)",
       "Bash(node inspect-zeros.js)",
-      "Bash(node backfill-1210.js --apply)"
+      "Bash(node backfill-1210.js --apply)",
+      "Bash(node -e \"require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('graphColor.js OK — name:', require\\('./src/commands/culvert/graphColor.js'\\).data.name\\)\")",
+      "Bash(node -e \"const c=require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('OK name:', c.data.name, '| options:', c.data.options.length\\)\")",
+      "Bash(node -e \"require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('loads OK'\\)\")",
+      "Bash(node -e \"const c=require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('loads OK:', c.data.name\\)\")",
+      "Bash(node -e \"require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('graphColor OK'\\)\")"
     ]
   }
 }
