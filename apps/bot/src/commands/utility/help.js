@@ -167,7 +167,7 @@ module.exports = {
           case "export":
             return "None";
           case "weekly":
-            return "`[stats date]` - The week to view stats for (YYYY-MM-DD, Wednesday). Defaults to last week\n`[stats weeks]` - Average stats over the last N finalized weeks\n`[graph date]` - The end week for the graph (YYYY-MM-DD, Wednesday). Defaults to last week\n`[graph number_of_weeks]` - The number of weeks to display on the graph (default: 8)";
+            return "`[stats date]` - The week to view stats for (YYYY-MM-DD, Wednesday). Defaults to last week\n`[stats weeks]` - Average stats over the last N finalized weeks\n`graph` - Opens an interactive graph; use the buttons to change the metric (total or spread), week count, and date";
           case "roll":
             return "None";
           case "8ball":

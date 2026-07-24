@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check apps/bot/src/commands/culvert/weekly.js)",
+      "Bash(node --check apps/bot/src/commands/utility/help.js)",
+      "Bash(node -e ' *)",
+      "Bash(node -e 'console.log\\(\"axios version:\", require\\(\"axios/package.json\"\\).version\\)')",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-56708057-ab74-4a5d-9224-f465745aa00e\" -o spread_test.png)",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-b57cc4b3-e51a-405f-96e9-a3a7ccfef21d\" -o line_test.png)",
+      "Bash(node -e 'const p=require\\(\"./package.json\"\\); console.log\\(JSON.stringify\\({...p.dependencies},null,2\\)\\)')",
+      "Bash(node -e 'try{console.log\\(require\\(\"discord.js/package.json\"\\).version\\)}catch\\(e\\){console.log\\(\"discord.js not found\"\\)}')",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-c3a9b59c-fac3-4280-bb1b-0ec751a31846\" -o spread2.png)",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-9a0674d7-7df6-42e2-8b70-4a3f45c8a3ed\" -o line_fixed.png)",
+      "Bash(node -e 'const c = require\\(\"./src/commands/culvert/weekly.js\"\\); console.log\\(\"loaded OK — command:\", c.data.name, \"| subcommands:\", c.data.options.map\\(o=>o.name\\).join\\(\", \"\\)\\)')"
+    ]
+  }
+}

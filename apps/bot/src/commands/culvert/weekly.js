@@ -1,4 +1,20 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+} = require("discord.js");
+const axios = require("axios");
 const weekSchema = require("../../schemas/weekSchema.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const { getResetDates } = require("../../utility/culvertUtils.js");
@@ -9,7 +25,6 @@ const dayjs = require("dayjs");
 const BEE_ROLE_ID = "720001044746076181";
 const OWNER_ID = "631337640754675725";
 const GRAPH_COLOR = "255,189,213";
-const GRAPH_TEMPLATE = "https://quickchart.io/chart/render/zm-c2f6cd67-0740-44d6-a023-649110e22db9";
 
 // Returns the Nth percentile of a pre-sorted ascending array
 function percentile(sorted, p) {
@@ -21,12 +36,9 @@ function percentile(sorted, p) {
   return Math.round(sorted[lo] + (idx - lo) * (sorted[hi] - sorted[lo]));
 }
 
-// Compute stats from a scores array [{name, score}], excluding 0-scores
+// Compute stats from a list of raw scores, excluding 0-scores
 function computeStats(scores) {
-  const values = (scores ?? [])
-    .map((s) => s.score)
-    .filter((s) => s > 0)
-    .sort((a, b) => a - b);
+  const values = (scores ?? []).filter((s) => s > 0).sort((a, b) => a - b);
   if (values.length === 0) return null;
   const total = values.reduce((a, b) => a + b, 0);
   return {
@@ -39,14 +51,208 @@ function computeStats(scores) {
   };
 }
 
-// Extract live scores for a specific week date from culvertSchema data
-function getWeekScores(culvertData, dateStr) {
-  return culvertData.flatMap((user) =>
-    (user.characters ?? []).flatMap((char) => {
-      const entry = (char.scores ?? []).find((s) => s.date === dateStr);
-      return entry !== undefined ? [{ name: char.name, score: entry.score }] : [];
-    })
-  );
+// Indexes every character score by week date: Map<"YYYY-MM-DD", number[]>. Built once
+// from culvertData so each week lookup is O(1) instead of re-scanning all characters.
+function buildScoreIndex(culvertData) {
+  const index = new Map();
+  for (const user of culvertData) {
+    for (const char of user.characters ?? []) {
+      for (const s of char.scores ?? []) {
+        const bucket = index.get(s.date);
+        if (bucket) bucket.push(s.score);
+        else index.set(s.date, [s.score]);
+      }
+    }
+  }
+  return index;
+}
+
+// Total of a week's non-zero scores — the single-line graph value
+function weekTotal(scores) {
+  const stats = computeStats(scores);
+  return stats ? stats.total : 0;
+}
+
+// Loads all character scores and indexes them by week date, in a single round-trip.
+async function loadScoreIndex() {
+  const culvertData = await culvertSchema.find({}, { "characters.scores": 1 }).lean();
+  return buildScoreIndex(culvertData);
+}
+
+const METRIC_TITLES = {
+  total: "Guild Culvert Total",
+  spread: "Guild Culvert Spread",
+};
+
+const GRAPH_RGBA = (a) => `rgba(${GRAPH_COLOR},${a})`;
+const GRID = "rgba(255,255,255,0.06)";
+const AXIS_TEXT = "rgba(255,255,255,0.5)";
+
+// Shared dark-theme axis styling; yTicks lets a chart add bounds (suggestedMin/Max, etc.)
+function chartScales(yTicks = {}) {
+  return {
+    xAxes: [{ gridLines: { color: GRID }, ticks: { fontColor: AXIS_TEXT } }],
+    yAxes: [{ gridLines: { color: GRID }, ticks: { fontColor: AXIS_TEXT, ...yTicks } }],
+  };
+}
+
+// Renders a QuickChart config to an image URL. Uses the inline URL directly when it's
+// short enough (avoids an extra round-trip), only falling back to the short-URL API when
+// the inline config would exceed Discord's 2048-char image URL limit (large spread ranges).
+async function createChartUrl(config) {
+  const inline = `https://quickchart.io/chart?w=600&h=350&bkg=%23202222&c=${encodeURIComponent(JSON.stringify(config))}`;
+  if (inline.length <= 1900) return inline;
+  try {
+    const { data } = await axios.post("https://quickchart.io/chart/create", {
+      width: 600,
+      height: 350,
+      backgroundColor: "#202222",
+      chart: config,
+    });
+    if (data?.success && data.url) return data.url;
+  } catch {
+    // Fall through to the inline URL below (may be truncated by Discord if very long)
+  }
+  return inline;
+}
+
+// Single-series line graph with the y-axis fit to the data (not anchored at zero),
+// so high, tightly-clustered values fill the chart instead of hugging the top.
+function buildLineUrl(labels, values) {
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const pad = hi > lo ? Math.round((hi - lo) * 0.2) : Math.max(1, Math.round(hi * 0.1));
+  const config = {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          data: values,
+          borderColor: GRAPH_RGBA(0.9),
+          backgroundColor: GRAPH_RGBA(0.2),
+          borderWidth: 2,
+          pointRadius: 2,
+          pointBackgroundColor: GRAPH_RGBA(1),
+          fill: true,
+          lineTension: 0.3,
+        },
+      ],
+    },
+    options: {
+      legend: { display: false },
+      scales: chartScales({ maxTicksLimit: 8, suggestedMin: Math.max(0, lo - pad), suggestedMax: hi + pad }),
+    },
+  };
+  return createChartUrl(config);
+}
+
+// p25–p75 spread band: a median line with a shaded ribbon between the 25th and 75th
+// percentiles, showing how tightly the guild is clustered each week.
+function buildSpreadUrl(labels, p25, p50, p75) {
+  const config = {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "25th %ile", data: p25, borderColor: GRAPH_RGBA(0.35), backgroundColor: GRAPH_RGBA(0.18), borderWidth: 1, pointRadius: 0, fill: false },
+        { label: "75th %ile", data: p75, borderColor: GRAPH_RGBA(0.35), backgroundColor: GRAPH_RGBA(0.18), borderWidth: 1, pointRadius: 0, fill: "-1" },
+        { label: "Median", data: p50, borderColor: GRAPH_RGBA(0.9), borderWidth: 2, pointRadius: 0, fill: false },
+      ],
+    },
+    options: {
+      legend: { labels: { fontColor: "rgba(255,255,255,0.6)" } },
+      scales: chartScales(),
+    },
+  };
+  return createChartUrl(config);
+}
+
+// Renders a stat with a bracketed week-over-week delta, e.g. "1,234 (🔺 56)"
+function statField(current, prev) {
+  const value = current.toLocaleString();
+  if (prev === null || prev === undefined) return value;
+  const diff = current - prev;
+  if (diff === 0) return `${value} (➖ 0)`;
+  const arrow = diff > 0 ? "🔺" : "🔻";
+  return `${value} (${arrow} ${Math.abs(diff).toLocaleString()})`;
+}
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Interactive graph panel (Components V2)
+
+const METRIC_OPTIONS = [
+  { label: "Total Score", value: "total" },
+  { label: "Score Spread", value: "spread" },
+];
+
+// Renders the chosen metric over the last `weeks` finalized weeks to an image URL.
+// weeksAsc (finalized week dates, oldest→newest) and scoreIndex are built once per panel
+// session, so each render is pure in-memory work plus the chart request — no DB round-trip.
+async function renderWeeklyGraph({ weeks, metric }, weeksAsc, scoreIndex) {
+  const selected = weeksAsc.slice(-weeks);
+  if (selected.length < 2) {
+    return { error: "Not enough finalized weeks in this range to render a graph (at least 2 are required)." };
+  }
+
+  const labels = selected.map((w) => dayjs(w).format("MM/DD"));
+  const scoresPerWeek = selected.map((w) => scoreIndex.get(w) ?? []);
+
+  let url;
+  if (metric === "spread") {
+    const per = scoresPerWeek.map((s) => computeStats(s));
+    url = await buildSpreadUrl(
+      labels,
+      per.map((s) => (s ? s.p25 : 0)),
+      per.map((s) => (s ? s.p50 : 0)),
+      per.map((s) => (s ? s.p75 : 0))
+    );
+  } else {
+    url = await buildLineUrl(labels, scoresPerWeek.map((s) => weekTotal(s)));
+  }
+  return { url };
+}
+
+// Builds the Components V2 message: the graph image and its controls inside one container.
+function buildGraphPanel({ metric, weeks, weeksSet, imageUrl, disabled = false }) {
+  const container = new ContainerBuilder()
+    .setAccentColor(0xffc3c5)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${METRIC_TITLES[metric]}`)
+    )
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl))
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        ...METRIC_OPTIONS.map((o) =>
+          new ButtonBuilder()
+            .setCustomId(`weekly_metric_${o.value}`)
+            .setLabel(o.label)
+            .setStyle(o.value === metric ? ButtonStyle.Primary : ButtonStyle.Secondary)
+            .setDisabled(disabled)
+        ),
+        new ButtonBuilder()
+          .setCustomId("weekly_weeks")
+          .setLabel(weeksSet ? `${weeks} weeks` : "# of Weeks")
+          .setStyle(weeksSet ? ButtonStyle.Success : ButtonStyle.Secondary)
+          .setDisabled(disabled)
+      )
+    );
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+}
+
+// A minimal Components V2 message carrying a single line of text (loading / error states).
+function textPanel(text) {
+  return {
+    components: [
+      new ContainerBuilder()
+        .setAccentColor(0xffc3c5)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(text)),
+    ],
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -73,17 +279,7 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName("graph")
-        .setDescription("View the guild's weekly total score progression graph")
-        .addStringOption((opt) =>
-          opt
-            .setName("date")
-            .setDescription("The end week (YYYY-MM-DD, Wednesday). Defaults to last week.")
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName("number_of_weeks")
-            .setDescription("The number of weeks to display (default: 8)")
-        )
+        .setDescription("Open the interactive guild culvert graph")
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -154,10 +350,10 @@ module.exports = {
           );
         }
 
-        const culvertData = await culvertSchema.find({}, { "characters.name": 1, "characters.scores": 1 }).lean();
+        const scoreIndex = await loadScoreIndex();
 
         const statsPerWeek = weekRecords
-          .map((r) => computeStats(getWeekScores(culvertData, r.week)))
+          .map((r) => computeStats(scoreIndex.get(r.week) ?? []))
           .filter(Boolean);
 
         if (statsPerWeek.length === 0) {
@@ -204,8 +400,8 @@ module.exports = {
         );
       }
 
-      const culvertData = await culvertSchema.find({}, { "characters.name": 1, "characters.scores": 1 }).lean();
-      const weekScores = getWeekScores(culvertData, targetDate);
+      const scoreIndex = await loadScoreIndex();
+      const weekScores = scoreIndex.get(targetDate) ?? [];
 
       const stats = computeStats(weekScores);
       if (!stats) {
@@ -216,19 +412,27 @@ module.exports = {
 
       const submittedCount = weekScores.length;
 
+      // Compare against the previous finalized week for week-over-week deltas
+      const prevWeekRecord = await weekSchema
+        .findOne({ week: { $lt: targetDate }, finalized: true }, { week: 1 })
+        .sort({ week: -1 })
+        .lean();
+      const prev = prevWeekRecord ? computeStats(scoreIndex.get(prevWeekRecord.week) ?? []) : null;
+
       const embed = new EmbedBuilder()
         .setColor(0xffc3c5)
-        .setTitle(`Week of ${targetDate}`)
-        .setDescription(`⠀`)
+        .setAuthor({ name: `Week of ${targetDate}` })
+        .setTitle("Guild Culvert Stats")
+        .setDescription("⠀")
         .addFields(
-          { name: "Total Score", value: stats.total.toLocaleString(), inline: true },
+          { name: "Total Score", value: statField(stats.total, prev?.total), inline: true },
           { name: "Submitted", value: `${submittedCount}${weekRecord.total ? ` / ${weekRecord.total}` : ""}`, inline: true },
           { name: "​", value: "​", inline: true },
-          { name: "Average", value: stats.mean.toLocaleString(), inline: true },
-          { name: "Median (p50)", value: stats.p50.toLocaleString(), inline: true },
+          { name: "Average", value: statField(stats.mean, prev?.mean), inline: true },
+          { name: "Median (p50)", value: statField(stats.p50, prev?.p50), inline: true },
           { name: "​", value: "​", inline: true },
-          { name: "25th Percentile", value: stats.p25.toLocaleString(), inline: true },
-          { name: "75th Percentile", value: stats.p75.toLocaleString(), inline: true },
+          { name: "25th Percentile", value: statField(stats.p25, prev?.p25), inline: true },
+          { name: "75th Percentile", value: statField(stats.p75, prev?.p75), inline: true },
           { name: "​", value: "​", inline: true }
         );
 
@@ -239,58 +443,113 @@ module.exports = {
     // /weekly graph
 
     if (sub === "graph") {
-      const dateOption = interaction.options.getString("date");
-      const weeksOption = interaction.options.getInteger("number_of_weeks") ?? 8;
+      await interaction.reply(textPanel("Rendering graph…"));
 
-      const validated = validateDate(dateOption);
-      if (!validated.valid) return interaction.reply(validated.error);
-      const targetDate = validated.date;
+      // Fetch the finalized week list + all scores once; every button press then works in-memory
+      const weeksAsc = (
+        await weekSchema
+          .find({ finalized: true, week: { $lte: lastReset } }, { week: 1 })
+          .sort({ week: 1 })
+          .lean()
+      ).map((r) => r.week);
+      const maxWeeks = weeksAsc.length;
 
-      if (weeksOption <= 1) {
-        return interaction.reply(
-          "Error - The number of weeks to display must be greater than 1."
-        );
-      }
-      if (weeksOption > 1000) {
-        return interaction.reply(
-          "Error - The number of weeks to display must be less than 1,000."
-        );
-      }
-
-      await interaction.deferReply();
-
-      const weekRecords = await weekSchema
-        .find({ week: { $lte: targetDate }, finalized: true }, { week: 1 })
-        .sort({ week: -1 })
-        .limit(weeksOption)
-        .lean();
-
-      if (weekRecords.length < 2) {
+      if (maxWeeks < 2) {
         return interaction.editReply(
-          "Error - Not enough finalized weeks found to render a graph. At least 2 are required."
+          textPanel("Error - Not enough finalized weeks to render a graph (at least 2 are required).")
         );
       }
 
-      const culvertData = await culvertSchema.find({}, { "characters.scores": 1 }).lean();
+      const scoreIndex = await loadScoreIndex();
 
-      const xLabels = weekRecords.map((r) => dayjs(r.week).format("MM/DD")).join(",");
-      const yLabels = weekRecords
-        .map((r) => {
-          const scores = getWeekScores(culvertData, r.week);
-          return scores.filter((s) => s.score > 0).reduce((sum, s) => sum + s.score, 0);
-        })
-        .join(",");
+      const state = { metric: "total", weeks: Math.min(8, maxWeeks), weeksSet: false };
+      const first = await renderWeeklyGraph(state, weeksAsc, scoreIndex);
+      if (first.error) return interaction.editReply(textPanel(`Error - ${first.error}`));
 
-      const url = `${GRAPH_TEMPLATE}?labels=${xLabels}&data1=${yLabels}&borderColor1=rgba(${GRAPH_COLOR},0.6)&backgroundColor1=rgba(${GRAPH_COLOR},0.4)`;
+      let lastUrl = first.url;
+      const message = await interaction.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
 
-      const embed = new EmbedBuilder()
-        .setColor(0x202222)
-        .setAuthor({ name: "Weekly Guild Graph" })
-        .setImage(url)
-        .setTitle("Guild Culvert Total")
-        .setFooter({ text: `Rendering the last ${weekRecords.length} weeks` });
+      const collector = message.createMessageComponentCollector({ idle: 300_000 });
 
-      return interaction.editReply({ embeds: [embed] });
+      collector.on("collect", async (i) => {
+        try {
+          if (i.user.id !== interaction.user.id) {
+            return i.reply({
+              content: "This isn't your graph panel — run `/weekly graph` for your own.",
+              ephemeral: true,
+            });
+          }
+
+          // Week-count modal — showModal must be the first response, so no deferUpdate here
+          if (i.customId === "weekly_weeks") {
+            const modal = new ModalBuilder()
+              .setCustomId("weekly_weeks_modal")
+              .setTitle("Set Week Count")
+              .addComponents(
+                new ActionRowBuilder().addComponents(
+                  new TextInputBuilder()
+                    .setCustomId("value")
+                    .setLabel(`Number of weeks (2-${maxWeeks})`)
+                    .setStyle(TextInputStyle.Short)
+                    .setValue(String(state.weeks))
+                    .setRequired(true)
+                )
+              );
+            await i.showModal(modal);
+
+            let submit;
+            try {
+              submit = await i.awaitModalSubmit({
+                time: 120_000,
+                filter: (m) => m.customId === "weekly_weeks_modal" && m.user.id === i.user.id,
+              });
+            } catch {
+              return; // modal timed out — leave the panel as-is
+            }
+
+            // Acknowledge first — a modal submit must be answered within ~3s, before any work
+            try {
+              await submit.deferUpdate();
+            } catch {
+              return; // interaction expired in transit (gateway latency); user can retry
+            }
+
+            const n = parseInt(submit.fields.getTextInputValue("value").trim(), 10);
+            if (!Number.isInteger(n) || n < 2 || n > maxWeeks) {
+              return submit.followUp({ content: `Error - weeks must be a whole number between 2 and ${maxWeeks}.`, ephemeral: true });
+            }
+            state.weeks = n;
+            state.weeksSet = true;
+
+            const rendered = await renderWeeklyGraph(state, weeksAsc, scoreIndex);
+            if (rendered.error) return submit.followUp({ content: `Error - ${rendered.error}`, ephemeral: true });
+            lastUrl = rendered.url;
+            return submit.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
+          }
+
+          await i.deferUpdate();
+          if (i.customId.startsWith("weekly_metric_")) state.metric = i.customId.slice("weekly_metric_".length);
+
+          const rendered = await renderWeeklyGraph(state, weeksAsc, scoreIndex);
+          if (rendered.error) {
+            return i.followUp({ content: `Error - ${rendered.error}`, ephemeral: true });
+          }
+          lastUrl = rendered.url;
+          await i.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
+        } catch (err) {
+          console.error("Error - /weekly graph interaction failed:", err);
+        }
+      });
+
+      collector.on("end", async () => {
+        try {
+          await interaction.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl, disabled: true }));
+        } catch {
+          // message may have been deleted
+        }
+      });
+
+      return;
     }
   },
 };
