@@ -9,13 +9,19 @@ const {
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
   MessageFlags,
 } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const { ACCENT, GRAPH_COLOR, computeStats, loadScoreIndex, buildLineChart, textPanel } = require("../../utility/culvertChart.js");
+const {
+  ACCENT,
+  GRAPH_COLOR,
+  computeStats,
+  loadScoreIndex,
+  buildLineChart,
+  textPanel,
+  rgbToInt,
+  promptWeekCount,
+} = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -26,13 +32,6 @@ const FOOTER = "-# Change your graph color with `/graphcolor`";
 const RANK_LABEL_MAX = 16; // beyond this many weeks the per-point rank labels overlap, so hide them
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// "R,G,B" (stored graph color) → 0xRRGGBB integer for the container accent bar
-function rgbToInt(rgb) {
-  const parts = (rgb || "").split(",").map((n) => parseInt(n, 10));
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
-  return (parts[0] << 16) | (parts[1] << 8) | parts[2];
-}
 
 // datalabels formatter (spliced into the chart as a real function by QuickChart): shows
 // "N/A" for weeks the character didn't submit, otherwise the rank number.
@@ -247,48 +246,20 @@ module.exports = {
 
         // # of Weeks modal — showModal must be the first response, so no deferUpdate here
         if (i.customId === "graph_weeks") {
-          const maxWeeks = characters[state.charIndex].scores.length;
-          const modal = new ModalBuilder()
-            .setCustomId("graph_weeks_modal")
-            .setTitle("Set Week Count")
-            .addComponents(
-              new ActionRowBuilder().addComponents(
-                new TextInputBuilder()
-                  .setCustomId("value")
-                  .setLabel(`Number of weeks (2-${maxWeeks})`)
-                  .setStyle(TextInputStyle.Short)
-                  .setValue(String(state.weeks))
-                  .setRequired(true)
-              )
-            );
-          await i.showModal(modal);
+          const res = await promptWeekCount(i, {
+            customId: "graph_weeks_modal",
+            max: characters[state.charIndex].scores.length,
+            current: state.weeks,
+          });
+          if (!res) return;
+          if (res.error) return res.submit.followUp({ content: res.error, ephemeral: true });
 
-          let submit;
-          try {
-            submit = await i.awaitModalSubmit({
-              time: 120_000,
-              filter: (m) => m.customId === "graph_weeks_modal" && m.user.id === i.user.id,
-            });
-          } catch {
-            return;
-          }
-
-          try {
-            await submit.deferUpdate();
-          } catch {
-            return; // interaction expired in transit; user can retry
-          }
-
-          const n = parseInt(submit.fields.getTextInputValue("value").trim(), 10);
-          if (!Number.isInteger(n) || n < 2 || n > maxWeeks) {
-            return submit.followUp({ content: `Error - weeks must be a whole number between 2 and ${maxWeeks}.`, ephemeral: true });
-          }
-          state.weeks = n;
+          state.weeks = res.value;
           state.weeksSet = true;
 
           const r = await render();
           if (r.url) lastUrl = r.url;
-          return submit.editReply(buildCharPanel(state, characters, { imageUrl: r.url, note: r.error }));
+          return res.submit.editReply(buildCharPanel(state, characters, { imageUrl: r.url, note: r.error }));
         }
 
         await i.deferUpdate();
