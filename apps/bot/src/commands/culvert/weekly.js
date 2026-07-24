@@ -9,9 +9,6 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
   MessageFlags,
 } = require("discord.js");
 const weekSchema = require("../../schemas/weekSchema.js");
@@ -25,6 +22,7 @@ const {
   buildLineChart,
   buildSpreadUrl,
   textPanel,
+  promptWeekCount,
 } = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
 
@@ -334,49 +332,21 @@ module.exports = {
 
           // Week-count modal — showModal must be the first response, so no deferUpdate here
           if (i.customId === "weekly_weeks") {
-            const modal = new ModalBuilder()
-              .setCustomId("weekly_weeks_modal")
-              .setTitle("Set Week Count")
-              .addComponents(
-                new ActionRowBuilder().addComponents(
-                  new TextInputBuilder()
-                    .setCustomId("value")
-                    .setLabel(`Number of weeks (2-${maxWeeks})`)
-                    .setStyle(TextInputStyle.Short)
-                    .setValue(String(state.weeks))
-                    .setRequired(true)
-                )
-              );
-            await i.showModal(modal);
+            const res = await promptWeekCount(i, {
+              customId: "weekly_weeks_modal",
+              max: maxWeeks,
+              current: state.weeks,
+            });
+            if (!res) return;
+            if (res.error) return res.submit.followUp({ content: res.error, ephemeral: true });
 
-            let submit;
-            try {
-              submit = await i.awaitModalSubmit({
-                time: 120_000,
-                filter: (m) => m.customId === "weekly_weeks_modal" && m.user.id === i.user.id,
-              });
-            } catch {
-              return; // modal timed out — leave the panel as-is
-            }
-
-            // Acknowledge first — a modal submit must be answered within ~3s, before any work
-            try {
-              await submit.deferUpdate();
-            } catch {
-              return; // interaction expired in transit (gateway latency); user can retry
-            }
-
-            const n = parseInt(submit.fields.getTextInputValue("value").trim(), 10);
-            if (!Number.isInteger(n) || n < 2 || n > maxWeeks) {
-              return submit.followUp({ content: `Error - weeks must be a whole number between 2 and ${maxWeeks}.`, ephemeral: true });
-            }
-            state.weeks = n;
+            state.weeks = res.value;
             state.weeksSet = true;
 
             const rendered = await renderWeeklyGraph(state, weeksAsc, scoreIndex);
-            if (rendered.error) return submit.followUp({ content: `Error - ${rendered.error}`, ephemeral: true });
+            if (rendered.error) return res.submit.followUp({ content: `Error - ${rendered.error}`, ephemeral: true });
             lastUrl = rendered.url;
-            return submit.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
+            return res.submit.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
           }
 
           await i.deferUpdate();

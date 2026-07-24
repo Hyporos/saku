@@ -12,18 +12,12 @@ const {
   MessageFlags,
 } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const { GRAPH_COLOR, buildLineChart, textPanel } = require("../../utility/culvertChart.js");
+const { GRAPH_COLOR, buildLineChart, textPanel, rgbToInt } = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
-
-// "R,G,B" → 0xRRGGBB for the container accent bar
-function rgbToInt(rgb) {
-  const [r, g, b] = rgb.split(",").map(Number);
-  return (r << 16) | (g << 8) | b;
-}
 
 // Selectable graph colors (line + fill on the dark chart card). Order runs warm → cool.
 // Keep in sync with GRAPH_COLORS in apps/webapp/src/features/admin/constants.ts

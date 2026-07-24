@@ -1,5 +1,13 @@
 const axios = require("axios");
-const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = require("discord.js");
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+} = require("discord.js");
 const culvertSchema = require("../schemas/culvertSchema.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -174,7 +182,7 @@ function buildSpreadUrl(labels, p25, p50, p75) {
   });
 }
 
-// ⎯⎯ Components V2 helper ⎯⎯ //
+// ⎯⎯ Components V2 helpers ⎯⎯ //
 
 // A minimal Components V2 message carrying a single line of text (loading / error states).
 function textPanel(text, accent = ACCENT) {
@@ -184,6 +192,58 @@ function textPanel(text, accent = ACCENT) {
     ],
     flags: MessageFlags.IsComponentsV2,
   };
+}
+
+// "R,G,B" → 0xRRGGBB for a container accent bar. Null on malformed input.
+function rgbToInt(rgb) {
+  const parts = (rgb || "").split(",").map((n) => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  return (parts[0] << 16) | (parts[1] << 8) | parts[2];
+}
+
+// Shows a "number of weeks" modal on the button interaction `i`, waits for submit,
+// acknowledges it, and validates the value. Returns one of:
+//   { submit, value }  — valid number chosen (submit already deferred)
+//   { submit, error }  — invalid input; caller surfaces `error`
+//   null               — timed out or the interaction expired
+async function promptWeekCount(i, { customId, max, current, min = 2 }) {
+  const modal = new ModalBuilder()
+    .setCustomId(customId)
+    .setTitle("Set Week Count")
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("value")
+          .setLabel(`Number of weeks (${min}-${max})`)
+          .setStyle(TextInputStyle.Short)
+          .setValue(String(current))
+          .setRequired(true)
+      )
+    );
+  await i.showModal(modal);
+
+  let submit;
+  try {
+    submit = await i.awaitModalSubmit({
+      time: 120_000,
+      filter: (m) => m.customId === customId && m.user.id === i.user.id,
+    });
+  } catch {
+    return null; // modal timed out
+  }
+
+  // A modal submit must be answered within ~3s, before any work
+  try {
+    await submit.deferUpdate();
+  } catch {
+    return null; // interaction expired in transit (gateway latency); user can retry
+  }
+
+  const n = parseInt(submit.fields.getTextInputValue("value").trim(), 10);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    return { submit, error: `Error - weeks must be a whole number between ${min} and ${max}.` };
+  }
+  return { submit, value: n };
 }
 
 module.exports = {
@@ -199,4 +259,6 @@ module.exports = {
   buildLineChart,
   buildSpreadUrl,
   textPanel,
+  rgbToInt,
+  promptWeekCount,
 };
