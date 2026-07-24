@@ -11,7 +11,15 @@
       "Bash(node -e 'try{console.log\\(require\\(\"discord.js/package.json\"\\).version\\)}catch\\(e\\){console.log\\(\"discord.js not found\"\\)}')",
       "Bash(curl -sL \"https://quickchart.io/chart/render/zf-c3a9b59c-fac3-4280-bb1b-0ec751a31846\" -o spread2.png)",
       "Bash(curl -sL \"https://quickchart.io/chart/render/zf-9a0674d7-7df6-42e2-8b70-4a3f45c8a3ed\" -o line_fixed.png)",
-      "Bash(node -e 'const c = require\\(\"./src/commands/culvert/weekly.js\"\\); console.log\\(\"loaded OK — command:\", c.data.name, \"| subcommands:\", c.data.options.map\\(o=>o.name\\).join\\(\", \"\\)\\)')"
+      "Bash(node -e 'const c = require\\(\"./src/commands/culvert/weekly.js\"\\); console.log\\(\"loaded OK — command:\", c.data.name, \"| subcommands:\", c.data.options.map\\(o=>o.name\\).join\\(\", \"\\)\\)')",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-61e884b8-4a07-4c49-8d86-5a2f5526c833\" -o spread_null.png)",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-92951e4e-7f7c-417e-8d84-8a736299f43f\" -o spread_compact.png)",
+      "Bash(curl -sL \"https://quickchart.io/chart/render/zf-b10ebc81-c109-4b5d-96f6-46b15c2114f8\" -o spread_nice.png)",
+      "Read(//tmp/**)",
+      "Bash(node -e \"const d=require\\('dayjs'\\); console.log\\('2025-12-10', d\\('2025-12-10'\\).day\\(\\)\\); console.log\\('2025-12-17', d\\('2025-12-17'\\).day\\(\\)\\);\")",
+      "Bash(node backfill-1210.js)",
+      "Bash(node inspect-zeros.js)",
+      "Bash(node backfill-1210.js --apply)"
     ]
   }
 }
