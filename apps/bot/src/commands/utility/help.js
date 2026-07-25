@@ -93,7 +93,7 @@ module.exports = {
           case "graphcolor":
             return "Change the color of your progression graph area using an interactive picker — choose from the dropdown to preview each color on your own graph, then apply it. Your graph is shown to other users in the color you choose";
           case "rankings":
-            return "View the culvert leaderboard. You can choose between displaying weekly or yearly scores";
+            return "View the interactive culvert leaderboard. Switch between Weekly and Yearly rankings from the dropdown, page through the standings, and use Jump to Me to find your own character. Shows a top-3 podium with medals";
           case "link":
             return "Link a character to a Discord ID. You must include the join date as well in a proper, common form (ex: YYYY-MM-DD)";
           case "unlink":
@@ -143,7 +143,7 @@ module.exports = {
           case "graphcolor":
             return "None - pick a color from the interactive dropdown, preview it live on your graph, then press Apply Color";
           case "rankings":
-            return "`[timeframe]` - The timeframe that the leaderboard will display";
+            return "None - choose the ranking type (Weekly, Yearly) from the interactive dropdown";
           case "link":
             return "`[character]` - The character to be linked\n`[discord_user]` - The Discord user to be paired with the character\n`[member_since]` - The date that the character joined the guild\n`[override]` - Force link the character, even if not present on rankings";
           case "unlink":

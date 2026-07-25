@@ -1,309 +1,199 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ActionRowBuilder,
-  ComponentType,
+  StringSelectMenuBuilder,
+  MessageFlags,
 } = require("discord.js");
-const {
-  getAllCharacters,
-  getResetDates,
-} = require("../../utility/culvertUtils.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
+const { getAllCharacters, getResetDates } = require("../../utility/culvertUtils.js");
+const { ACCENT, textPanel } = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
-const updateLocale = require("dayjs/plugin/updateLocale");
 dayjs.extend(utc);
-dayjs.extend(updateLocale);
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const PAGE_SIZE = 10;
+const PODIUM = 3;
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+// Pagination chevrons (guild custom emojis)
+const NAV = {
+  first: "<:doubleleftchevron:1193783344996024350>",
+  prev: "<:singleleftchevron:1375242927634120804>",
+  next: "<:singlerightchevron:1375242928787689693>",
+  last: "<:doublerightchevron:1193783935071682591>",
+};
+
+const METRICS = {
+  weekly: { label: "Weekly", field: "thisScore" },
+  yearly: { label: "Yearly", field: "yearlyThis" },
+};
+
+// ⎯⎯ Helpers ⎯⎯ //
+
+// Sorted entries for a metric: [{ c, value, rank }] descending by value.
+function rankEntries(metric, chars) {
+  const field = METRICS[metric].field;
+  const list = chars.filter((c) => c[field] > 0).map((c) => ({ c, value: c[field] }));
+  list.sort((a, b) => b.value - a.value);
+  list.forEach((e, i) => (e.rank = i + 1));
+  return list;
+}
+
+const fmtScore = (e) => `**${e.value.toLocaleString()}**`;
+
+// Time until the current culvert week resets (Thursday 12:00 AM UTC).
+function updatesIn(nextReset) {
+  const now = dayjs().utc();
+  const days = nextReset.diff(now, "day");
+  if (days >= 1) return `${days} day${days > 1 ? "s" : ""}`;
+  const hours = nextReset.diff(now, "hour");
+  if (hours >= 1) return `${hours} hour${hours > 1 ? "s" : ""}`;
+  const mins = nextReset.diff(now, "minute");
+  return `${mins} minute${mins !== 1 ? "s" : ""}`;
+}
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("rankings")
-    .setDescription("View the culvert leaderboard")
-    .addStringOption((option) =>
-      option
-        .setName("timeframe")
-        .setDescription("The timeframe that the leaderboard will display")
-        .setRequired(true)
-        .addChoices(
-          { name: "Weekly", value: "weekly" },
-          { name: "Yearly", value: "yearly" }
-        )
-    ),
-
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+  data: new SlashCommandBuilder().setName("rankings").setDescription("View the interactive culvert leaderboard"),
 
   async execute(interaction) {
-    // Parse the command arguments
-    const categoryOption = interaction.options.getString("timeframe");
+    await interaction.reply(textPanel("Loading rankings…"));
 
-    // Command may take longer to execute. Defer the initial reply.
-    await interaction.deferReply();
-
-    // Create pagination buttons and action row
-    const previous = new ButtonBuilder()
-      .setCustomId("previous")
-      .setEmoji("<:singleleftchevron:1375242927634120804>")
-      .setStyle(ButtonStyle.Primary);
-
-    const next = new ButtonBuilder()
-      .setCustomId("next")
-      .setEmoji("<:singlerightchevron:1375242928787689693>")
-      .setStyle(ButtonStyle.Primary);
-
-    const first = new ButtonBuilder()
-      .setCustomId("first")
-      .setEmoji("<:doubleleftchevron:1193783344996024350>")
-      .setStyle(ButtonStyle.Secondary);
-
-    const last = new ButtonBuilder()
-      .setCustomId("last")
-      .setEmoji("<:doublerightchevron:1193783935071682591>")
-      .setStyle(ButtonStyle.Secondary);
-
-    const pagination = new ActionRowBuilder().addComponents(
-      first,
-      previous,
-      next,
-      last
-    );
-
-    // Get the last reset and next reset dates (Thursday 12:00 AM UTC)
     const { lastReset, nextReset } = getResetDates();
+    const thisWeek = lastReset;
 
-    // Get a list of all currently linked characters
-    const characterList = await getAllCharacters();
+    // One load of every character + the invoker's own names (for "you are here")
+    const [allCharacters, mineDoc] = await Promise.all([
+      getAllCharacters(),
+      culvertSchema.findById(interaction.user.id, "characters").lean(),
+    ]);
+    const mineNames = new Set((mineDoc?.characters ?? []).map((c) => c.name.toLowerCase()));
 
-    // Calculate the sum of weekly character scores
-    const weeklyScoresList = characterList.reduce((list, character) => {
-      const scoreInput = character.scores.find(
-        (score) => score.date === lastReset
-      );
-
-      if (scoreInput)
-        list.push({
-          name: character.name,
-          score: scoreInput.score,
-        });
-
-      return list;
-    }, []);
-
-    // Sort the list of characters in ascending order (weekly score)
-    weeklyScoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-    // Set placements for each character, based on weekly scores
-    weeklyScoresList.forEach((character, index) => {
-      character.placement = index + 1;
+    const chars = allCharacters.map((c) => {
+      const asc = [...c.scores].sort((a, b) => a.date.localeCompare(b.date));
+      return {
+        name: c.name,
+        mine: mineNames.has(c.name.toLowerCase()),
+        thisScore: asc.find((s) => s.date === thisWeek)?.score ?? 0,
+        yearlyThis: asc.slice(-52).reduce((a, s) => a + s.score, 0),
+      };
     });
 
-    // Create the weekly rankings list embed field
-    let firstPlacement = 0;
-    let lastPlacement = 8;
+    // Ranked entries per metric are computed once, then cached for instant switching / paging
+    const cache = new Map();
+    const metricData = (metric) => {
+      if (!cache.has(metric)) cache.set(metric, rankEntries(metric, chars));
+      return cache.get(metric);
+    };
 
-    function getWeeklyRankings() {
-      let content = "\u0060\u0060\u0060";
+    // A ranked character's page (podium ranks live on page 1). view() clamps to the real maxPage.
+    const jumpPageFor = (metric) => {
+      const mine = metricData(metric).find((e) => e.c.mine);
+      if (!mine) return null;
+      return mine.rank <= PODIUM ? 1 : Math.ceil((mine.rank - PODIUM) / PAGE_SIZE);
+    };
 
-      for (let i = firstPlacement; i < lastPlacement; i++) {
-        const character = weeklyScoresList[i];
-        if (!character?.name) break;
+    const state = { metric: "weekly", page: 1 };
 
-        // Adjust text padding based on placement length
-        let padding = 20;
-        if (character.placement > 99) padding = 18;
-        if (character.placement > 9) padding = 19;
+    function view(disabled = false) {
+      const entries = metricData(state.metric);
+      const meta = METRICS[state.metric];
+      const podium = entries.slice(0, PODIUM);
+      const rest = entries.slice(PODIUM);
+      const maxPage = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
+      state.page = Math.min(Math.max(1, state.page), maxPage);
+      const pageRows = rest.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
+      const hasMine = entries.some((e) => e.c.mine);
 
-        const characterInfo = `${character.placement}. ${weeklyScoresList[
-          i
-        ].name.padEnd(padding, " ")}${
-          weeklyScoresList[i].score?.toLocaleString() || 0
-        }\n`;
-        content += characterInfo;
-      }
-      return content.concat("\u0060\u0060\u0060");
+      const podiumStr =
+        podium
+          .map((e, i) => `${MEDALS[i]} **${e.c.name}** — ${fmtScore(e)}${e.c.mine ? " ⟵ **you**" : ""}`)
+          .join("\n") || "-# No scores submitted yet.";
+
+      const listStr = pageRows.length
+        ? pageRows.map((e) => `\`#${e.rank}\` ${e.c.mine ? `➤ **${e.c.name}**` : e.c.name} — ${fmtScore(e)}`).join("\n")
+        : podium.length
+        ? "-# That's everyone!"
+        : "-# —";
+
+      const context = state.metric === "weekly" ? `Week of ${thisWeek}` : "Last 52 weeks";
+      const footer = `Page ${state.page}/${maxPage} · Resets in ${updatesIn(nextReset)}`;
+
+      const container = new ContainerBuilder()
+        .setAccentColor(ACCENT)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Culvert Rankings\n-# ${meta.label} · ${context}`))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(podiumStr))
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(listStr))
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId("rank_metric")
+              .setDisabled(disabled)
+              .addOptions(Object.entries(METRICS).map(([value, m]) => ({ label: m.label, value, default: value === state.metric })))
+          )
+        )
+        .addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("rank_first").setEmoji(NAV.first).setStyle(ButtonStyle.Secondary).setDisabled(disabled || state.page === 1),
+            new ButtonBuilder().setCustomId("rank_prev").setEmoji(NAV.prev).setStyle(ButtonStyle.Primary).setDisabled(disabled || state.page === 1),
+            new ButtonBuilder().setCustomId("rank_next").setEmoji(NAV.next).setStyle(ButtonStyle.Primary).setDisabled(disabled || state.page === maxPage),
+            new ButtonBuilder().setCustomId("rank_last").setEmoji(NAV.last).setStyle(ButtonStyle.Secondary).setDisabled(disabled || state.page === maxPage),
+            new ButtonBuilder().setCustomId("rank_jump").setLabel("Jump to Me").setStyle(ButtonStyle.Success).setDisabled(disabled || !hasMine)
+          )
+        )
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${footer}`));
+
+      return { components: [container], flags: MessageFlags.IsComponentsV2 };
     }
 
-    // Get the time remaining until the next weekly update
-    function getWeeklyUpdateTime() {
-      const nextUpdateDays = dayjs(nextReset).diff(dayjs().utc(), "day");
-      const nextUpdateHours = dayjs(nextReset).diff(dayjs().utc(), "hour");
-      const nextUpdateMinutes = dayjs(nextReset).diff(dayjs().utc(), "minute");
+    const message = await interaction.editReply(view());
+    const collector = message.createMessageComponentCollector({ idle: 120_000 });
 
-      if (nextUpdateDays >= 1) {
-        return `${nextUpdateDays} day${nextUpdateDays > 1 ? "s" : ""}`;
-      } else if (nextUpdateHours >= 1) {
-        return `${nextUpdateHours} hour${nextUpdateHours > 1 ? "s" : ""}`;
-      } else {
-        return `${nextUpdateMinutes} minute${nextUpdateMinutes > 1 ? "s" : ""}`;
-      }
-    }
-
-    // Create a list of characters with their yearly scores
-    const yearlyScoresList = characterList.reduce((list, character) => {
-      // Sort the character scores, most recent first
-      const sortedScores = [...character.scores].sort(
-        (a, b) => new Date(a.date) - new Date(b.date)
-      );
-
-      // Get the last 52 scores (one year)
-      const recentScores = sortedScores.slice(-52);
-      const totalScore = recentScores.reduce(
-        (sum, scoreInput) => sum + scoreInput.score,
-        0
-      );
-
-      list.push({
-        name: character.name,
-        score: totalScore,
-      });
-
-      return list;
-    }, []);
-
-    // Sort the list of characters in ascending order (yearly score)
-    yearlyScoresList.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-    // Set placements for each character, based on yearly scores
-    yearlyScoresList.forEach((character, index) => {
-      character.placement = index + 1;
-    });
-
-    // Create the placement fields for the yearly ranking list
-    function getYearlyRankings() {
-      let content = "\u0060\u0060\u0060";
-
-      for (let i = firstPlacement; i < lastPlacement; i++) {
-        const character = yearlyScoresList[i];
-        if (!character?.name) break;
-
-        // Adjust text padding based on placement length
-        let padding = 20;
-        if (character.placement > 99) padding = 18;
-        if (character.placement > 9) padding = 19;
-
-        const characterInfo = `${character.placement}. ${yearlyScoresList[
-          i
-        ].name.padEnd(padding, " ")}${
-          yearlyScoresList[i].score?.toLocaleString() || 0
-        }\n`;
-        content += characterInfo;
-      }
-      return content.concat("\u0060\u0060\u0060");
-    }
-
-    // Original embed
-    let page = 1;
-    const maxPage = Math.ceil(yearlyScoresList.length / 8);
-
-    function createRankingsEmbed(page, maxPage) {
-      return new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setAuthor({ name: "Culvert Rankings" })
-        .addFields({
-          name: `${
-            categoryOption === "weekly"
-              ? `Weekly Score (${lastReset})`
-              : "Yearly Score (Last 52 weeks)"
-          }`,
-          value: `${
-            categoryOption === "weekly"
-              ? getWeeklyRankings()
-              : getYearlyRankings()
-          }`,
-          inline: false,
-        })
-        .setFooter({
-          text: `Page ${page}/${maxPage} ${
-            categoryOption === "weekly"
-              ? `• Updates in ${getWeeklyUpdateTime()}`
-              : ""
-          }`,
-        });
-    }
-
-    // Disable the first/previous buttons on initial render
-    if (page === 1) {
-      first.setDisabled(true);
-      previous.setDisabled(true);
-    }
-
-    // Display the initial ranking embed
-    const response = await interaction.editReply({
-      embeds: [createRankingsEmbed(page, maxPage)],
-      components: [pagination],
-    });
-
-    // Create a collector to handle the pagination buttons
-    const collector = response.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      filter: (i) => i.user.id === interaction.user.id, // Only allow the initiator of the command to use the buttons
-      idle: 120000, // After 2 minutes, turn off the buttons
-    });
-
-    // Handle button presses via the collector
-    collector.on("collect", async (interaction) => {
-      // Handle pagination, placement accuracy
-      if (interaction.customId === "previous") {
-        if (page > 1) {
-          page--;
-          firstPlacement -= 8;
-          lastPlacement -= 8;
+    collector.on("collect", async (i) => {
+      try {
+        if (i.user.id !== interaction.user.id) {
+          return i.reply({ content: "This isn't your rankings panel — run `/rankings` for your own.", ephemeral: true });
         }
-      } else if (interaction.customId === "next") {
-        if (page < maxPage) {
-          page++;
-          firstPlacement += 8;
-          lastPlacement += 8;
+
+        // Ack first; a stale panel or gateway latency can expire the interaction (10062) — bail quietly
+        try {
+          await i.deferUpdate();
+        } catch {
+          return;
         }
-      } else if (interaction.customId === "first") {
-        page = 1;
-        firstPlacement = 0;
-        lastPlacement = 8;
-      } else if (interaction.customId === "last") {
-        page = maxPage;
-        firstPlacement = maxPage * 8 - 8;
-        lastPlacement = maxPage * 8;
+
+        // view() clamps state.page to [1, maxPage], so nav can freely over/undershoot
+        if (i.customId === "rank_metric") {
+          state.metric = i.values[0];
+          state.page = 1;
+        } else if (i.customId === "rank_first") state.page = 1;
+        else if (i.customId === "rank_prev") state.page -= 1;
+        else if (i.customId === "rank_next") state.page += 1;
+        else if (i.customId === "rank_last") state.page = Infinity;
+        else if (i.customId === "rank_jump") state.page = jumpPageFor(state.metric) ?? state.page;
+
+        await i.editReply(view());
+      } catch (err) {
+        console.error("Error - /rankings interaction failed:", err);
       }
-
-      // Disable buttons if they do not serve any purpose (already at first or last page)
-      if (page === 1) {
-        first.setDisabled(true);
-        previous.setDisabled(true);
-      } else {
-        first.setDisabled(false);
-        previous.setDisabled(false);
-      }
-
-      if (page === maxPage) {
-        last.setDisabled(true);
-        next.setDisabled(true);
-      } else {
-        last.setDisabled(false);
-        next.setDisabled(false);
-      }
-
-      // Display the previous/next page
-      await interaction.deferUpdate();
-
-      await interaction.editReply({
-        embeds: [createRankingsEmbed(page, maxPage)],
-        components: [pagination],
-      });
     });
 
-    // Handle the end of the collector (after 2 minutes of idle)
-    collector.on("end", () => {
-      previous.setDisabled(true);
-      next.setDisabled(true);
-      first.setDisabled(true);
-      last.setDisabled(true);
-
-      interaction.editReply({
-        embeds: [createRankingsEmbed(page, maxPage)],
-        components: [pagination],
-      });
+    collector.on("end", async () => {
+      try {
+        await interaction.editReply(view(true));
+      } catch {
+        // message may have been deleted
+      }
     });
   },
 };

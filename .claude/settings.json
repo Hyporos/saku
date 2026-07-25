@@ -24,7 +24,13 @@
       "Bash(node -e \"const c=require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('OK name:', c.data.name, '| options:', c.data.options.length\\)\")",
       "Bash(node -e \"require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('loads OK'\\)\")",
       "Bash(node -e \"const c=require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('loads OK:', c.data.name\\)\")",
-      "Bash(node -e \"require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('graphColor OK'\\)\")"
+      "Bash(node -e \"require\\('./src/commands/culvert/graphColor.js'\\); console.log\\('graphColor OK'\\)\")",
+      "Bash(node -e \"const c=require\\('./src/commands/culvert/rankings.js'\\); console.log\\('rankings OK:', c.data.name, '| options:', c.data.options.length\\)\")",
+      "Bash(node -e \"require\\('./src/commands/culvert/rankings.js'\\); console.log\\('rankings OK'\\)\")",
+      "Bash(node -e \"const c=require\\('./src/commands/culvert/rankings.js'\\); console.log\\('rankings OK | slash options:', JSON.stringify\\(c.data.options.map\\(o=>o.name\\)\\)\\)\")",
+      "Bash(node -e \"require\\('./src/commands/culvert/rankings.js'\\); require\\('./src/commands/utility/help.js'\\); console.log\\('both load OK'\\)\")",
+      "Bash(node inspect-pewp.js)",
+      "Bash(node -e \"const r=require\\('./src/commands/culvert/rankings.js'\\); require\\('./src/commands/utility/help.js'\\); console.log\\('both load OK | rankings options:', r.data.options.length\\)\")"
     ]
   }
 }
