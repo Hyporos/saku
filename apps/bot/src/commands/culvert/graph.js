@@ -241,7 +241,7 @@ module.exports = {
     collector.on("collect", async (i) => {
       try {
         if (i.user.id !== interaction.user.id) {
-          return i.reply({ content: "This isn't your graph panel — run `/graph` for your own.", ephemeral: true });
+          return i.reply({ content: "This isn't your graph panel — run `/graph` for your own.", flags: MessageFlags.Ephemeral }).catch(() => {});
         }
 
         // # of Weeks modal — showModal must be the first response, so no deferUpdate here
@@ -252,7 +252,7 @@ module.exports = {
             current: state.weeks,
           });
           if (!res) return;
-          if (res.error) return res.submit.followUp({ content: res.error, ephemeral: true });
+          if (res.error) return res.submit.followUp({ content: res.error, flags: MessageFlags.Ephemeral }).catch(() => {});
 
           state.weeks = res.value;
           state.weeksSet = true;

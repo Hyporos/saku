@@ -63,11 +63,13 @@ module.exports = {
 
 ### Adding a Command to `/help`
 
-1. Add command name to `isBee && choices.push(...)` in `autocomplete()` in `help.js`
-2. Add `case "name":` to the `description` switch
-3. Add `case "name":` to the `parameters` switch
-4. Add the command name to the bee embed field value in `addFields` (the string concatenation block with `isBee ?`)
-5. **Important**: The `value:` string in `addFields` uses double-quoted strings with actual backtick characters. Do not use template literals as the outer delimiter there — backticks inside template literals require ``` escapes.
+`help.js` is an interactive Components V2 panel driven by a single `COMMANDS` array (the one source of truth). Add one object to that array:
+
+```js
+{ name: "foo", cat: "Culvert", bee: true /* omit if public */, desc: "...", params: "`[arg]` - ..." }
+```
+
+The category dropdown, command dropdown, detail view, and autocomplete are all derived from it — no switches or embed fields to keep in sync. Use `"None"` for `params` when the command takes no arguments. `cat` must be one of `CATEGORIES` (Culvert / Fun / Utility). Access tiers: default = public, `bee: true` = bee/admin (hidden from members), `owner: true` = owner-only (hidden from everyone but the owner). Bee commands are tagged 🐝 in the dropdown / "Bee only" in detail; owner commands use the `sakuCop` emoji / "Owner only". `cat` must be one of `CATEGORIES` (Culvert / User / Fun / Utility). The command dropdown is category-scoped, so a single category must stay under 25 commands. The owner gets "View as Member / Bee / Owner" toggle buttons to preview each tier. Subcommands are documented as their own entries with a spaced name (e.g. `"user level"`).
 
 ---
 
@@ -142,7 +144,7 @@ d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" 
 
 ## Common Pitfalls
 
-- **help.js unicode**: The `value:` in `addFields` uses double-quoted strings. Backticks inside double-quoted strings are fine; do **not** use template literals as the outer delimiter for that value.
+- **help.js data source**: `/help` is data-driven — edit the `COMMANDS` array, not per-command switches or embed fields. The command dropdown is category-scoped; each category must stay under 25 commands (the select-menu cap).
 - **ISO date fallback**: If the bot's `routes.js` does not recognize an ISO date string (old code), it silently falls back to `lastReset`. Always restart the bot after changes to routes.js.
 - **Week date is Wednesday**: The culvert week is stored/referenced by its Wednesday date, not Thursday. `getResetDates().lastReset` returns the Wednesday of last week.
 - **`dayjs().day() === 3`** checks for Wednesday. Day 4 = Thursday.

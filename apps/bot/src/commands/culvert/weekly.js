@@ -324,10 +324,9 @@ module.exports = {
       collector.on("collect", async (i) => {
         try {
           if (i.user.id !== interaction.user.id) {
-            return i.reply({
-              content: "This isn't your graph panel — run `/weekly graph` for your own.",
-              ephemeral: true,
-            });
+            return i
+              .reply({ content: "This isn't your graph panel — run `/weekly graph` for your own.", flags: MessageFlags.Ephemeral })
+              .catch(() => {});
           }
 
           // Week-count modal — showModal must be the first response, so no deferUpdate here
@@ -338,13 +337,13 @@ module.exports = {
               current: state.weeks,
             });
             if (!res) return;
-            if (res.error) return res.submit.followUp({ content: res.error, ephemeral: true });
+            if (res.error) return res.submit.followUp({ content: res.error, flags: MessageFlags.Ephemeral }).catch(() => {});
 
             state.weeks = res.value;
             state.weeksSet = true;
 
             const rendered = await renderWeeklyGraph(state, weeksAsc, scoreIndex);
-            if (rendered.error) return res.submit.followUp({ content: `Error - ${rendered.error}`, ephemeral: true });
+            if (rendered.error) return res.submit.followUp({ content: `Error - ${rendered.error}`, flags: MessageFlags.Ephemeral }).catch(() => {});
             lastUrl = rendered.url;
             return res.submit.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
           }
@@ -354,7 +353,7 @@ module.exports = {
 
           const rendered = await renderWeeklyGraph(state, weeksAsc, scoreIndex);
           if (rendered.error) {
-            return i.followUp({ content: `Error - ${rendered.error}`, ephemeral: true });
+            return i.followUp({ content: `Error - ${rendered.error}`, flags: MessageFlags.Ephemeral }).catch(() => {});
           }
           lastUrl = rendered.url;
           await i.editReply(buildGraphPanel({ ...state, imageUrl: lastUrl }));
