@@ -162,7 +162,7 @@ module.exports = {
     collector.on("collect", async (i) => {
       try {
         if (i.user.id !== interaction.user.id) {
-          return i.reply({ content: "This isn't your rankings panel — run `/rankings` for your own.", ephemeral: true });
+          return i.reply({ content: "This isn't your rankings panel — run `/rankings` for your own.", flags: MessageFlags.Ephemeral }).catch(() => {});
         }
 
         // Ack first; a stale panel or gateway latency can expire the interaction (10062) — bail quietly

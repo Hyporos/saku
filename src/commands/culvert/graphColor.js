@@ -137,7 +137,7 @@ module.exports = {
     collector.on("collect", async (i) => {
       try {
         if (i.user.id !== interaction.user.id) {
-          return i.reply({ content: "This isn't your color panel — run `/graphcolor` for your own.", ephemeral: true });
+          return i.reply({ content: "This isn't your color panel — run `/graphcolor` for your own.", flags: MessageFlags.Ephemeral }).catch(() => {});
         }
 
         await i.deferUpdate();
