@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "node src/index.js",
     "deploy-commands": "node src/deploy-commands.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test-chat": "node tests/chatRegression.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^2.14.0",
     "@google/generative-ai": "^0.24.1",
     "@napi-rs/canvas": "^0.1.65",
     "axios": "^1.5.0",

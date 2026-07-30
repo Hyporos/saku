@@ -147,6 +147,12 @@ const COMMANDS = [
     params:
       "`[stats date]` - The week to view stats for (YYYY-MM-DD, Wednesday). Defaults to last week\n`[stats weeks]` - Average stats over the last N finalized weeks\n`graph` - Opens an interactive graph; use the buttons to change the metric (total or spread) and week count",
   },
+  {
+    name: "chat",
+    cat: "Fun",
+    desc: "Chat with Saku AI. Talk MapleStory (bosses, gear, progression, patches) or ask about your culvert scores, the leaderboard, and when culvert resets — Saku pulls live guild data and can search the web to answer, and remembers your conversation. You can also just @mention Saku in any channel to chat. Guild members only.",
+    params: "`[message]` - What you want to say or ask Saku",
+  },
   { name: "roll", cat: "Fun", desc: "Roll a number between 1 and 100", params: "None" },
   { name: "8ball", cat: "Fun", desc: "Seek advice from the Magic 8 Ball", params: "`[question]` - Your question, to be answered by the Magic 8 Ball" },
   { name: "dannis", cat: "Fun", desc: "Praise the lord", params: "None" },
