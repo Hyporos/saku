@@ -36,6 +36,12 @@ const client = new Client({
     [GatewayIntentBits.GuildMessages] |
     [GatewayIntentBits.GuildMessageReactions],
   partials: [Partials.GuildMember],
+  // Saku's chat reads the channel tail on every mention, so messages pile up in the cache. Sweep
+  // them hourly and keep only the last half hour, which is all the context ever looks at.
+  sweepers: {
+    messages: { interval: 3600, lifetime: 1800 },
+    threads: { interval: 3600, lifetime: 3600 },
+  },
 });
 
 // Make the Discord client accessible inside Express route handlers via req.app.get("client")

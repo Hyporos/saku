@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
 const { getAllCharacters } = require("../../utility/culvertUtils.js");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { readImage } = require("../../utility/ocr.js");
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -48,10 +48,6 @@ module.exports = {
       return Buffer.from(await res.arrayBuffer());
     }
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite-preview" });
-
     await interaction.editReply("Analyzing image...");
 
     // Fetch the image and convert to base64
@@ -76,18 +72,11 @@ PlayerName3`;
     let nameArray;
     
     try {
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: base64Image,
-            mimeType: imageOption.contentType || "image/png"
-          }
-        },
-        prompt
-      ]);
-
-      const response = await result.response;
-      const text = response.text();
+      const text = await readImage({
+        prompt,
+        data: base64Image,
+        mimeType: imageOption.contentType || "image/png",
+      });
 
       // Parse the AI response into an array of names
       nameArray = text.trim().split(/\r?\n/).filter(name => name.length > 0);
@@ -95,9 +84,7 @@ PlayerName3`;
       await interaction.editReply("Processing names...");
     } catch (error) {
       console.error("Gemini API Error:", error);
-      return interaction.editReply(
-        "Error - Failed to analyze the image with Gemini API."
-      );
+      return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image with Gemini API.");
     }
 
     // Array to store users who need to run culvert

@@ -1071,7 +1071,7 @@ router.delete("/admin/exceptions/:id", async (req, res) => {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Scanner routes
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { readImage, CULVERT_SCAN_PROMPT } = require("../utility/ocr.js");
 const { getAllCharacters, isScoreSubmitted, getResetDates } = require("../utility/culvertUtils.js");
 const dayjs = require("dayjs");
 
@@ -1153,45 +1153,13 @@ router.post("/admin/scanner/scan", async (req, res) => {
       }
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3.5-flash-lite-preview",
-      generationConfig: {
-        temperature: 0.0,
-      },
-    });
-
-    const prompt = `Analyze this MapleStory guild culvert participation screenshot.
-
-Perform a precise horizontal scan of each row to link the 'Character Name' (Leftmost Column) with the 'Culvert Score' (Rightmost Column).
-
-Rules:
-- Spatial Mapping: Treat the first text string as 'CharacterName' and the final integer in the row as 'Score'.
-- Ignore Context: Skip all middle columns (Class, Level, World, Guild).
-- Data Integrity: If a score is missing or obscured, default to 0.
-- Character Encoding: Preserve all special characters and symbols (ö, á, etc.) exactly as rendered.
-- Formatting: Return ONLY 'CharacterName Score' (space-separated), one per line. No headers, no intro text.
-- Ellipsis Truncation: If a character name contains an ellipsis (..), treat the ellipsis as the end of the name.
-- Strict Column Separation: Do not include any text that follows an ellipsis (e.g., if you see heatherhah..Dawn, the name is just heatherhah).
-- Integer Only Scores: Output the culvert score as a raw integer with no commas or symbols (e.g., 216993 instead of 216,993).
-
-Example output:
-PlayerName1 63100
-PlayerName2 62918
-PlayerName3 0`;
-
     let entryArray;
     try {
-      const result = await model.generateContent([
-        { inlineData: { data: image.data, mimeType: image.mimeType || "image/png" } },
-        prompt,
-      ]);
-      const response = await result.response;
-      const text = response.text();
+      const text = await readImage({ prompt: CULVERT_SCAN_PROMPT, data: image.data, mimeType: image.mimeType || "image/png", temperature: 0 });
       entryArray = text.trim().split(/\r?\n/);
     } catch (error) {
       console.error("Gemini API Error:", error);
-      return res.status(502).json({ error: "Failed to analyze image with Gemini AI" });
+      return res.status(502).json({ error: error.quotaExhausted ? error.message : "Failed to analyze image with Gemini AI" });
     }
 
     // Parse entries

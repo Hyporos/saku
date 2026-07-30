@@ -6,7 +6,7 @@ const {
   isScoreSubmitted,
   getResetDates,
 } = require("../../utility/culvertUtils.js");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { readImage, CULVERT_SCAN_PROMPT } = require("../../utility/ocr.js");
 const dayjs = require("dayjs");
 require("dotenv").config();
 
@@ -75,10 +75,6 @@ module.exports = {
       return Buffer.from(await res.arrayBuffer());
     }
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite-preview" });
-
     // Progress tracking
     let currentProgress = 0;
     async function updateProgress(progress, message) {
@@ -94,44 +90,18 @@ module.exports = {
 
     await updateProgress(20, "Analyzing image...");
 
-    const prompt = `Analyze this MapleStory guild culvert participation screenshot.
-
-Perform a precise horizontal scan of each row to link the 'Character Name' (Leftmost Column) with the 'Culvert Score' (Rightmost Column).
-
-Rules:
-- Spatial Mapping: Treat the first text string as 'CharacterName' and the final integer in the row as 'Score'.
-- Ignore Context: Skip all middle columns (Class, Level, World, Guild).
-- Data Integrity: If a score is missing or obscured, default to 0.
-- Character Encoding: Preserve all special characters and symbols (ö, á, etc.) exactly as rendered.
-- Formatting: Return ONLY 'CharacterName Score' (space-separated), one per line. No headers, no intro text.
-- Ellipsis Truncation: If a character name contains an ellipsis (..), treat the ellipsis as the end of the name.
-- Strict Column Separation: Do not include any text that follows an ellipsis (e.g., if you see heatherhah..Dawn, the name is just heatherhah).
-- Integer Only Scores: Output the culvert score as a raw integer with no commas or symbols (e.g., 216993 instead of 216,993).
-
-Example output:
-PlayerName1 63100
-PlayerName2 62918
-PlayerName3 0`;
-
     let entryArray;
-    
+
     try {
       await updateProgress(30, "Processing image...");
-      
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: base64Image,
-            mimeType: imageOption.contentType || "image/png"
-          }
-        },
-        prompt
-      ]);
+
+      const text = await readImage({
+        prompt: CULVERT_SCAN_PROMPT,
+        data: base64Image,
+        mimeType: imageOption.contentType || "image/png",
+      });
 
       await updateProgress(60, "Processing image...");
-
-      const response = await result.response;
-      const text = response.text();
 
       // Log the raw AI response for debugging
       console.log("=== SCAN DEBUG ===");
@@ -145,9 +115,7 @@ PlayerName3 0`;
       await updateProgress(70, "Submitting scores...");
     } catch (error) {
       console.error("Gemini API Error:", error);
-      return interaction.editReply(
-        "Error - Failed to analyze the image with Gemini API."
-      );
+      return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image with Gemini API.");
     }
 
     // Declare necessary variables

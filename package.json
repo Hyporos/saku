@@ -4,6 +4,7 @@
   "scripts": {
     "bot": "pnpm --filter bot dev",
     "webapp": "pnpm --filter saku-webapp dev",
-    "deploy-commands": "pnpm --filter bot deploy-commands"
+    "deploy-commands": "pnpm --filter bot deploy-commands",
+    "test-chat": "pnpm --filter bot test-chat"
   }
 }

@@ -4,6 +4,7 @@ const os = require("os");
 const { checkForCrashes } = require("../utility/botUtils");
 const { setBirthdays, setAnniversaries } = require("../utility/cronUtils");
 const { startLatencyMonitor } = require("../services/latencyMonitor");
+const { refreshRosterMeta, refreshServerExtras } = require("../utility/sakuChat");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -35,5 +36,14 @@ module.exports = {
 
     // Start the server latency monitor
     await startLatencyMonitor(client);
+
+    // Top up Saku's cached class/level data for the roster (slow, in the background)
+    refreshRosterMeta();
+    setInterval(refreshRosterMeta, 24 * 60 * 60 * 1000);
+
+    // Prime the guild's pinned notes and scheduled events for Saku's chat context. No interval: the
+    // chat path already refreshes this on its own TTL when someone talks, so a timer here was a
+    // second schedule for one cache that would drift the moment that TTL changed.
+    refreshServerExtras(guild);
   },
 };
