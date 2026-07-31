@@ -72,7 +72,15 @@ const NOT_MEMBER_NOTICE = "Chatting with me is a guild member thing, sorry.";
 // /chat is unaffected wherever it is used, because its replies are ephemeral and clutter nobody.
 const MENTION_CHANNEL_ID = "1532571112469299220";
 const canMentionAnywhere = (member, userId) => isBee(member, userId) || userId === MICHE_ID;
-const WRONG_CHANNEL_NOTICE = `Ping me over in <#${MENTION_CHANNEL_ID}> and I'll answer you there, or use /chat to speak to me privately.`;
+// Discord only renders a slash command as a clickable link in its </name:id> form, and the id is only
+// known once the application's commands have been fetched. Until ready.js supplies it this stays as
+// plain text, which still reads correctly, so a failed lookup costs the link and nothing else.
+let chatCommandMention = "/chat";
+const setChatCommandId = (id) => {
+  if (id) chatCommandMention = `</chat:${id}>`;
+};
+const wrongChannelNotice = () =>
+  `Ping me over in <#${MENTION_CHANNEL_ID}> and I'll answer you there, or use ${chatCommandMention} to speak to me privately.`;
 
 // One rate limit per person, shared by /chat and @mentions. It lives here rather than in each entry
 // point because the thing being rationed is a Gemini request, not a transport: a map per entry point
@@ -140,7 +148,8 @@ WHAT TO TALK ABOUT:
 - COOKING: if someone asks you for a recipe, give them a real one. Ingredients, then numbered steps, actual amounts and temperatures. Do not deflect with "I'm just a culvert bot". This is the one case where you may break the length rule: keep the steps terse and skip any preamble about the dish. Don't bring food up on your own, only when asked.
 
 MEMBER COMMANDS (so you can point people to the right one):
-- /gpq log your weekly Culvert score. /profile a character's Culvert profile. /graph the interactive progression graph. /graphcolor your own graph colour. /rankings the leaderboard, Weekly or Yearly. /chat talk to you, or just @mention you anywhere. /birthday save your birthday. /user server level and the level leaderboard. Fun: /roll, /8ball, /dannis. Utility: /help, /ping.
+- /gpq log your weekly Culvert score. /profile a character's Culvert profile. /graph the interactive progression graph. /graphcolor your own graph colour. /rankings the leaderboard, Weekly or Yearly. /chat talk to you privately. /birthday save the month you were born in. /user server level and the level leaderboard. Fun: /roll, /8ball, /dannis. Utility: /help, /ping.
+- WHERE PEOPLE CAN TALK TO YOU, and you get this wrong if you guess. /chat works in EVERY channel, because only the person who ran it sees the reply. @mentioning you is public, so for ordinary members it works in ONE channel: <#${MENTION_CHANNEL_ID}>. Members who ping you anywhere else just get pointed back to it. Bees, the owner and miche can @mention you in any channel. Asked where they can talk to you, say exactly that, and write the channel as <#${MENTION_CHANNEL_ID}> so it comes out as a link.
 - Only point at a command for something you genuinely cannot do: logging a score, changing a graph colour, opening the interactive graph, or when someone isn't linked and has no data at all.
 - Admins ("Bees") run the guild and the score tracking. They have NOTHING to do with boss loot, drops, or who gets what. Drops belong to whoever ran the boss: solo means it's theirs, in a party it's between the people who ran it. Nobody hands out drops, so never send someone to the Bees about loot.
 - Don't invent how the guild works. If you don't actually know who does something or how something is handled here, say you're not sure instead of making up a process.
@@ -2634,4 +2643,4 @@ async function refreshRosterMeta() {
 
 // unsupportedNumbers is exported for the regression suite: it fires on maybe one turn in three, so
 // testing it through live chat proves nothing, and it needs deterministic cases.
-module.exports = { askSaku, isBee, canChat, canMentionAnywhere, collectImages, onCooldown, refreshRosterMeta, refreshServerExtras, unsupportedNumbers, repairEmotes, MENTION_CHANNEL_ID, NOT_MEMBER_NOTICE, WRONG_CHANNEL_NOTICE };
+module.exports = { askSaku, isBee, canChat, canMentionAnywhere, collectImages, onCooldown, refreshRosterMeta, refreshServerExtras, unsupportedNumbers, repairEmotes, MENTION_CHANNEL_ID, NOT_MEMBER_NOTICE, wrongChannelNotice, setChatCommandId };

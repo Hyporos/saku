@@ -4,7 +4,7 @@ const os = require("os");
 const { checkForCrashes } = require("../utility/botUtils");
 const { setBirthdays, setAnniversaries } = require("../utility/cronUtils");
 const { startLatencyMonitor } = require("../services/latencyMonitor");
-const { refreshRosterMeta, refreshServerExtras } = require("../utility/sakuChat");
+const { refreshRosterMeta, refreshServerExtras, setChatCommandId } = require("../utility/sakuChat");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -23,7 +23,14 @@ module.exports = {
     // repair pass that rebuilds a misspelled :name: into a real one, which silently deletes emotes if
     // the cache is empty. Channels and roles arrive with the gateway payload, so they only get counted.
     const guild = await client.guilds.fetch("719788426022617138");
-    const [members, emojis] = await Promise.all([guild.members.fetch(), guild.emojis.fetch()]);
+    const [members, emojis, commands] = await Promise.all([
+      guild.members.fetch(),
+      guild.emojis.fetch(),
+      // Commands are registered globally, so their ids live on the application. Only needed so a
+      // slash command can be written as a clickable </chat:id> link instead of plain text.
+      client.application.commands.fetch().catch(() => null),
+    ]);
+    setChatCommandId(commands?.find((c) => c.name === "chat")?.id);
 
     // Display event responses
     console.log(`Ready! Logged in as ${client.user.tag}`);

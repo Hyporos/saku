@@ -8,7 +8,7 @@ const {
   onCooldown,
   MENTION_CHANNEL_ID,
   NOT_MEMBER_NOTICE,
-  WRONG_CHANNEL_NOTICE,
+  wrongChannelNotice,
 } = require("../utility/sakuChat.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -71,7 +71,7 @@ module.exports = {
     // and miche are unrestricted. Sent after the cooldown check on purpose, so someone pinging around
     // the server gets one pointer rather than a redirect in every channel they try.
     if (message.channelId !== MENTION_CHANNEL_ID && !canMentionAnywhere(message.member, message.author.id)) {
-      await message.reply({ content: WRONG_CHANNEL_NOTICE, allowedMentions: { parse: [] } }).catch(() => {});
+      await message.reply({ content: wrongChannelNotice(), allowedMentions: { parse: [] } }).catch(() => {});
       return;
     }
 
