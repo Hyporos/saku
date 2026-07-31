@@ -174,6 +174,18 @@ const COMMANDS = [
     desc: "Display a list of all commands. Browse by category and open any command from the dropdown to see its details. Did you really just do /help help?",
     params: "None",
   },
+  {
+    name: "birthday set",
+    cat: "Utility",
+    desc: "Save the month you were born in. Saku wishes everyone born that month together, in a single message posted at midnight Pacific on the 1st. Only the month is stored, never a date.",
+    params: "`[month]` - Pick your birth month from the list",
+  },
+  {
+    name: "birthday clear",
+    cat: "Utility",
+    desc: "Remove your saved birthday so you are no longer included in the monthly announcement.",
+    params: "None",
+  },
   { name: "ping", cat: "Utility", desc: "Check Saku's response time. It will display both the latency and API ping.", params: "None" },
   {
     name: "say",

@@ -24,7 +24,6 @@
     "dotenv": "^16.3.1",
     "express": "^4.19.2",
     "mongoose": "^7.5.0",
-    "timezone-support": "^3.1.0",
     "undici": "^7.2.0"
   }
 }

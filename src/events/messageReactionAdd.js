@@ -54,15 +54,14 @@ module.exports = {
               `${message.content}\n\n${attachmentsDescription}[Jump to message](https://discord.com/channels/${message.guildId}/${message.channelId}/${message.id})`
             )
             .setFooter({
-              text: `${message.id} • ${message.createdAt.toLocaleString(
-                "en-US",
-                {
-                  timeZone: user.timezone,
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                }
-              )}`,
+              // `user` here is the Discord user who reacted, not a database document, so the
+              // timeZone this used to pass was always undefined and the date has always rendered in
+              // the host's timezone. Stated outright now instead of looking like a per-user setting.
+              text: `${message.id} • ${message.createdAt.toLocaleString("en-US", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              })}`,
             });
 
           // Set image from content URL or attachment
