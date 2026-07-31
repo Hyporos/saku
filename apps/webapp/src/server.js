@@ -191,10 +191,12 @@ app.all("/bot/*", async (req, res) => {
   const query = req.url.includes("?") ? "?" + req.url.split("?")[1] : "";
   const targetUrl = `${botApiUrl}${targetPath}${query}`;
 
-  // For admin routes, forward the shared secret so the bot can validate the source
-  const extraHeaders = {};
+  // The bot requires this secret on EVERY route, not just admin: its read routes hand back the whole
+  // roster and its port is internet-reachable, so this is what keeps them from being world readable.
+  const extraHeaders = { "x-admin-secret": process.env.ADMIN_API_SECRET ?? "" };
+
+  // Admin routes additionally carry who the (already role-checked) caller is, for the action log.
   if (targetPath.startsWith("/api/admin/")) {
-    extraHeaders["x-admin-secret"] = process.env.ADMIN_API_SECRET ?? "";
     extraHeaders["x-admin-user-id"] = req.session.user?.id ?? "";
     extraHeaders["x-admin-username"] = req.session.user?.username ?? "";
     extraHeaders["x-admin-is-owner"] = String(req.session.user?.id === process.env.OWNER_ID);
