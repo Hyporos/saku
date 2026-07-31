@@ -1,5 +1,15 @@
 const { Events, MessageFlags } = require("discord.js");
-const { askSaku, isBee, canChat, collectImages, onCooldown, NOT_MEMBER_NOTICE } = require("../utility/sakuChat.js");
+const {
+  askSaku,
+  isBee,
+  canChat,
+  canMentionAnywhere,
+  collectImages,
+  onCooldown,
+  MENTION_CHANNEL_ID,
+  NOT_MEMBER_NOTICE,
+  WRONG_CHANNEL_NOTICE,
+} = require("../utility/sakuChat.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Pinging @Saku in a message triggers the same AI chat as /chat (shared brain + per-user memory).
@@ -54,6 +64,14 @@ module.exports = {
 
     if (!canChat(message.member, message.author.id)) {
       await message.reply({ content: NOT_MEMBER_NOTICE, allowedMentions: { parse: [] } }).catch(() => {});
+      return;
+    }
+
+    // A mention is public, so for members it belongs in the one channel meant for it. Bees, the owner
+    // and miche are unrestricted. Sent after the cooldown check on purpose, so someone pinging around
+    // the server gets one pointer rather than a redirect in every channel they try.
+    if (message.channelId !== MENTION_CHANNEL_ID && !canMentionAnywhere(message.member, message.author.id)) {
+      await message.reply({ content: WRONG_CHANNEL_NOTICE, allowedMentions: { parse: [] } }).catch(() => {});
       return;
     }
 

@@ -150,7 +150,7 @@ const COMMANDS = [
   {
     name: "chat",
     cat: "Fun",
-    desc: "Chat with Saku AI. Talk MapleStory (bosses, gear, progression, patches) or ask about your culvert scores, the leaderboard, and when culvert resets — Saku pulls live guild data and can search the web to answer, and remembers your conversation. You can also just @mention Saku in any channel to chat. Guild members only.",
+    desc: "Chat with Saku AI. Talk MapleStory (bosses, gear, progression, patches) or ask about your culvert scores, the leaderboard, and when culvert resets — Saku pulls live guild data and can search the web to answer, and remembers your conversation. `/chat` works in any channel because the reply is only visible to you. @mentioning Saku is public, so that one is limited to the Saku chat channel; bees can mention anywhere. Guild members only.",
     params: "`[message]` - What you want to say or ask Saku",
   },
   { name: "roll", cat: "Fun", desc: "Roll a number between 1 and 100", params: "None" },
