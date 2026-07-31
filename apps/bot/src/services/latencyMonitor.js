@@ -9,51 +9,25 @@ const LATENCY_DATA_FILE = path.join(__dirname, "../data/latencyMessage.json");
 const GUILD_ID = "719788426022617138";
 const CHANNEL_ID = "1463623492015620137";
 
-// IP addresses for all 40 channels
-const ipAddresses = [
-  "35.155.204.207",
-  "52.26.82.74",
-  "34.217.205.66",
-  "35.161.183.101",
-  "54.218.157.183",
-  "52.25.78.39",
-  "54.68.160.34",
-  "34.218.141.142",
-  "52.33.249.126",
-  "54.148.170.23",
-  "54.201.184.26",
-  "54.191.142.56",
-  "52.13.185.207",
-  "34.215.228.37",
-  "54.187.177.143",
-  "54.203.83.148",
-  "54.148.188.235",
-  "52.43.83.76",
-  "54.69.114.137",
-  "54.148.137.49",
-  "54.212.109.33",
-  "44.230.255.51",
-  "100.20.116.83",
-  "54.188.84.22",
-  "34.215.170.50",
-  "54.184.162.28",
-  "54.185.209.29",
-  "52.12.53.225",
-  "54.189.33.238",
-  "54.188.84.238",
-  "44.234.162.14",
-  "44.234.162.13",
-  "44.234.161.92",
-  "44.234.161.48",
-  "44.234.160.137",
-  "44.234.161.28",
-  "44.234.162.100",
-  "44.234.161.69",
-  "44.234.162.145",
-  "44.234.162.130",
-];
+// The channel list lives in data/channel-ips.json so it can be refreshed when Nexon moves the servers
+// without a code change or redeploy. ips[0] is CH1. An unreadable or empty file leaves this empty,
+// which the monitor reports outright rather than quietly pinging nothing.
+const CHANNEL_IPS_FILE = path.join(__dirname, "../data/channel-ips.json");
 
-const port = 8585;
+function loadChannelIps() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(CHANNEL_IPS_FILE, "utf8"));
+    const ips = (Array.isArray(parsed) ? parsed : parsed.ips) ?? [];
+    if (!Array.isArray(ips) || ips.length === 0) throw new Error("no ips listed");
+    return { ips, port: Number(parsed.port) || 8585 };
+  } catch (error) {
+    console.error(`Error - Could not read ${CHANNEL_IPS_FILE}: ${error.message}`);
+    return { ips: [], port: 8585 };
+  }
+}
+
+const { ips: ipAddresses, port } = loadChannelIps();
+
 let pingLoop = null;
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -349,11 +323,36 @@ function buildEmbed(failedChannels, highLatencyChannels, lowLatencyChannels, for
   return embed;
 }
 
+// Shown when not one channel answered. Deliberately not styled like a reading: there are no numbers
+// to report, and the useful information is which file to fix.
+function buildUnreachableEmbed(formattedTime) {
+  return new EmbedBuilder()
+    .setTitle("Channel Latency Analysis — unavailable")
+    .setColor(0xed4245)
+    .setDescription(
+      `None of the ${ipAddresses.length} channel servers answered on port ${port}, so there is nothing to measure.\n\n` +
+        "Every address timing out at once is almost always the address list having gone stale, rather than the game being down: " +
+        "Nexon moves these servers and the old IPs stop responding entirely.\n\n" +
+        "Update `data/channel-ips.json` with the current addresses. No redeploy is needed, only a restart.​"
+    )
+    .setFooter({
+      text: `Last checked at ${formattedTime}`,
+      iconURL: "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
+    });
+}
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 // Start the latency monitor
 async function startLatencyMonitor(client) {
   console.log("Starting High Latency Channel Monitor...");
+
+  // No list means loadChannelIps already logged why. Starting a loop that pings nothing every ten
+  // seconds forever would only bury that, so it stops here instead.
+  if (ipAddresses.length === 0) {
+    console.error(`Error - High Latency Monitor not started: no channel IPs in ${CHANNEL_IPS_FILE}`);
+    return;
+  }
 
   // Data structures (frequencies reset on restart)
   const channelPings = {};
@@ -407,12 +406,6 @@ async function startLatencyMonitor(client) {
       // Calculate stats
       const stats = calculateStatsForMessage(channelPings, frequencyHistory);
 
-      // Check if all channels failed
-      if (stats.failedChannels.length === ipAddresses.length) {
-        console.error("High Latency Monitor: All channels failed connection attempts");
-        return;
-      }
-
       // Format timestamp
       const now = new Date();
       const formattedTime = now
@@ -420,17 +413,24 @@ async function startLatencyMonitor(client) {
         .replace(/^[A-Za-z]+,\s/, "")
         .replace("GMT", "UTC");
 
+      // Every single channel failing is not a latency reading, it's a broken configuration: almost
+      // always the IP list having gone stale after Nexon moved the servers. It used to log and return,
+      // which left the last good embed sitting in the channel looking current, so the one state that
+      // needs a human is the one nobody could see. Now it says so in the channel itself.
+      const allDown = ipAddresses.length > 0 && stats.failedChannels.length === ipAddresses.length;
+      if (allDown) console.error(`High Latency Monitor: all ${ipAddresses.length} channels failed on port ${port}`);
+
+      const embed = allDown
+        ? buildUnreachableEmbed(formattedTime)
+        : buildEmbed(stats.failedChannels, stats.highLatencyChannels, stats.lowLatencyChannels, formattedTime);
+
       // Post or update message
       if (!postedMessage) {
-        postedMessage = await targetChannel.send({
-          embeds: [buildEmbed(stats.failedChannels, stats.highLatencyChannels, stats.lowLatencyChannels, formattedTime)],
-        });
+        postedMessage = await targetChannel.send({ embeds: [embed] });
         saveMessageId(postedMessage.id);
         console.log("Created new High Latency analysis message");
       } else {
-        await postedMessage.edit({
-          embeds: [buildEmbed(stats.failedChannels, stats.highLatencyChannels, stats.lowLatencyChannels, formattedTime)],
-        });
+        await postedMessage.edit({ embeds: [embed] });
       }
     } catch (error) {
       console.error("Error in High Latency monitor loop:", error);
