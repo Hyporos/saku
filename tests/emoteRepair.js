@@ -11,13 +11,8 @@ const EMOTES = [
   { name: "sakuHammer", id: "222222222222222222" },
   { name: "sakuHappy", id: "333333333333333333", animated: true },
 ];
-const guild = {
-  emojis: {
-    cache: {
-      find: (fn) => EMOTES.map((e) => ({ ...e, toString: () => `<${e.animated ? "a" : ""}:${e.name}:${e.id}>` })).find(fn),
-    },
-  },
-};
+const built = EMOTES.map((e) => ({ ...e, toString: () => `<${e.animated ? "a" : ""}:${e.name}:${e.id}>` }));
+const guild = { emojis: { cache: { find: (fn) => built.find(fn), values: () => built } } };
 
 let failed = 0;
 const check = (name, got, want) => {
@@ -32,10 +27,18 @@ check("bare :name: becomes a real emote", repairEmotes("nice one :sakuSly:", gui
 check("half-formed <:name:> becomes a real emote", repairEmotes("caught you <:sakuSly:>", guild), "caught you <:sakuSly:111111111111111111>");
 check("bare :name: mid sentence", repairEmotes("get it done :sakuHammer: today", guild), "get it done <:sakuHammer:222222222222222222> today");
 
-// Names the model invented: dropped, not left as text
-check("invented bare name is removed", repairEmotes("stop sandbagging :sakuNope:", guild), "stop sandbagging");
-check("invented bracket name is removed", repairEmotes("hey <:sakuNope:> there", guild), "hey there");
-check("invented name with a fake id is removed", repairEmotes("x <:sakuNope:999> y", guild), "x y");
+// Near misses are rescued rather than deleted: deleting one mid-sentence leaves broken grammar
+// ("I'll give you a instead"), which is worse than the glitch it was meant to fix.
+check("trailing-letter typo resolves", repairEmotes("caught you <:sakuSlyL:>", guild), "caught you <:sakuSly:111111111111111111>");
+check("dropped-letter typo resolves", repairEmotes("nice :sakuHapy:", guild), "nice <a:sakuHappy:333333333333333333>");
+check("wrong case resolves", repairEmotes("go :SAKUHAMMER:", guild), "go <:sakuHammer:222222222222222222>");
+check("the reported sentence stays intact", repairEmotes("I'll give you a :sakuSlyy: instead.", guild), "I'll give you a <:sakuSly:111111111111111111> instead.");
+
+// Only a name with no plausible match at all is dropped
+check("unrelated name is removed", repairEmotes("stop sandbagging :sakuQwertyzzz:", guild), "stop sandbagging");
+check("unrelated bracket name is removed", repairEmotes("hey <:sakuQwertyzzz:> there", guild), "hey there");
+check("fake id is rebuilt from the name", repairEmotes("x <:sakuSly:999> y", guild), "x <:sakuSly:111111111111111111> y");
+check("near miss never lands on a non-saku emote", repairEmotes(":notsaku:", guild), ":notsaku:");
 
 // Already correct output is untouched
 check("valid emote passes through", repairEmotes("gz <:sakuSly:111111111111111111>", guild), "gz <:sakuSly:111111111111111111>");

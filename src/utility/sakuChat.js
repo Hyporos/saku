@@ -1769,7 +1769,12 @@ const CHANNEL_LIMIT = 14;
 // Every saku* emote is fair game, so this is a sanity bound rather than a curation. Listing names
 // instead of full <:name:id> forms costs about a quarter of the tokens, which is what makes carrying
 // the whole set affordable; the reply post-processor turns :name: back into the real emote.
-const EMOJI_LIMIT = 80;
+//
+// This sat at 80 while the guild had 145 of them, so 65 were invisible to the model. It kept hearing
+// those names in the channel log, couldn't find them in its own list, and guessed at the spelling,
+// which is where the broken ":sakuHammer:" text in replies came from. The whole set is ~420 tokens
+// and lives in the cached prefix of the instruction, so carrying all of it is the cheaper trade.
+const EMOJI_LIMIT = 200;
 
 const pronounsOf = (member) => PRONOUN_ROLES.filter((p) => member?.roles?.cache?.some((r) => r.name === p)).join(" / ");
 
@@ -1838,7 +1843,19 @@ function serverContext(guild, channel) {
   // to collapse colour variants, and it had a nasty failure: an emote named exactly "Saku" is a prefix
   // of every other one, so a single short name silently swallowed the entire list and Saku went round
   // telling people it only owned one emote.
-  const emotes = [...guild.emojis.cache.values()].filter((e) => /^saku/i.test(e.name)).slice(0, EMOJI_LIMIT);
+  // Deduped on the EXACT name, because Discord lets two emotes share one and showing the same
+  // :name: twice only spends tokens. Note this is not the old prefix dedupe, which collapsed the
+  // entire list the moment an emote named plain "Saku" turned out to be a prefix of every other.
+  const seenEmotes = new Set();
+  const emotes = [];
+  for (const emote of guild.emojis.cache.values()) {
+    if (!/^saku/i.test(emote.name)) continue;
+    const key = emote.name.toLowerCase();
+    if (seenEmotes.has(key)) continue;
+    seenEmotes.add(key);
+    emotes.push(emote);
+    if (emotes.length >= EMOJI_LIMIT) break;
+  }
 
   return (
     `\n\nTHIS SERVER: ${guild.name}, ${guild.memberCount} members${channel?.name ? `, and you're replying in #${channel.name} right now` : ""}.` +
@@ -2161,9 +2178,51 @@ const emoteCooldown = new Map();
 // Repair whichever resolve to a real guild emote and DELETE the ones that don't, including names the
 // model invented outright, because a stray ":sakuHammer:" sitting in a sentence reads worse than no
 // emote at all. Exported for the regression suite: the model can't be made to misformat on demand.
+// Edit distance, capped work: only used to rescue a near-miss emote name.
+function editDistance(a, b) {
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let corner = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const next = Math.min(prev[j] + 1, prev[j - 1] + 1, corner + (a[i - 1] === b[j - 1] ? 0 : 1));
+      corner = prev[j];
+      prev[j] = next;
+    }
+  }
+  return prev[b.length];
+}
+
+// Deleting an emote that doesn't resolve leaves the sentence around it broken ("I'll give you a
+// instead"), which is worse than the glitch it was meant to fix. Most misses are near misses, so the
+// name is matched loosely first: case, punctuation, a dropped or added letter. Only a name with no
+// plausible match at all is dropped.
+function matchEmote(name, cache) {
+  if (!cache) return null;
+  const list = [...cache.values()];
+  const flat = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const want = flat(name);
+
+  const exact = list.find((e) => e.name.toLowerCase() === name.toLowerCase()) ?? list.find((e) => flat(e.name) === want);
+  if (exact) return exact;
+
+  // Saku's own set only: a near miss should never land on some unrelated server emote.
+  const own = list.filter((e) => /^saku/i.test(e.name));
+  const shortest = (a, b) => a.name.length - b.name.length;
+
+  const overlap = own.filter((e) => flat(e.name).startsWith(want) || want.startsWith(flat(e.name))).sort(shortest);
+  if (overlap.length) return overlap[0];
+
+  const near = own
+    .map((e) => ({ e, d: editDistance(flat(e.name), want) }))
+    .filter((x) => x.d <= 2)
+    .sort((a, b) => a.d - b.d || shortest(a.e, b.e));
+  return near.length ? near[0].e : null;
+}
+
 function repairEmotes(reply, guild) {
   const cache = guild?.emojis?.cache ?? null;
-  const resolve = (name) => cache?.find((e) => e.name.toLowerCase() === name.toLowerCase()) ?? null;
+  const resolve = (name) => matchEmote(name, cache);
 
   return String(reply)
     // Anything in angle brackets is rebuilt from the real emote rather than trusted, because the id
