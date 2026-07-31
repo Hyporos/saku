@@ -61,11 +61,18 @@ const RATE_NOTICE = "I'm getting throttled right now, every model I can reach is
 const BEE_ROLE_ID = "720001044746076181";
 const MEMBER_ROLE_ID = "750000646345719899";
 const OWNER_ID = "631337640754675725";
+const MICHE_ID = "139062876080963584";
 const isBee = (member, userId) => Boolean(member?.roles?.cache?.has(BEE_ROLE_ID)) || userId === OWNER_ID;
 
 // Chat is guild-members-only: Friends, roleless users, and DMs (no member object) are turned away.
 const canChat = (member, userId) => Boolean(member?.roles?.cache?.has(MEMBER_ROLE_ID)) || isBee(member, userId);
 const NOT_MEMBER_NOTICE = "Chatting with me is a guild member thing, sorry.";
+
+// Mentions are public, so for members they are confined to the one channel meant for talking to Saku.
+// /chat is unaffected wherever it is used, because its replies are ephemeral and clutter nobody.
+const MENTION_CHANNEL_ID = "1532571112469299220";
+const canMentionAnywhere = (member, userId) => isBee(member, userId) || userId === MICHE_ID;
+const WRONG_CHANNEL_NOTICE = `Ping me over in <#${MENTION_CHANNEL_ID}> and I'll answer you there.`;
 
 // One rate limit per person, shared by /chat and @mentions. It lives here rather than in each entry
 // point because the thing being rationed is a Gemini request, not a transport: a map per entry point
@@ -425,7 +432,6 @@ const BEE_PUBLIC_RULES = `ACCESS, this person is a Bee (guild admin), but you ar
 
 const NO_FILTER_ID = "106111034804142080"; // alex (wrignt), also the current guild leader
 const DANNIS_ID = "146055470442872833";
-const MICHE_ID = "139062876080963584";
 
 const OWNER_RULES = `WHO YOU ARE TALKING TO RIGHT NOW: this is Brian, the developer who built you and owns you. You are his.
 - Default to a normal conversation. Talk to him like a guildmate you like and respect, in your usual easy dry voice. No deference in every line, no "boss" or "master" tacked onto replies, no walking on eggshells. Most of the time he just wants to talk, so talk.
@@ -2628,4 +2634,4 @@ async function refreshRosterMeta() {
 
 // unsupportedNumbers is exported for the regression suite: it fires on maybe one turn in three, so
 // testing it through live chat proves nothing, and it needs deterministic cases.
-module.exports = { askSaku, isBee, canChat, collectImages, onCooldown, refreshRosterMeta, refreshServerExtras, unsupportedNumbers, repairEmotes, NOT_MEMBER_NOTICE };
+module.exports = { askSaku, isBee, canChat, canMentionAnywhere, collectImages, onCooldown, refreshRosterMeta, refreshServerExtras, unsupportedNumbers, repairEmotes, MENTION_CHANNEL_ID, NOT_MEMBER_NOTICE, WRONG_CHANNEL_NOTICE };
