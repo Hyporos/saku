@@ -72,7 +72,7 @@ const NOT_MEMBER_NOTICE = "Chatting with me is a guild member thing, sorry.";
 // /chat is unaffected wherever it is used, because its replies are ephemeral and clutter nobody.
 const MENTION_CHANNEL_ID = "1532571112469299220";
 const canMentionAnywhere = (member, userId) => isBee(member, userId) || userId === MICHE_ID;
-const WRONG_CHANNEL_NOTICE = `Ping me over in <#${MENTION_CHANNEL_ID}> and I'll answer you there.`;
+const WRONG_CHANNEL_NOTICE = `Ping me over in <#${MENTION_CHANNEL_ID}> and I'll answer you there, or use /chat to speak to me privately.`;
 
 // One rate limit per person, shared by /chat and @mentions. It lives here rather than in each entry
 // point because the thing being rationed is a Gemini request, not a transport: a map per entry point
