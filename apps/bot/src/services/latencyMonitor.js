@@ -331,9 +331,7 @@ function buildUnreachableEmbed(formattedTime) {
     .setColor(0xed4245)
     .setDescription(
       `None of the ${ipAddresses.length} channel servers answered on port ${port}, so there is nothing to measure.\n\n` +
-        "Every address timing out at once is almost always the address list having gone stale, rather than the game being down: " +
-        "Nexon moves these servers and the old IPs stop responding entirely.\n\n" +
-        "Update `data/channel-ips.json` with the current addresses. No redeploy is needed, only a restart.​"
+        "Every address timing out at once usually means the server list has gone stale rather than the game being down."
     )
     .setFooter({
       text: `Last checked at ${formattedTime}`,
