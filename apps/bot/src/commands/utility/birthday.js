@@ -1,80 +1,70 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const userSchema = require("../../schemas/userSchema.js");
-const { listTimeZones } = require("timezone-support");
-const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Only the month is asked for. Everyone born in a month is wished together on the 1st, so a day
+// was never used, and free-text dates were the whole source of the old command's problems.
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("birthday")
-    .setDescription(
-      "Set your birthday! The bot will announce it in the server :)"
-    )
-    .addStringOption((option) =>
-      option
-        .setName("date")
-        .setDescription("The date of your birthday")
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("timezone")
-        .setDescription(
-          "Your current timezone (ex: America/Toronto)"
+    .setDescription("Set your birthday month so Saku can celebrate it with the guild")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set the month you were born in")
+        .addIntegerOption((option) =>
+          option
+            .setName("month")
+            .setDescription("The month you were born in")
+            .setRequired(true)
+            .addChoices(...MONTHS.map((name, i) => ({ name, value: i + 1 })))
         )
-        .setRequired(true)
+    )
+    .addSubcommand((sub) =>
+      sub.setName("clear").setDescription("Remove your birthday so it is no longer announced")
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
-    // Parse the command arguments
-    const birthdayDateOption = interaction.options.getString("date");
-    const timezoneOption = interaction.options.getString("timezone");
+    const sub = interaction.options.getSubcommand();
 
-    // Check if the date is valid (real or not)
-    if (!dayjs(birthdayDateOption).isValid()) {
-      return interaction.reply({
-        content: `Error - The date **${birthdayDateOption}** is not valid. Make sure that it is properly formatted (ex: April 28)`,
-        ephemeral: true,
-      });
-    }
-
-    // Check if the timezone is valid
-    function isTimezoneValid(timezone) {
-      const validTimezones = listTimeZones();
-      return validTimezones.map(tz => tz.toLowerCase()).includes(timezone.toLowerCase());
-    }
-
-    if (!isTimezoneValid(timezoneOption)) {
-      return interaction.reply({
-        content: `Error - The timezone **${timezoneOption}** is not valid. Make sure that it is properly formatted (ex: America/Toronto).\n\nYou can find your timezone here: https://www.timezoneconverter.com/cgi-bin/findzone`,
-        ephemeral: true,
-      });
-    }
-
-    // Add or update the birthday date and timezone of the user
-    await userSchema.findOneAndUpdate(
-      {
-        _id: interaction.user.id,
-      },
-      {
-        _id: interaction.user.id,
-        birthdayDate: dayjs(birthdayDateOption).format("MMMM DD"),
-        timezone: timezoneOption,
-      },
-      {
-        upsert: true,
+    if (sub === "clear") {
+      const existing = await userSchema.findById(interaction.user.id, "birthdayMonth").lean();
+      if (!existing?.birthdayMonth) {
+        return interaction.reply({ content: "You don't have a birthday saved.", flags: MessageFlags.Ephemeral });
       }
+      await userSchema.updateOne(
+        { _id: interaction.user.id },
+        { $unset: { birthdayMonth: "", birthdayAnnouncedYear: "" } }
+      );
+      return interaction.reply({ content: "Your birthday has been removed.", flags: MessageFlags.Ephemeral });
+    }
+
+    const month = interaction.options.getInteger("month");
+    const name = MONTHS[month - 1];
+
+    // Changing to a different month clears the announced marker, so someone who fixes a wrong month
+    // can still be included this year. Re-picking the same month leaves it alone, so it can't be
+    // used to trigger a second announcement.
+    const existing = await userSchema.findById(interaction.user.id, "birthdayMonth").lean();
+    const moved = existing?.birthdayMonth !== month;
+
+    await userSchema.findOneAndUpdate(
+      { _id: interaction.user.id },
+      { _id: interaction.user.id, birthdayMonth: month, ...(moved ? { birthdayAnnouncedYear: null } : {}) },
+      { upsert: true }
     );
 
-    // Handle responses
-    interaction.reply({
-      content: `Your birthday has been set to **${dayjs(
-        birthdayDateOption
-      ).format("MMMM DD")}**, in the **${timezoneOption}** timezone.`,
-      ephemeral: true,
+    await interaction.reply({
+      content: `Your birthday is set to **${name}**. Saku will wish you on the 1st, along with everyone else born that month.`,
+      flags: MessageFlags.Ephemeral,
     });
   },
 };

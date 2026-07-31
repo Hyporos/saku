@@ -9,11 +9,15 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-    birthdayDate: {
-      type: String,
+    birthdayMonth: {
+      // 1-12. Only the month is stored: birthdays are announced together on the 1st, so the exact
+      // day was never used for anything and asking for it only invited a parsing bug.
+      type: Number,
     },
-    timezone: {
-      type: String,
+    birthdayAnnouncedYear: {
+      // Last year this person was included in a birthday announcement, so a restart during the
+      // month can't post them twice.
+      type: Number,
     },
     level: {
       type: Number,

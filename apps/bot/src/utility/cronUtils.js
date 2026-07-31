@@ -4,67 +4,73 @@ const Culvert = require("../schemas/culvertSchema.js");
 const cron = require("cron");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
 dayjs.extend(utc);
+dayjs.extend(timezone);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const setBirthdays = async (client) => {
+const BIRTHDAY_CHANNEL_ID = "1090002887410729090";
+const BIRTHDAY_TZ = "America/Los_Angeles";
+
+// Everyone born this month, wished together in one message. Fires on the 1st and only on the 1st:
+// a bot that is down at that moment skips the month rather than posting late. birthdayAnnouncedYear
+// is kept as a cheap guard so the same month can never be announced twice.
+const announceBirthdays = async (client) => {
   try {
-    const users = await User.find({});
-    for (const user of users) {
-      const channel = client.channels.cache.get("1090002887410729090");
-      const birthdayDate = user.birthdayDate;
-      const timezone = user.timezone;
+    const now = dayjs().tz(BIRTHDAY_TZ);
+    const month = now.month() + 1;
+    const year = now.year();
 
-      // Check if values were provided and accessible
-      if (!channel) {
-        console.log("Error - Birthday message channel not found");
-        return;
-      }
+    // $ne already matches documents where the field is missing or null, so no $or is needed.
+    const users = await User.find({ birthdayMonth: month, birthdayAnnouncedYear: { $ne: year } }, { _id: 1 }).lean();
+    if (!users.length) return;
 
-      if (!birthdayDate || !timezone) continue;
+    const channel = client.channels.cache.get(BIRTHDAY_CHANNEL_ID);
+    if (!channel) return console.error("Error - Birthday message channel not found");
 
-      // Create the birthday message embed
-      const birthdayMessage = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setThumbnail(
-          "https://cdn.discordapp.com/emojis/1072880580187930735.png?size=64"
-        )
-        .setTitle("It's a special day today!")
-        .setDescription(
-          `Everybody wish <@631337640754675725> a happy birthday!`
-        )
-        .setFooter({
-          text: "Set your own birthday with /birthday",
-          iconURL:
-            "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
-        });
+    const guild = channel.guild;
+    // Anyone who has left is skipped rather than mentioned as a stale ping.
+    const present = users.filter((u) => guild?.members?.cache?.has(u._id));
+    if (!present.length) return;
 
-      // Parse the birthday date
-      const birthday = dayjs(birthdayDate, "MM DD");
-      const month = birthday.month() + 1; // Add 1 because dayjs month is zero-based
-      const day = birthday.date();
+    // "A" · "A and B" · "A, B, and C"
+    const names = present.map((u) => `<@${u._id}>`);
+    const mentions = names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 
-      // Convert the user's time zone to EST (as the bot is hosted in this timezone)
-      const midnight = dayjs().tz(timezone).startOf("day");
-      const hour = midnight.tz("America/Toronto").hour();
+    const embed = new EmbedBuilder()
+      .setColor(0xffc3c5)
+      .setThumbnail("https://cdn.discordapp.com/emojis/1072880580187930735.png?size=64")
+      .setTitle("It's a special month!")
+      .setDescription(`Everybody wish ${mentions} a happy birthday this month!`)
+      .setFooter({
+        text: "Set your own birthday with /birthday set",
+        iconURL: "https://cdn.discordapp.com/attachments/1147319860481765500/1149549510066978826/Saku.png",
+      });
 
-      // Create a cron schedule for the user's birthday at midnight
-      const cronSchedule = `0 ${hour} ${day} ${month} *`;
-
-      // Create a birthday job for the user
-      new cron.CronJob(
-        cronSchedule,
-        () => {
-          channel.send({ embeds: [birthdayMessage] });
-        },
-        null,
-        true // Start the job right away
-      );
-    }
+    await channel.send({ embeds: [embed] });
+    await User.updateMany({ _id: { $in: present.map((u) => u._id) } }, { $set: { birthdayAnnouncedYear: year } });
+    console.log(`Saku birthdays: announced ${present.length} for ${now.format("MMMM YYYY")}`);
   } catch (error) {
-    console.error("Error - Could not set up birthday jobs:", error);
+    console.error("Error - Could not announce birthdays:", error);
   }
+};
+
+/**
+ * Starts the birthday announcer: midnight Pacific on the 1st of every month, and nothing else. There
+ * is deliberately no catch-up pass at startup, so the announcement only ever lands on the 1st.
+ *
+ * The old version built one cron job per person from their own timezone, but converted only the hour
+ * and kept the calendar day, so anyone whose midnight fell on a different date in the host's timezone
+ * was announced a day out. It also baked the offset in at boot (so it drifted at the next DST change),
+ * only built jobs at startup (so a birthday saved later never fired), and had the owner's ID hardcoded
+ * into the message, meaning every birthday announced the same person.
+ *
+ * One monthly job in a named timezone has none of that: cron resolves the zone itself, so the DST
+ * shift is handled, and nothing is precomputed per person.
+ */
+const setBirthdays = (client) => {
+  new cron.CronJob("0 0 1 * *", () => announceBirthdays(client), null, true, BIRTHDAY_TZ);
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -153,4 +159,6 @@ const setAnniversaries = (client) => {
   );
 };
 
-module.exports = { setBirthdays, setAnniversaries };
+// announceBirthdays is exported for the test suite: the schedule only fires on the 1st, so there is
+// otherwise no way to exercise it without waiting for the calendar.
+module.exports = { setBirthdays, announceBirthdays, setAnniversaries };
