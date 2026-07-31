@@ -9,6 +9,7 @@ const {
   ActionRowBuilder,
 } = require("discord.js");
 const culvertSchema = require("../schemas/culvertSchema.js");
+const weekSchema = require("../schemas/weekSchema.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Shared culvert chart + stats helpers, used by /weekly and the character graph.
@@ -63,10 +64,33 @@ function buildScoreIndex(culvertData) {
   return index;
 }
 
-// Loads all character scores and indexes them by week date, in a single round-trip.
+// Loads every week's scores, indexed by week date.
+//
+// A finalized week is read from its weekSchema snapshot rather than from the live characters,
+// because the snapshot is the only record of what the guild actually scored that week. Character
+// scores are deleted along with the character when someone leaves and is unlinked, so building
+// history out of them made past weeks shrink retroactively: every week's total drifted down as
+// members left, and the median drifted up, since leavers sit mostly in the lower half of the board.
+// The week in progress has no snapshot yet, so it still comes from the live data underneath.
 async function loadScoreIndex() {
-  const culvertData = await culvertSchema.find({}, { "characters.scores": 1 }).lean();
-  return buildScoreIndex(culvertData);
+  const [culvertData, weeks] = await Promise.all([
+    culvertSchema.find({}, { "characters.scores": 1 }).lean(),
+    weekSchema.find({ finalized: true }, { week: 1, scores: 1 }).lean(),
+  ]);
+
+  const index = buildScoreIndex(culvertData);
+  for (const week of weeks) {
+    if (week.scores?.length) index.set(week.week, week.scores.map((s) => s.score));
+  }
+  return index;
+}
+
+// The weeks that have an immutable snapshot behind them. Guild-wide overlays are only meaningful
+// for these: outside them the numbers come from live characters, so an old week reflects whoever
+// happens to still be linked today rather than who was actually in the guild that week.
+async function loadFinalizedWeeks() {
+  const weeks = await weekSchema.find({ finalized: true }, { week: 1 }).lean();
+  return new Set(weeks.map((w) => w.week));
 }
 
 // Total of a week's non-zero scores
@@ -253,6 +277,7 @@ module.exports = {
   computeStats,
   buildScoreIndex,
   loadScoreIndex,
+  loadFinalizedWeeks,
   weekTotal,
   chartScales,
   createChartUrl,
