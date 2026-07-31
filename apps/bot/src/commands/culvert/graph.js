@@ -43,10 +43,49 @@ const VIEWS = { score: "Score", scoremedian: "Score + Median", rank: "Rank" };
 
 // The character's most recent `weeks` score entries (oldest→newest), optionally dropping
 // missed (0) weeks.
-function selectCharWeeks(char, weeks, omit) {
+// `usable` narrows the pool BEFORE the slice, so a view that can't draw certain weeks still gets the
+// full count asked for. Filtering after the slice would silently shorten the chart: the last 8 weeks
+// minus the two most recent unfinalized ones is 6 points, where stepping two further back gives 8.
+function selectCharWeeks(char, weeks, omit, usable = null) {
   const sorted = [...(char.scores ?? [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  const filtered = omit ? sorted.filter((s) => s.score > 0) : sorted;
+  let filtered = omit ? sorted.filter((s) => s.score > 0) : sorted;
+  if (usable) filtered = filtered.filter(usable);
   return filtered.slice(-weeks);
+}
+
+// How far back a view can actually reach for this character. Rank needs a finalized snapshot to place
+// someone against the guild, and the median needs one to have a guild to take a median of, so both
+// stop at the oldest week that has guild data behind it. The plain score view is the character's own
+// history and has no such limit, so it returns null.
+async function viewCap(state, char, getScoreIndex) {
+  if (state.view === "score") return null;
+  const { finalized } = await getScoreIndex();
+  const sorted = [...(char.scores ?? [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const filtered = state.omit ? sorted.filter((s) => s.score > 0) : sorted;
+  return filtered.filter((s) => finalized.has(s.date)).length;
+}
+
+// Rank and Median can't reach further back than the guild has data, so the week count follows the
+// view instead of silently claiming a range it isn't drawing: switching into a limited view drops the
+// number to that view's reach, and switching back to Score restores the larger number the person
+// picked. `uncapped` holds that original choice, so bouncing between the two limited views never
+// loses it, and a view whose cap is looser than the last one gets as much of it back as it can take.
+// Pure so the state machine can be tested without driving Discord components.
+function applyCap(state, cap) {
+  const wanted = state.uncapped ?? { weeks: state.weeks, weeksSet: state.weeksSet };
+
+  if (cap != null && cap >= 2 && wanted.weeks > cap) {
+    state.uncapped ??= wanted;
+    state.weeks = cap;
+    state.weeksSet = true; // show the clamped number, otherwise the change is invisible
+    return state;
+  }
+  if (state.uncapped) {
+    state.weeks = state.uncapped.weeks;
+    state.weeksSet = state.uncapped.weeksSet;
+    state.uncapped = null;
+  }
+  return state;
 }
 
 // getScoreIndex lazily loads the guild score index (only the Median/Rank views need it).
@@ -67,7 +106,7 @@ async function renderCharGraph(state, char, getScoreIndex) {
     // a finalized snapshot. Weeks without one are dropped from this view rather than padded with
     // N/A: a partial week would rank someone against the handful who have logged so far, and a week
     // from before finalization existed would rank them against whoever is still linked today.
-    const ranked = selected.filter((s) => finalized.has(s.date));
+    const ranked = selectCharWeeks(char, state.weeks, state.omit, (s) => finalized.has(s.date));
     if (ranked.length < 2) {
       return { error: `**${char.name}** needs at least 2 scores in finalized weeks to show rank.` };
     }
@@ -97,18 +136,32 @@ async function renderCharGraph(state, char, getScoreIndex) {
 
   // Score + the guild median overlaid as a faint dashed line
   if (state.view === "scoremedian") {
-    const { index: scoreIndex, finalized, provisional } = await getScoreIndex();
-    // Finalized weeks read their snapshot; the current and other not-yet-finalized recent weeks are
-    // computed live from what has been logged so far, since they will be finalized shortly. Weeks
-    // from before finalization existed are the ones that gap: there the live data is only whoever is
-    // still linked today, so a 2023 week would report a handful of survivors as the guild median.
-    const median = selected.map((s) => {
-      if (!finalized.has(s.date) && !provisional(s.date)) return null;
-      const g = computeStats(scoreIndex.get(s.date) ?? []);
-      return g ? g.p50 : null;
-    });
-    series.push({ label: "Guild median", data: median, color: GUILD_LINE, dashed: true, dim: true, points: false });
-    return { url: await buildLineChart(labels, series, { legend: true }) };
+    const { index: scoreIndex, finalized } = await getScoreIndex();
+    // Only finalized weeks, exactly like rank. A median is a statement about the whole guild, so a
+    // week that hasn't finalized would take it from the handful who happen to have logged so far,
+    // and a week from before finalization existed would take it from whoever is still linked today.
+    // Both are misleading, so those weeks are dropped rather than drawn, and the view simply starts
+    // where the guild data starts.
+    const usable = selectCharWeeks(char, state.weeks, state.omit, (s) => finalized.has(s.date));
+    if (usable.length < 2) {
+      return { error: `**${char.name}** needs at least 2 scores in weeks with guild data to show the median.` };
+    }
+    const medianLabels = usable.map((s) => dayjs(s.date).format("MM/DD"));
+    const medianSeries = [
+      { label: char.name, data: usable.map((s) => s.score), color, fill: true },
+      {
+        label: "Guild median",
+        data: usable.map((s) => {
+          const g = computeStats(scoreIndex.get(s.date) ?? []);
+          return g ? g.p50 : null;
+        }),
+        color: GUILD_LINE,
+        dashed: true,
+        dim: true,
+        points: false,
+      },
+    ];
+    return { url: await buildLineChart(medianLabels, medianSeries, { legend: true }) };
   }
 
   // Raw score
@@ -181,6 +234,9 @@ function buildCharPanel(state, characters, { imageUrl, note, disabled = false })
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  // exported for tests/graphWeeks.js
+  applyCap,
+  viewCap,
   data: new SlashCommandBuilder()
     .setName("graph")
     .setDescription("View the interactive progression graph of a character")
@@ -242,16 +298,19 @@ module.exports = {
     const getScoreIndex = async () => {
       if (!scoreCache) {
         const [index, finalized] = await Promise.all([loadScoreIndex(), loadFinalizedWeeks()]);
-        // Weeks past the newest snapshot are simply awaiting finalization, so they still have real
-        // guild data behind them. Weeks older than the first snapshot never will be finalized.
-        const latest = [...finalized].sort().pop() ?? "";
-        scoreCache = { index, finalized, provisional: (week) => week > latest };
+        scoreCache = { index, finalized };
       }
       return scoreCache;
     };
 
-    const state = { charIndex: startIndex, weeks: 8, weeksSet: false, omit: false, view: "score" };
+    const state = { charIndex: startIndex, weeks: 8, weeksSet: false, omit: false, view: "score", uncapped: null };
     const render = () => renderCharGraph(state, characters[state.charIndex], getScoreIndex);
+
+    // Rank and Median can't reach further back than the guild has data, so the week count follows the
+    // view instead of silently lying: switching into one of them drops the number to that view's
+    // limit, and switching back to Score puts the larger number the person picked back. `uncapped`
+    // holds that original choice, so bouncing between the two limited views never loses it.
+    const reconcileWeeks = async () => applyCap(state, await viewCap(state, characters[state.charIndex], getScoreIndex));
 
     let lastUrl = null;
     const first = await render();
@@ -268,9 +327,12 @@ module.exports = {
 
         // # of Weeks modal — showModal must be the first response, so no deferUpdate here
         if (i.customId === "graph_weeks") {
+          const cap = await viewCap(state, characters[state.charIndex], getScoreIndex);
           const res = await promptWeekCount(i, {
             customId: "graph_weeks_modal",
-            max: characters[state.charIndex].scores.length,
+            // Asking for 52 weeks of rank when only 17 are finalized is a request that can't be met,
+            // so the ceiling offered here is the current view's reach, not the raw score count.
+            max: Math.max(2, Math.min(characters[state.charIndex].scores.length, cap ?? Infinity)),
             current: state.weeks,
           });
           if (!res) return;
@@ -278,6 +340,7 @@ module.exports = {
 
           state.weeks = res.value;
           state.weeksSet = true;
+          state.uncapped = null; // typing a number is a fresh choice, so there's nothing left to restore
 
           const r = await render();
           if (r.url) lastUrl = r.url;
@@ -288,6 +351,10 @@ module.exports = {
         if (i.customId === "graph_char") state.charIndex = Number(i.values[0]);
         else if (i.customId.startsWith("graph_view_")) state.view = i.customId.slice("graph_view_".length);
         else if (i.customId === "graph_omit") state.omit = !state.omit;
+
+        // All three of those move the limit: a different character has a different history, and
+        // hiding missed weeks changes how many usable weeks are left.
+        await reconcileWeeks();
 
         const r = await render();
         if (r.url) lastUrl = r.url;

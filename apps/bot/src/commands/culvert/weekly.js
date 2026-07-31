@@ -1,6 +1,5 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   MediaGalleryBuilder,
@@ -32,13 +31,67 @@ const BEE_ROLE_ID = "720001044746076181";
 const OWNER_ID = "631337640754675725";
 
 // Renders a stat with a bracketed week-over-week delta, e.g. "1,234 (🔺 56)"
+const UPTREND = "<:uptrend:1532546386497765416>";
+const DOWNTREND = "<:downtrend:1532546371712848013>";
+
+// Pagination chevrons (guild custom emojis), same pair /rankings and /wos use
+const CHEVRON = {
+  prev: "<:singleleftchevron:1375242927634120804>",
+  next: "<:singlerightchevron:1375242928787689693>",
+};
+
 function statField(current, prev) {
   const value = current.toLocaleString();
   if (prev === null || prev === undefined) return value;
   const diff = current - prev;
   if (diff === 0) return `${value} (➖ 0)`;
-  const arrow = diff > 0 ? "🔺" : "🔻";
+  const arrow = diff > 0 ? UPTREND : DOWNTREND;
   return `${value} (${arrow} ${Math.abs(diff).toLocaleString()})`;
+}
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// Interactive stats panel (Components V2)
+
+// Every figure here comes from the week's finalized snapshot, so it stays fixed once the week is
+// closed. Deltas are against the finalized week immediately before whichever one is on screen.
+function buildStatsPanel({ week, stats, prev, submitted, total, index, count, disabled = false }) {
+  const rows = [
+    `**Submitted** ${submitted}${total ? ` / ${total}` : ""}`,
+    `**Total Score** ${statField(stats.total, prev?.total)}`,
+    `**Average** ${statField(stats.mean, prev?.mean)}`,
+    `**Median (p50)** ${statField(stats.p50, prev?.p50)}`,
+    `**25th Percentile** ${statField(stats.p25, prev?.p25)}`,
+    `**75th Percentile** ${statField(stats.p75, prev?.p75)}`,
+  ];
+
+  const container = new ContainerBuilder()
+    .setAccentColor(ACCENT)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Guild Culvert Stats\n-# Week of ${week}`))
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(rows.join("\n")))
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Week ${index + 1} of ${count}`))
+    .addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("weekly_stats_prev")
+          .setEmoji(CHEVRON.prev)
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled || index === 0),
+        new ButtonBuilder()
+          .setCustomId("weekly_stats_next")
+          .setEmoji(CHEVRON.next)
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled || index === count - 1),
+        new ButtonBuilder()
+          .setCustomId("weekly_stats_latest")
+          .setLabel("Latest")
+          .setStyle(ButtonStyle.Primary)
+          .setDisabled(disabled || index === count - 1)
+      )
+    );
+
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -114,17 +167,7 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName("stats")
-        .setDescription("View culvert statistics for a given week")
-        .addStringOption((opt) =>
-          opt
-            .setName("date")
-            .setDescription("The week to view (YYYY-MM-DD, Wednesday). Defaults to last week.")
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName("weeks")
-            .setDescription("Average stats over the last N finalized weeks instead of a single week")
-        )
+        .setDescription("View the latest finalized week's culvert statistics")
     )
     .addSubcommand((sub) =>
       sub
@@ -149,144 +192,83 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
     const { lastReset } = getResetDates();
 
-    // Validate and normalise the date option — defaults to last week if omitted
-    function validateDate(dateOption) {
-      if (!dateOption) return { valid: true, date: lastReset };
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOption)) {
-        return {
-          valid: false,
-          error: `Error - The date **${dateOption}** is not valid. Make sure it follows the 'YYYY-MM-DD' format.`,
-        };
-      }
-      if (dayjs(dateOption).day() !== 3) {
-        return {
-          valid: false,
-          error: `Error - The date **${dateOption}** is not valid. Make sure the day lands on a Wednesday.`,
-        };
-      }
-      return { valid: true, date: dateOption };
-    }
-
     // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
     // /weekly stats
 
     if (sub === "stats") {
-      const dateOption = interaction.options.getString("date");
-      const weeksOption = interaction.options.getInteger("weeks");
-
-      const validated = validateDate(dateOption);
-      if (!validated.valid) return interaction.reply(validated.error);
-      const targetDate = validated.date;
-
       await interaction.deferReply();
 
-      // Average-over-N-weeks mode
-      if (weeksOption !== null) {
-        if (weeksOption < 1 || weeksOption > 100) {
-          return interaction.editReply(
-            "Error - The `weeks` value must be between 1 and 100."
-          );
-        }
-
-        const weekRecords = await weekSchema
-          .find({ week: { $lte: targetDate }, finalized: true }, { week: 1 })
-          .sort({ week: -1 })
-          .limit(weeksOption)
-          .lean();
-
-        if (weekRecords.length === 0) {
-          return interaction.editReply(
-            `Error - No finalized weeks found on or before **${targetDate}**.`
-          );
-        }
-
-        const scoreIndex = await loadScoreIndex();
-
-        const statsPerWeek = weekRecords
-          .map((r) => computeStats(scoreIndex.get(r.week) ?? []))
-          .filter(Boolean);
-
-        if (statsPerWeek.length === 0) {
-          return interaction.editReply(
-            "Error - No submitted scores found across the selected weeks."
-          );
-        }
-
-        const avg = (arr) =>
-          Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
-
-        const newestWeek = weekRecords[0].week;
-        const oldestWeek = weekRecords[weekRecords.length - 1].week;
-
-        const embed = new EmbedBuilder()
-          .setColor(0xffc3c5)
-          .setTitle(`${oldestWeek}  →  ${newestWeek}`)
-          .setDescription(
-            `Averaged over **${statsPerWeek.length}** finalized week${statsPerWeek.length !== 1 ? "s" : ""}\n⠀`
-          )
-          .addFields(
-            { name: "Total Score", value: avg(statsPerWeek.map((s) => s.total)).toLocaleString(), inline: true },
-            { name: "​", value: "​", inline: true },
-            { name: "​", value: "​", inline: true },
-            { name: "Average", value: avg(statsPerWeek.map((s) => s.mean)).toLocaleString(), inline: true },
-            { name: "Median (p50)", value: avg(statsPerWeek.map((s) => s.p50)).toLocaleString(), inline: true },
-            { name: "​", value: "​", inline: true },
-            { name: "25th Percentile", value: avg(statsPerWeek.map((s) => s.p25)).toLocaleString(), inline: true },
-            { name: "75th Percentile", value: avg(statsPerWeek.map((s) => s.p75)).toLocaleString(), inline: true },
-            { name: "​", value: "​", inline: true }
-          );
-
-        return interaction.editReply({ embeds: [embed] });
-      }
-
-      // Single-week mode
-      const weekRecord = await weekSchema
-        .findOne({ week: targetDate, finalized: true }, { week: 1, total: 1 })
+      // The whole finalized list is fetched once so paging is in-memory. Opens on the newest week;
+      // the chevrons walk back from there, so there is nothing to pass in.
+      const records = await weekSchema
+        .find({ finalized: true, week: { $lte: lastReset } }, { week: 1, total: 1 })
+        .sort({ week: 1 })
         .lean();
 
-      if (!weekRecord) {
-        return interaction.editReply(
-          `Error - No finalized week record found for **${targetDate}**.`
-        );
+      if (records.length === 0) {
+        return interaction.editReply("Error - No finalized weeks found.");
       }
+
+      let cursor = records.length - 1;
 
       const scoreIndex = await loadScoreIndex();
-      const weekScores = scoreIndex.get(targetDate) ?? [];
 
-      const stats = computeStats(weekScores);
-      if (!stats) {
+      // Reads the week at a list position, with its delta against the finalized week before it.
+      const viewAt = (position) => {
+        const record = records[position];
+        const scores = scoreIndex.get(record.week) ?? [];
+        const stats = computeStats(scores);
+        if (!stats) return null;
+        return {
+          week: record.week,
+          stats,
+          prev: position > 0 ? computeStats(scoreIndex.get(records[position - 1].week) ?? []) : null,
+          submitted: scores.length,
+          total: record.total,
+          index: position,
+          count: records.length,
+        };
+      };
+
+      const first = viewAt(cursor);
+      if (!first) {
         return interaction.editReply(
-          `Error - No submitted scores found for the week of **${targetDate}**.`
+          `Error - No submitted scores found for the week of **${records[cursor].week}**.`
         );
       }
 
-      const submittedCount = weekScores.length;
+      const message = await interaction.editReply(buildStatsPanel(first));
+      const collector = message.createMessageComponentCollector({ idle: 300_000 });
 
-      // Compare against the previous finalized week for week-over-week deltas
-      const prevWeekRecord = await weekSchema
-        .findOne({ week: { $lt: targetDate }, finalized: true }, { week: 1 })
-        .sort({ week: -1 })
-        .lean();
-      const prev = prevWeekRecord ? computeStats(scoreIndex.get(prevWeekRecord.week) ?? []) : null;
+      collector.on("collect", async (i) => {
+        try {
+          if (i.user.id !== interaction.user.id) {
+            return i
+              .reply({ content: "This isn't your stats panel — run `/weekly stats` for your own.", flags: MessageFlags.Ephemeral })
+              .catch(() => {});
+          }
+          await i.deferUpdate();
 
-      const embed = new EmbedBuilder()
-        .setColor(0xffc3c5)
-        .setAuthor({ name: `Week of ${targetDate}` })
-        .setTitle("Guild Culvert Stats")
-        .setDescription("⠀")
-        .addFields(
-          { name: "Total Score", value: statField(stats.total, prev?.total), inline: true },
-          { name: "Submitted", value: `${submittedCount}${weekRecord.total ? ` / ${weekRecord.total}` : ""}`, inline: true },
-          { name: "​", value: "​", inline: true },
-          { name: "Average", value: statField(stats.mean, prev?.mean), inline: true },
-          { name: "Median (p50)", value: statField(stats.p50, prev?.p50), inline: true },
-          { name: "​", value: "​", inline: true },
-          { name: "25th Percentile", value: statField(stats.p25, prev?.p25), inline: true },
-          { name: "75th Percentile", value: statField(stats.p75, prev?.p75), inline: true },
-          { name: "​", value: "​", inline: true }
-        );
+          if (i.customId === "weekly_stats_prev") cursor = Math.max(0, cursor - 1);
+          else if (i.customId === "weekly_stats_next") cursor = Math.min(records.length - 1, cursor + 1);
+          else if (i.customId === "weekly_stats_latest") cursor = records.length - 1;
 
-      return interaction.editReply({ embeds: [embed] });
+          const view = viewAt(cursor);
+          if (!view) {
+            return i.followUp({ content: `Error - No scores recorded for **${records[cursor].week}**.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+          }
+          await i.editReply(buildStatsPanel(view));
+        } catch (err) {
+          console.error("Error - /weekly stats interaction failed:", err);
+        }
+      });
+
+      collector.on("end", async () => {
+        const view = viewAt(cursor);
+        if (view) await interaction.editReply(buildStatsPanel({ ...view, disabled: true })).catch(() => {});
+      });
+
+      return;
     }
 
     // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
