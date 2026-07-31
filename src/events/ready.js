@@ -18,12 +18,19 @@ module.exports = {
     // Connect to the database
     mongoose.connect(process.env.MONGO_URI);
 
-    // Fetch all members for use on other events, instead of using the cache
+    // Warm the caches everything else reads from, so nothing depends on a lazy fetch later. Members
+    // back the roster's person search and pronoun lookups; emotes back Saku's own emote list and the
+    // repair pass that rebuilds a misspelled :name: into a real one, which silently deletes emotes if
+    // the cache is empty. Channels and roles arrive with the gateway payload, so they only get counted.
     const guild = await client.guilds.fetch("719788426022617138");
-    await guild.members.fetch();
+    const [members, emojis] = await Promise.all([guild.members.fetch(), guild.emojis.fetch()]);
 
     // Display event responses
     console.log(`Ready! Logged in as ${client.user.tag}`);
+    console.log(
+      `Cache warmed: ${members.size} members, ${emojis.size} emotes ` +
+        `(${emojis.filter((e) => /^saku/i.test(e.name)).size} saku*), ${guild.channels.cache.size} channels, ${guild.roles.cache.size} roles`
+    );
 
     // Report a recent crash to the server, if any
     if (os.hostname() !== "DESKTOP-15LSGET") {
