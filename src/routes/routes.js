@@ -61,6 +61,23 @@ const getActorId = (req) => {
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// EVERY route below needs the shared secret, not just the admin ones.
+//
+// This port has to be reachable from the internet for the webapp host to call it, and the read
+// routes were open: /getAll alone hands back every character and their full score history. No
+// browser ever calls this API directly (the webapp proxies all of it server-side through /bot/*),
+// so the only legitimate caller is the webapp, and it already holds this secret for admin routes.
+// Missing config fails closed, which is the right direction: the panel breaks loudly rather than
+// the data quietly staying public.
+const requireApiSecret = (req, res, next) => {
+  const secret = process.env.ADMIN_API_SECRET;
+  if (!secret || req.headers["x-admin-secret"] !== secret) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+};
+
+router.use(requireApiSecret);
 
 // Get all Method
 router.get("/getAll", async (req, res) => {
@@ -139,15 +156,8 @@ router.get("/rankings/:name", async (req, res) => {
 // adds an X-Admin-Secret header so the bot can confirm the request is legitimate.
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const requireAdminSecret = (req, res, next) => {
-  const secret = process.env.ADMIN_API_SECRET;
-  if (!secret || req.headers["x-admin-secret"] !== secret) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  next();
-};
-
-router.use("/admin", requireAdminSecret);
+// The secret is already enforced for every route further up; what still matters here is that the
+// webapp verified the caller's bee role before forwarding, and passed who they are in x-admin-*.
 
 router.get("/admin/action-log", async (req, res) => {
   try {

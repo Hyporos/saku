@@ -9,7 +9,6 @@ const path = require("node:path");
 require("dotenv").config();
 const express = require("express");
 const routes = require("./routes/routes");
-const cors = require("cors");
 const { loadDstOffset, saveDstState, JOB_DEFINITIONS, computeNextRun, startAllJobs } = require("./utility/cronRegistry");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -18,7 +17,9 @@ const app = express();
 
 app.use(express.json({ limit: "50mb" }));
 
-app.use(cors());
+// No CORS: nothing in a browser calls this API. The webapp reaches it server-side through its own
+// /bot/* proxy, and server-to-server requests ignore CORS entirely. Allowing every origin only made
+// the routes reachable from any page on the internet.
 
 const PORT = process.env.PORT || 25637;
 app.listen(PORT, "0.0.0.0", () => {
