@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node src/index.js",
     "deploy-commands": "node src/deploy-commands.js",
-    "test-chat": "node tests/chatRegression.js"
+    "test-chat": "node tests/chatRegression.js",
+    "test-graph": "node tests/graphWeeks.js"
   },
   "keywords": [],
   "author": "",

@@ -45,7 +45,7 @@ const COMMANDS = [
   {
     name: "graph",
     cat: "Culvert",
-    desc: "View the interactive progression graph of a character. Switch between Score, Score + Median, and Rank views, adjust the number of weeks, hide missed weeks, and browse your characters — or view anyone else's.",
+    desc: "View the interactive progression graph of a character. Switch between Score, Score + Median, and Rank views, adjust the number of weeks, hide missed weeks, and browse your characters — or view anyone else's. Score covers every week the character has. The guild median needs guild data behind it, so it only reaches back to the first finalized week (the current week is included, calculated from what's been logged so far). Rank is finalized weeks only, since placing someone against a half-logged week would be meaningless.",
     params: "`[character]` - The character to graph (optional; defaults to your own, and you can view anyone's)",
   },
   {
@@ -143,9 +143,9 @@ const COMMANDS = [
     name: "weekly",
     cat: "Culvert",
     bee: true,
-    desc: "View weekly guild culvert statistics and score graphs. Use the `stats` subcommand to view totals, averages, and percentiles for a given week, or the `graph` subcommand to see the guild's score progression over time.",
+    desc: "View weekly guild culvert statistics and score graphs. `stats` opens on the latest finalized week with totals, averages and percentiles, each showing its change against the week before — page back through every finalized week with the chevrons. `graph` shows the guild's score progression over time. All figures come from the finalized snapshot of each week, so they stay fixed once a week is closed, even if a member later leaves.",
     params:
-      "`[stats date]` - The week to view stats for (YYYY-MM-DD, Wednesday). Defaults to last week\n`[stats weeks]` - Average stats over the last N finalized weeks\n`graph` - Opens an interactive graph; use the buttons to change the metric (total or spread) and week count",
+      "None - `stats` takes no arguments; use the chevrons to move between weeks and Latest to jump back to the newest\n`graph` - Opens an interactive graph; use the buttons to change the metric (total or spread) and week count",
   },
   {
     name: "chat",
