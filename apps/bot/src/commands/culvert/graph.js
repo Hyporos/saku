@@ -17,6 +17,7 @@ const {
   GRAPH_COLOR,
   computeStats,
   loadScoreIndex,
+  loadFinalizedWeeks,
   buildLineChart,
   textPanel,
   rgbToInt,
@@ -61,8 +62,18 @@ async function renderCharGraph(state, char, getScoreIndex) {
   // Placement among all non-zero submitted scores that week (1 = top). Axis reversed so the
   // best rank sits at the top; unsubmitted weeks drop to the bottom labelled "N/A".
   if (state.view === "rank") {
-    const scoreIndex = await getScoreIndex();
-    const perWeek = selected.map((s) => {
+    const { index: scoreIndex, finalized } = await getScoreIndex();
+    // A rank is a placement against the whole guild, so it only means anything for a week that has
+    // a finalized snapshot. Weeks without one are dropped from this view rather than padded with
+    // N/A: a partial week would rank someone against the handful who have logged so far, and a week
+    // from before finalization existed would rank them against whoever is still linked today.
+    const ranked = selected.filter((s) => finalized.has(s.date));
+    if (ranked.length < 2) {
+      return { error: `**${char.name}** needs at least 2 scores in finalized weeks to show rank.` };
+    }
+
+    const rankLabels = ranked.map((s) => dayjs(s.date).format("MM/DD"));
+    const perWeek = ranked.map((s) => {
       if (s.score <= 0) return null;
       const guild = (scoreIndex.get(s.date) ?? []).filter((x) => x > 0).sort((a, b) => b - a);
       return guild.indexOf(s.score) + 1 || null;
@@ -72,10 +83,10 @@ async function renderCharGraph(state, char, getScoreIndex) {
     const data = perWeek.map((r) => (r == null ? bottom : r));
     const naFlags = perWeek.map((r) => r == null);
     return {
-      url: await buildLineChart(labels, [{ label: "Rank", data, color, fill: "start", naFlags }], {
+      url: await buildLineChart(rankLabels, [{ label: "Rank", data, color, fill: "start", naFlags }], {
         yTicks: { reverse: true, precision: 0 },
         datalabels:
-          selected.length <= RANK_LABEL_MAX
+          ranked.length <= RANK_LABEL_MAX
             ? { display: true, align: "top", anchor: "end", color: "rgba(255,255,255,0.9)", font: { size: 12, weight: "bold" }, formatter: RANK_NA_FORMATTER }
             : null,
       }),
@@ -86,8 +97,13 @@ async function renderCharGraph(state, char, getScoreIndex) {
 
   // Score + the guild median overlaid as a faint dashed line
   if (state.view === "scoremedian") {
-    const scoreIndex = await getScoreIndex();
+    const { index: scoreIndex, finalized, provisional } = await getScoreIndex();
+    // Finalized weeks read their snapshot; the current and other not-yet-finalized recent weeks are
+    // computed live from what has been logged so far, since they will be finalized shortly. Weeks
+    // from before finalization existed are the ones that gap: there the live data is only whoever is
+    // still linked today, so a 2023 week would report a handful of survivors as the guild median.
     const median = selected.map((s) => {
+      if (!finalized.has(s.date) && !provisional(s.date)) return null;
       const g = computeStats(scoreIndex.get(s.date) ?? []);
       return g ? g.p50 : null;
     });
@@ -224,7 +240,13 @@ module.exports = {
     // Guild scores are only needed by the Median/Rank views — load once, on first use.
     let scoreCache = null;
     const getScoreIndex = async () => {
-      if (!scoreCache) scoreCache = await loadScoreIndex();
+      if (!scoreCache) {
+        const [index, finalized] = await Promise.all([loadScoreIndex(), loadFinalizedWeeks()]);
+        // Weeks past the newest snapshot are simply awaiting finalization, so they still have real
+        // guild data behind them. Weeks older than the first snapshot never will be finalized.
+        const latest = [...finalized].sort().pop() ?? "";
+        scoreCache = { index, finalized, provisional: (week) => week > latest };
+      }
       return scoreCache;
     };
 
