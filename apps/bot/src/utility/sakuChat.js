@@ -190,6 +190,8 @@ FUN & GUESSES:
 - Keep the guess grounded in the data you fetched, and never present it as a real stat or a tool result.
 
 NAMES:
+- TWO MEMBERS CAN SHARE A NAME. Characters listed under different players are different PEOPLE, however alike the two names look. Never fold them into one person with several characters, never add their scores together, and never argue the point: if a search comes back with matches from more than one member, say there are two of them and ask which one they mean. The person telling you they're not the same knows better than you do.
+- Someone having several characters is normal too, so the tell is the player each character is listed under, not the count. Only characters under the SAME player belong to one person.
 - GUILD NAMES COME FIRST. If someone asks how good, how strong, how funded, or how "op" some name is, assume it's one of our characters or members and call getCharacter to check before anything else. Plenty of names double as MapleStory skills, items, or old systems, and the guild meaning is almost always the one they mean. Only fall back to the game meaning once the roster lookup actually misses, and never open with a joke built on the wrong reading.
 - Character names can contain accents or look-alike letters (an accented e or l, a capital I that reads as lowercase L, a zero standing in for O). getCharacter matches loosely, so just pass the name the user gave.
 - If getCharacter returns suggestions instead of an exact match, quietly use the closest obvious one; only ask which they meant if it's genuinely ambiguous.
@@ -1322,6 +1324,7 @@ async function runTool(name, args, ctx) {
       const previous = asc.find((s) => s.date === prevWeek)?.score ?? 0;
       const best = asc.reduce((m, s) => Math.max(m, s.score), 0);
       return {
+        ownerId: c.ownerId, // internal only, stripped before the result goes out
         name: c.name,
         player: ctx.displayName(c.ownerId),
         job: meta.job,
@@ -1392,9 +1395,18 @@ async function runTool(name, args, ctx) {
         `matches (${rows.length}) is how many of those also have a ${sortBy} figure to sort by, so it EXCLUDES anyone who didn't score. ` +
         `"How many Adeles are there" is rosterMatches. Only use matches when the question is about who scored. Never count the rows in results yourself: that list can be shortened, the counts are not.`,
       personFilter: person ? args.person : "everyone",
+      // Two members can share a name. Searching "chris" matched one character from each of two
+      // different accounts, and the reply presented them as one person with two characters, then
+      // defended it when the real Chris said otherwise. The rows alone can't show this, since all
+      // they carry is a display name, so the split is stated outright.
+      distinctPlayers: new Set(rows.map((r) => r.ownerId)).size,
+      sharedName:
+        person && new Set(rows.map((r) => r.ownerId)).size > 1
+          ? `WARNING: these characters belong to ${new Set(rows.map((r) => r.ownerId)).size} DIFFERENT members whose names both match "${args.person}". They are NOT one person with several characters. Never merge them, never add their scores together, and if it matters which one they mean, ask.`
+          : undefined,
       matches: rows.length,
       classDataCoverage: `${resolved} of ${chars.length} characters have class and level cached`,
-      results: rows.slice(0, limit),
+      results: rows.slice(0, limit).map(({ ownerId, ...row }) => row),
       note:
         (resolved < chars.length
           ? "Class data is still filling in from the public rankings. If a class filter comes back empty or thin, say you could only check the characters you have class data for. Never say a class isn't in the guild. "
@@ -2173,6 +2185,18 @@ const HAS_EMOTE = /<a?:\w+:\d+>/; // separate and non-global: .test() on a /g re
 const EMOTE_GAP = 4;
 const emoteCooldown = new Map();
 
+// Asking for a channel has to be caught here, because a miss is not a small one: no roll gets put in
+// front of the model, the guard further down then strips the channel it named anyway, and the person
+// who asked a direct question gets a non-answer about luck instead. The old verb list missed real
+// requests ("could you give me the real channel for pitched drops?" contains none of them, and
+// "going" doesn't match \bgo\b), so any question mentioning a channel now counts.
+const CHANNEL_WORD = /\bch(?:annel)?s?\b/i;
+// Request words only. Topic words like "drop" or "pitched" belong to the question mark branch:
+// putting them here made a plain statement ("i just got a drop on ch 12") look like a request, which
+// is how Saku started volunteering channels at people who hadn't asked.
+const CHANNEL_ASK =
+  /\b(what|whats|which|good|best|where|try|go|going|use|using|lucky|luck|recommend|suggest|should|give|gimme|can|could|would|tell|pick|roll|need|want|any|real|another|other|different|next)\b/i;
+
 // Discord renders a custom emote ONLY as <:name:id>. The model writes two near misses: the bare
 // :name: that people type, and a half-formed <:name:> with the id dropped. Both ship as literal text.
 // Repair whichever resolve to a real guild emote and DELETE the ones that don't, including names the
@@ -2258,7 +2282,7 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   // to use. Instructing it to "only mention this if asked" was not enough twice over: it offered a
   // channel to someone asking if they were lucky, and to someone who was just swearing at it. A
   // number it was never given is a number it cannot hand out.
-  const asksChannel = /\bch(?:annel)?s?\b/i.test(message) && /\b(what|which|good|best|where|try|go|use|lucky|recommend|suggest|should)\b/i.test(message);
+  const asksChannel = CHANNEL_WORD.test(message) && (CHANNEL_ASK.test(message) || message.includes("?"));
 
   // All four are independent, so they go out together rather than costing four round-trips of latency.
   const [{ history, summary, facts }, mineDoc, { text: spoken, people }] = await Promise.all([
@@ -2569,11 +2593,17 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   // sentence that did. Only ever removes a sentence when something is left to send.
   const CHANNEL_MENTION = /\bch(?:annel)?\.?\s*\d{1,2}\b/i;
   if (!asksChannel && CHANNEL_MENTION.test(reply)) {
+    const before = reply;
     const kept = reply.split(/(?<=[.!?])\s+/).filter((s) => !CHANNEL_MENTION.test(s)).join(" ").trim();
     // Removing the offending sentence can leave a dangling "Go test your luck there", so what's left
-    // has to stand on its own. If it doesn't, drop the whole thing rather than send a fragment.
-    reply = kept.length >= 25 && !/^(so|and|but|then|go|try)\b/i.test(kept) ? kept : "Luck's whatever you make of it today.";
-    console.warn(`Saku chat: stripped an unasked-for channel number from the reply (${username})`);
+    // has to stand on its own. The bar used to be 25 characters, which threw away short but perfectly
+    // good answers and replaced them with a line about luck, in the middle of conversations that had
+    // nothing to do with luck. Anything that reads as a whole sentence is kept now.
+    const usable = kept.length >= 12 && !/^(so|and|but|then|go|try)\b/i.test(kept);
+    reply = usable ? kept : "Luck's whatever you make of it today.";
+    // The pre-strip text is logged because this only fires when the model named a channel nobody
+    // asked for, and that is worth being able to read back rather than guess at.
+    console.warn(`Saku chat: stripped an unasked-for channel number (${username})${usable ? "" : ", nothing usable left"}: ${JSON.stringify(before.slice(0, 160))}`);
   }
   if (reply.length > REPLY_CAP) reply = trimToBoundary(reply.slice(0, REPLY_CAP));
   console.log(
