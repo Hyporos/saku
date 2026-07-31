@@ -2155,6 +2155,33 @@ const EMOTE_RE = /<a?:\w+:\d+>/g;
 const HAS_EMOTE = /<a?:\w+:\d+>/; // separate and non-global: .test() on a /g regex carries lastIndex
 const EMOTE_GAP = 4;
 const emoteCooldown = new Map();
+
+// Discord renders a custom emote ONLY as <:name:id>. The model writes two near misses: the bare
+// :name: that people type, and a half-formed <:name:> with the id dropped. Both ship as literal text.
+// Repair whichever resolve to a real guild emote and DELETE the ones that don't, including names the
+// model invented outright, because a stray ":sakuHammer:" sitting in a sentence reads worse than no
+// emote at all. Exported for the regression suite: the model can't be made to misformat on demand.
+function repairEmotes(reply, guild) {
+  const cache = guild?.emojis?.cache ?? null;
+  const resolve = (name) => cache?.find((e) => e.name.toLowerCase() === name.toLowerCase()) ?? null;
+
+  return String(reply)
+    // Anything in angle brackets is rebuilt from the real emote rather than trusted, because the id
+    // is invented as readily as the name is, and Discord renders a wrong id as literal text too.
+    // With no cache to check against, a well-formed tag is left alone and only broken ones go.
+    .replace(/<a?:([A-Za-z0-9_]+):[^<>]*>/g, (whole, name) => {
+      const hit = resolve(name);
+      if (hit) return hit.toString();
+      return !cache && /^<a?:[A-Za-z0-9_]+:\d+>$/.test(whole) ? whole : "";
+    })
+    // Bare :name:. Only saku* is touched, so "3:4:5" and clock times are left alone.
+    .replace(/(?<!<):([A-Za-z0-9_]+):(?!\d)/g, (whole, name) =>
+      /^saku/i.test(name) ? (resolve(name)?.toString() ?? "") : whole
+    )
+    .replace(/ {2,}/g, " ") // spaces only: collapsing \s would eat the line breaks
+    .replace(/ +([,.!?])/g, "$1")
+    .trim();
+}
 const modelCooldowns = new Map();
 
 function availableModels() {
@@ -2449,16 +2476,7 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
 
   reply = reply.replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, ", "); // the persona bans em dashes; enforce it
 
-  // Discord only renders an emote in its <:name:id> form. The model sometimes writes the bare :name:
-  // it sees people type, which arrives as literal text, so repair it against the real emote rather
-  // than losing it. The lookbehind keeps it off the inner colons of an already correct <:name:id>.
-  if (guild) {
-    reply = reply.replace(/(?<!<):([A-Za-z0-9_]+):(?!\d)/g, (whole, name) => {
-      if (!/^saku/i.test(name)) return whole;
-      const match = guild.emojis.cache.find((e) => e.name.toLowerCase() === name.toLowerCase());
-      return match ? match.toString() : whole;
-    });
-  }
+  reply = repairEmotes(reply, guild);
 
   // Emote rationing, enforced here because the prompt has asked for it in three different wordings
   // and the model still fires them off back to back. At most one per reply, and none at all until a
@@ -2521,4 +2539,4 @@ async function refreshRosterMeta() {
 
 // unsupportedNumbers is exported for the regression suite: it fires on maybe one turn in three, so
 // testing it through live chat proves nothing, and it needs deterministic cases.
-module.exports = { askSaku, isBee, canChat, collectImages, onCooldown, refreshRosterMeta, refreshServerExtras, unsupportedNumbers, NOT_MEMBER_NOTICE };
+module.exports = { askSaku, isBee, canChat, collectImages, onCooldown, refreshRosterMeta, refreshServerExtras, unsupportedNumbers, repairEmotes, NOT_MEMBER_NOTICE };
