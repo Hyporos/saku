@@ -7,3 +7,5 @@ node_modules
 # Backup files
 backup/
 backups/
+# Runtime state written by the bot itself
+src/data/latencyMessage.json
