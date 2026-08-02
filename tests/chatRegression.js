@@ -94,9 +94,21 @@ async function buildCases() {
       name: "no invented majority",
       guards: 'the "half the roster is 297" fabrication',
       ask: "what level is most of the guild?",
-      // "most common level is 292" is a legitimate answer straight out of the level spread, so only
-      // the fraction words count here. The bug was claiming a share of the roster sits at one level.
-      check: lacks(/\b(half|majority|most of (the|our))\b[^.]{0,40}\b29[0-9]\b/i, "claiming a level majority that was never in the data"),
+      // Checks whether the claim is TRUE, not how many figures it cites. An earlier version of this
+      // case counted citations, which failed perfectly accurate replies about two times in three and
+      // told us nothing: the bug was never under-citing, it was saying "most of the guild" about a
+      // slice that is nothing of the sort. So the levels named are resolved against the real spread.
+      check: (reply) => {
+        const levels = meta.filter((m) => Number.isFinite(m.level) && m.level > 0).map((m) => m.level);
+        if (!levels.length) return "no level data in the database to check against";
+        const claim = reply.match(/\b(?:half|majority|most|bulk)\b[^.]{0,60}?\b(\d{3})\b(?:\s*(?:to|-|–|and|through)\s*(\d{3})\b)?/i);
+        if (!claim) return null; // no proportional claim was made, so there is nothing to be wrong about
+        const lo = Math.min(Number(claim[1]), Number(claim[2] ?? claim[1]));
+        const hi = Math.max(Number(claim[1]), Number(claim[2] ?? claim[1]));
+        const share = levels.filter((l) => l >= lo && l <= hi).length / levels.length;
+        const named = lo === hi ? `level ${lo}` : `levels ${lo}-${hi}`;
+        return share > 0.5 ? null : `claimed most of the guild is ${named}, which is really ${Math.round(share * 100)}% of the roster`;
+      },
     },
     {
       name: "total control is the right item",
@@ -108,7 +120,7 @@ async function buildCases() {
       name: "flames respect the slot",
       guards: "advising a rebirth flame on a ring",
       ask: "should i put a rebirth flame on my endless terror?",
-      check: all(has(/ring/i), has(/can'?t|cannot|don'?t take|not flam|no flame/i)),
+      check: all(has(/ring/i), has(/can'?t|cannot|do(?:es)?n'?t take|not flam|no flame/i)),
     },
     {
       name: "kronos has no trading",
