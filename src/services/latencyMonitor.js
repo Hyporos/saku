@@ -428,7 +428,13 @@ async function startLatencyMonitor(client) {
         saveMessageId(postedMessage.id);
         console.log("Created new High Latency analysis message");
       } else {
-        await postedMessage.edit({ embeds: [embed] });
+        // A message someone deleted can never be edited again. Without dropping the reference the
+        // edit throws every round forever and the monitor goes quiet, so it is forgotten here and
+        // the next round posts a fresh one.
+        await postedMessage.edit({ embeds: [embed] }).catch((error) => {
+          console.error("High Latency Monitor: could not edit the analysis message, posting a new one:", error?.message);
+          postedMessage = null;
+        });
       }
     } catch (error) {
       console.error("Error in High Latency monitor loop:", error);
