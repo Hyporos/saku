@@ -206,6 +206,21 @@ FUN & GUESSES:
 - Playful hypotheticals are fair game: predicting a future score, guessing where someone lands next week, who would win a race, what class someone should main. Never brush these off with "I can't predict the future" and stop there.
 - Do the fun version properly: pull the real numbers with a tool first, then extrapolate from the actual trend and give a specific ballpark. Say plainly that it's a guess, then commit to a number instead of hedging into mush.
 - Keep the guess grounded in the data you fetched, and never present it as a real stat or a tool result.
+- WHO WOULD WIN IN A FIGHT is its own thing, and it is one of the best questions you get. Look BOTH characters up first (class, level and last week's score), then write the fight as a short MapleStory scene rather than a verdict: where it happens, who opens, what actually decides it. Use their real classes to do it, not generic hits, so a Bishop is throwing Genesis and resurrecting, a Night Lord is off the ceiling with Quad Throw, a Kanna is dragging the whole thing into a kishin'd map. Call getGameReference or searchMapleStory if you need a class's real skills instead of inventing one.
+- Pick a winner and say so. The level and last week's culvert score are your evidence, since culvert is the closest thing this guild has to a damage test, so lean on them: a 40k score gap decides it, a few hundred points means it comes down to who lands the bind. Name the numbers that made you call it.
+- THE SCORE GAP DECIDES HOW MUCH ROOM THE FIGHT HAS, and the higher score wins nearly every time. Work out the gap and hold to it:
+  - More than about 25,000 apart: the leader wins, always. No upsets at this range, and no hedging about it either.
+  - Roughly 5,000 to 25,000: the leader still wins, but write it as work rather than a walkover.
+  - Under about 5,000: genuinely close, and this is the ONLY range where the underdog may take it. Even here the leader is the way to bet, so an upset should be the exception rather than your default ending.
+- If you do call an upset, the reason lives in the SCENE, not in the fighters. One good bind landing, a dodged burst, the map favouring their kit. Never invent a flaw in the leader to justify it ("inconsistent", "lets his ego get in the way"): they are ahead on the board, and inventing a weakness to take that away from them is both untrue and a dig at someone who is not in the conversation.
+- Whatever you decide, the answer has to agree with the numbers you just quoted. Naming two scores and handing the win to the lower one with no explanation is the one way to get this visibly wrong.
+- If one of them has no recent score to compare, say that plainly and call it on level and class instead, rather than pretending the comparison happened.
+- THIS IS ONE OF THE FEW PLACES YOU MAY BREAK THE LENGTH RULE, and you should. Two short paragraphs, six to ten sentences: the scene first, the verdict and the numbers last. A three-line answer that says one of them "used their kit well" is the boring version and the whole point is lost.
+- ONE STEP, TWO getCharacter CALLS, both in the same step. That returns each fighter's class, level, score AND a signatureSkills list of their real skills, which is everything the scene needs. Do not reach for findCharacters or searchMapleStory as well: a fight is already the most expensive question you answer, and the extra rounds buy nothing you were not just handed.
+- NAME REAL SKILLS, at least two each, straight out of signatureSkills. Never generic filler: "a barrage of swift strikes", "their Kain combos", "the Bishop kit" are all wrong. Skill names you invent are stripped from your reply before it sends, so the scene would arrive full of holes; the ones handed to you survive. Only if signatureSkills comes back empty for a class should you search for it.
+- Give it MapleStory texture: name the map, and use the things that decide real fights. Binds, iframes on an Origin animation, a dodged burst window, potion cooldowns, someone getting knocked off a platform, a Kanna dragging the fight into a kishin'd map. Let the loser have a moment where they nearly take it before the winner closes.
+- Warm throughout: the loser lost a fight in a story, never "the worse player". No cracks about their gear, their funding, or how they play, and if one of them is Dannis he simply wins.
+- Same rules as everywhere else on the data: the classes, levels and scores are real and come from a tool this turn. Only the fight is invented.
 
 NAMES:
 - TWO MEMBERS CAN SHARE A NAME. Characters listed under different players are different PEOPLE, however alike the two names look. Never fold them into one person with several characters, never add their scores together, and never argue the point: if a search comes back with matches from more than one member, say there are two of them and ask which one they mean. The person telling you they're not the same knows better than you do.
@@ -726,8 +741,14 @@ function characterSummary(c, weekly, thisWeek, openWeek) {
   const thisScore = asc.find((s) => s.date === thisWeek)?.score ?? 0;
   const openScore = asc.find((s) => s.date === openWeek)?.score ?? 0;
   const recent = asc.filter((s) => s.score > 0).slice(-8);
+  const meta = metaFor(c.name);
   return {
     name: c.name,
+    // The class was missing here entirely, so anything wanting it had to go through findCharacters.
+    // The skills ride along so a fight scene can name real ones without a search per fighter.
+    job: meta.job,
+    level: meta.level,
+    signatureSkills: (meta.job && CLASS_SKILLS[meta.job]) || null,
     memberSince: c.memberSince,
     lastCompletedWeek: thisWeek,
     lastCompletedWeekScore: thisScore,
@@ -747,6 +768,59 @@ function characterSummary(c, weekly, thisWeek, openWeek) {
     ...streaks(asc, thisWeek),
   };
 }
+
+// Signature skills per class, keyed by the job name the rankings API returns. Attached to a character
+// lookup so a "who would win" scene can name real skills without spending a searchMapleStory round on
+// each fighter, and so those names arrive as tool data and survive the invented-name guard. A class
+// missing here is harmless: the fight rules fall back to searching for it.
+const CLASS_SKILLS = {
+  Adele: "Order, Ruin, Cleave, Aether Bloom, Grave",
+  "Angelic Buster": "Trinity, Soul Seeker, Finale Ribbon, Supernova",
+  Aran: "Beyond Blade, Final Blow, Adrenaline Boost, Combo Judgment",
+  "Arch Mage (F/P)": "Meteor Shower, Poison Nova, Mist Eruption, Inferno Aura",
+  "Arch Mage (I/L)": "Chain Lightning, Blizzard, Frozen Orb, Thunder Break",
+  Ark: "Scarlet Charge, Abyssal Charge, Endless Nightmare, Spectre Rage",
+  "Battle Mage": "Finish Attack, Death, Grim Reaper, Union Aura",
+  Bishop: "Genesis, Angel Ray, Big Bang, Resurrection, Holy Symbol, Divine Punishment",
+  "Blade Master": "Blade Fury, Asura's Anger, Final Cut, Blade Storm",
+  Blaster: "Magnum Punch, Bunker Buster Explosion, Revolving Cannon, Shotgun Punch",
+  "Bow Master": "Hurricane, Arrow Stream, Quiver Cartridge, Silhouette Mirage",
+  Buccaneer: "Octopunch, Nautilus Strike, Buccaneer Blast, Serpent Vortex",
+  "Cannon Master": "Cannon Barrage, Cannon Bazooka, Pirate Spirit, Rolling Cannon Rainbow",
+  Corsair: "Rapid Fire, Broadside, Nautilus Strike, Death Trigger",
+  "Dark Knight": "Gungnir's Descent, Dark Impale, Sacrifice, Final Pact, Reincarnation",
+  "Dawn Warrior": "Solar Slash, Luna Divide, Astral Blitz, Rising Sun",
+  "Demon Avenger": "Exceed: Execution, Nether Shield, Demonic Frenzy, Requiem",
+  "Demon Slayer": "Demon Impact, Demon Awakening, Cerberus Chomp, Infernal Concussion",
+  Evan: "Mana Burst, Dragon Breath, Elemental Barrage, Zodiac Ray",
+  Hayato: "Rai Sanrenzan, Falcon's Honor, Battoujutsu, Shinsoku",
+  Hero: "Raging Blow, Puncture, Combo Death Fault, Rage Uprising",
+  Hoyoung: "Consuming Flames, Heaven: Iron Fan Gale, Sage: Clone Rampage, Scroll: Tiger",
+  Illium: "Crystal Ignition, Craft: Javelin, Glory Wing, Longinus Zone",
+  Kain: "Falling Dust, Strike Arrow, Chasing Shot, Death Blessing, Dragon Fang",
+  Kaiser: "Gigas Wave, Draco Slasher, Wing Beat, Final Figuration, Prominence",
+  Kanna: "Shikigami Haunting, Kishin Shoukan, Vanquisher's Charm, Ghost Yaksha Boss",
+  Khali: "Void Rush, Chakri Fury, Hex: Sand Storm, Arts: Flurry",
+  Lara: "Dragon Vein, Eruption, Sunrise Well, Big Stretch",
+  Luminous: "Reflection, Apocalypse, Ender, Equilibrium, Morning Star",
+  Lynn: "Strike, Beast's Rage, Beak Strike, Source Flow",
+  Marksman: "Snipe, Piercing Arrow, High Speed Shot, Repeating Crossbow Cartridge",
+  Mercedes: "Ishtar's Ring, Unicorn Spike, Spikes Royale, Irkalla's Wrath",
+  Mihile: "Radiant Cross, Royal Guard, Soul Asylum, Instant Judgment",
+  "Mo Xuan": "Xuanshan Forms, Secret Art: Qi Projection, Divine Art: Howling Storm, Soul Art: Black Wind",
+  "Night Lord": "Quad Throw, Sudden Raid, Showdown, Four Seasons, Dark Flare",
+  "Night Walker": "Quintuple Star, Dark Omen, Shadow Bat, Dominion, Rapid Throw",
+  Pathfinder: "Cardinal Blast, Ancient Astra, Obsidian Barrier, Relic Unbound",
+  Phantom: "Tempest, Mille Aiguilles, Judgment, Ultimate Drive",
+  Ren: "Plum Blossom Sword: Storm, Soul Immeasurable, Rising Azure Dragon: Divided Heavens",
+  Shade: "Spirit Claw, Death Mark, Fox Trot, Spirit Frenzy",
+  Shadower: "Assassinate, Meso Explosion, Boomerang Stab, Ultimate Dark Sight",
+  "Thunder Breaker": "Annihilate, Typhoon, Thunderbolt, Primal Storm",
+  "Wild Hunter": "Jaguar Storm, Wild Arrow Blast, Another Bite, Sonic Roar",
+  "Wind Archer": "Song of Heaven, Trifling Wind, Storm Bringer, Merciless Winds",
+  Xenon: "Mecha Purge, Hologram Graffiti, Photon Ray, Overload Mode",
+  Zero: "Giga Crash, Wind Cutter, Shadow Rain, Limit Break",
+};
 
 const NEWS_CACHE = { at: 0, items: [] };
 
@@ -1298,7 +1372,10 @@ async function runTool(name, args, ctx) {
     const chars = await ctx.allCharacters();
     const q = normalizeName(args.name);
     const exact = chars.find((x) => normalizeName(x.name) === q);
-    if (exact) return { found: true, player: ctx.displayName(exact.ownerId), ...characterSummary(exact, await ctx.weeklyRanking(), lastReset, reset) };
+    if (exact) {
+      await loadCharacterMeta([exact.name]); // class and level come from the cache, not a fresh fetch
+      return { found: true, player: ctx.displayName(exact.ownerId), ...characterSummary(exact, await ctx.weeklyRanking(), lastReset, reset) };
+    }
     const suggestions = chars
       .filter((x) => {
         const n = normalizeName(x.name);
@@ -1316,6 +1393,7 @@ async function runTool(name, args, ctx) {
 
   if (name === "getMyProfile") {
     if (!ctx.myCharacters.length) return { linked: false, message: "You have no characters linked yet." };
+    await loadCharacterMeta(ctx.myCharacters.map((c) => c.name));
     const weekly = await ctx.weeklyRanking();
     return { linked: true, characters: ctx.myCharacters.map((c) => characterSummary(c, weekly, lastReset, reset)) };
   }
