@@ -36,7 +36,10 @@ const client = new Client({
     [GatewayIntentBits.MessageContent] |
     [GatewayIntentBits.GuildMessages] |
     [GatewayIntentBits.GuildMessageReactions],
-  partials: [Partials.GuildMember],
+  // Message and Reaction partials are what let a reaction on an older message fire at all: without
+  // them Discord drops the event whenever the message has left the cache, which the sweeper below
+  // makes routine. The handler fetches whatever arrives partial before reading it.
+  partials: [Partials.GuildMember, Partials.Message, Partials.Reaction, Partials.Channel],
   // Saku's chat reads the channel tail on every mention, so messages pile up in the cache. Sweep
   // them hourly and keep only the last half hour, which is all the context ever looks at.
   sweepers: {
