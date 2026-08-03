@@ -155,7 +155,6 @@ const COMMANDS = [
     params: "`[message]` - What you want to say or ask Saku",
   },
   { name: "roll", cat: "Fun", desc: "Roll a number between 1 and 100", params: "None" },
-  { name: "8ball", cat: "Fun", desc: "Seek advice from the Magic 8 Ball", params: "`[question]` - Your question, to be answered by the Magic 8 Ball" },
   { name: "dannis", cat: "Fun", desc: "Praise the lord", params: "None" },
   {
     name: "starboard top",
