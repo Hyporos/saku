@@ -1,5 +1,6 @@
 const { Events } = require("discord.js");
 const { buildChecklistMessage, parseCompletionsFromMessage } = require("../utility/checklistUtils.js");
+const { ROLES, USERS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -59,7 +60,7 @@ module.exports = {
 
       // Display an error message if Friends try to use culvert commands
       if (
-        interaction.member.roles.cache.has("720006084252663868") &&
+        interaction.member.roles.cache.has(ROLES.FRIEND) &&
         culvertCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
@@ -70,8 +71,8 @@ module.exports = {
 
       // Display an error message if members try to use bee commands
       if (
-        !interaction.member.roles.cache.has("720001044746076181") &&
-        interaction.user.id !== "631337640754675725" && // Add myself as an exception to use the bee commands
+        !interaction.member.roles.cache.has(ROLES.BEE) &&
+        interaction.user.id !== USERS.OWNER && // Add myself as an exception to use the bee commands
         beeCommands.includes(interaction.commandName)
       ) {
         interaction.reply(
@@ -82,7 +83,7 @@ module.exports = {
 
       // Display an error message if members try to use owner commands
       if (
-        interaction.user.id !== "631337640754675725" &&
+        interaction.user.id !== USERS.OWNER &&
         ownerCommands.includes(interaction.commandName)
       ) {
         interaction.reply(

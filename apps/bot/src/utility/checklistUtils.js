@@ -1,6 +1,7 @@
+const { CHANNELS } = require("../config/ids.js");
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const CHECKLIST_CHANNEL_ID = "1090002887410729090";
+const CHECKLIST_CHANNEL_ID = CHANNELS.REMINDERS_SCAN;
 
 // One entry per weekly task. The id is used as the button's customId.
 const CHECKLIST_ITEMS = [

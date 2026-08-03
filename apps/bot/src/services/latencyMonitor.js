@@ -2,12 +2,12 @@ const { EmbedBuilder } = require("discord.js");
 const net = require("net");
 const fs = require("fs");
 const path = require("path");
+const { CHANNELS, GUILD_ID } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const LATENCY_DATA_FILE = path.join(__dirname, "../data/latencyMessage.json");
-const GUILD_ID = "719788426022617138";
-const CHANNEL_ID = "1463623492015620137";
+const CHANNEL_ID = CHANNELS.LATENCY;
 
 // The channel list lives in data/channel-ips.json so it can be refreshed when Nexon moves the servers
 // without a code change or redeploy. ips[0] is CH1. An unreadable or empty file leaves this empty,

@@ -24,11 +24,12 @@ const {
   promptWeekCount,
 } = require("../../utility/culvertChart.js");
 const dayjs = require("dayjs");
+const { ROLES, USERS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const BEE_ROLE_ID = "720001044746076181";
-const OWNER_ID = "631337640754675725";
+const BEE_ROLE_ID = ROLES.BEE;
+const OWNER_ID = USERS.OWNER;
 
 // Renders a stat with a bracketed week-over-week delta, e.g. "1,234 (🔺 56)"
 const UPTREND = "<:uptrend:1532546386497765416>";

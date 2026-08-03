@@ -4,6 +4,7 @@ const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const { isCharacterLinked } = require("../../utility/culvertUtils.js");
 const axios = require("axios");
 const dayjs = require("dayjs");
+const { CHANNELS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -120,7 +121,7 @@ module.exports = {
 
         // Send an introduction to the newly linked user
         const culvertChannel = interaction.client.channels.cache.get(
-          "1090037019557769256"
+          CHANNELS.CULVERT
         );
 
         // Let the lab rat be tested on secretly...

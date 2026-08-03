@@ -1,3 +1,4 @@
+const { ROLES, USERS } = require("../../config/ids.js");
 const {
   SlashCommandBuilder,
   ContainerBuilder,
@@ -12,8 +13,8 @@ const {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const BEE_ROLE_ID = "720001044746076181";
-const OWNER_ID = "631337640754675725";
+const BEE_ROLE_ID = ROLES.BEE;
+const OWNER_ID = USERS.OWNER;
 const ACCENT = 0xffc3c5;
 const EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
@@ -156,6 +157,24 @@ const COMMANDS = [
   { name: "roll", cat: "Fun", desc: "Roll a number between 1 and 100", params: "None" },
   { name: "8ball", cat: "Fun", desc: "Seek advice from the Magic 8 Ball", params: "`[question]` - Your question, to be answered by the Magic 8 Ball" },
   { name: "dannis", cat: "Fun", desc: "Praise the lord", params: "None" },
+  {
+    name: "starboard top",
+    cat: "Fun",
+    desc: "The interactive starboard leaderboard. A message reaches the starboard once 10 people react to it with the star emote (your own star on your own message never counts). Switch between All Time, This Year and This Month, and page through the rest. Ranked by the most stars a post ever held, so an old favourite doesn't slide down the board when people leave the server.",
+    params: "None",
+  },
+  {
+    name: "starboard user",
+    cat: "Fun",
+    desc: "Someone's starboard record: how many of their messages made it, how many stars they've earned in total, where they place against everyone else, their best post, and how many other people's posts they've handed a star to.",
+    params: "`[member]` - Whose record to view (optional; defaults to you)",
+  },
+  {
+    name: "starboard random",
+    cat: "Fun",
+    desc: "Pull a random post off the starboard, with the context around it: how many stars it got, where it ranks against everything else, when it made the board, and which channel it came from.",
+    params: "None",
+  },
   {
     name: "user level",
     cat: "User",

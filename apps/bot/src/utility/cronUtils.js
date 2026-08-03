@@ -5,17 +5,21 @@ const cron = require("cron");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+const { CHANNELS, GUILD_ID } = require("../config/ids.js");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const BIRTHDAY_CHANNEL_ID = "1090002887410729090";
+const BIRTHDAY_CHANNEL_ID = CHANNELS.REMINDERS_SCAN;
 const BIRTHDAY_TZ = "America/Los_Angeles";
 
-// Everyone born this month, wished together in one message. Fires on the 1st and only on the 1st:
-// a bot that is down at that moment skips the month rather than posting late. birthdayAnnouncedYear
-// is kept as a cheap guard so the same month can never be announced twice.
+// Everyone born this month who hasn't been wished yet, together in one message. Runs every midnight
+// Pacific rather than only on the 1st, so it doubles as the catch-up: the 1st is when the bulk of a
+// month goes out, and any later run picks up whoever the 1st couldn't. That covers a bot that was
+// down at midnight, and anyone who saves their birthday partway through their own month.
+// birthdayAnnouncedYear is what stops a month being announced twice, so a daily pass costs nothing
+// once everyone born this month has been named.
 const announceBirthdays = async (client) => {
   try {
     const now = dayjs().tz(BIRTHDAY_TZ);
@@ -57,8 +61,14 @@ const announceBirthdays = async (client) => {
 };
 
 /**
- * Starts the birthday announcer: midnight Pacific on the 1st of every month, and nothing else. There
- * is deliberately no catch-up pass at startup, so the announcement only ever lands on the 1st.
+ * Starts the birthday announcer: midnight Pacific, every day.
+ *
+ * The daily schedule IS the catch-up. The query only ever matches people whose birthday month is the
+ * month it is right now and who haven't been wished this year, so on the 1st it names everyone and on
+ * the 2nd through the 31st it names only whoever the 1st missed. Nothing fires at all once the month
+ * is fully announced. It also self-limits at the month boundary: someone who saves their birthday on
+ * the last day of their own month is not matched by the next run, because by then the month has
+ * changed, so they are wished the following year instead of a day late into the wrong month.
  *
  * The old version built one cron job per person from their own timezone, but converted only the hour
  * and kept the calendar day, so anyone whose midnight fell on a different date in the host's timezone
@@ -66,17 +76,16 @@ const announceBirthdays = async (client) => {
  * only built jobs at startup (so a birthday saved later never fired), and had the owner's ID hardcoded
  * into the message, meaning every birthday announced the same person.
  *
- * One monthly job in a named timezone has none of that: cron resolves the zone itself, so the DST
- * shift is handled, and nothing is precomputed per person.
+ * One job in a named timezone has none of that: cron resolves the zone itself, so the DST shift is
+ * handled, and nothing is precomputed per person.
  */
 const setBirthdays = (client) => {
-  new cron.CronJob("0 0 1 * *", () => announceBirthdays(client), null, true, BIRTHDAY_TZ);
+  new cron.CronJob("0 0 * * *", () => announceBirthdays(client), null, true, BIRTHDAY_TZ);
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const ANNIVERSARY_CHANNEL_ID = "719788426022617142";
-const GUILD_ID = "719788426022617138";
+const ANNIVERSARY_CHANNEL_ID = CHANNELS.SAKU;
 
 /**
  * Schedules a daily midnight UTC job that announces server join anniversaries.

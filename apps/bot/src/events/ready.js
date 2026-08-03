@@ -5,6 +5,8 @@ const { checkForCrashes } = require("../utility/botUtils");
 const { setBirthdays, setAnniversaries } = require("../utility/cronUtils");
 const { startLatencyMonitor } = require("../services/latencyMonitor");
 const { refreshRosterMeta, refreshServerExtras, setChatCommandId } = require("../utility/sakuChat");
+const { reconcileStarboard } = require("../utility/starboard");
+const { CHANNELS, GUILD_ID } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -22,7 +24,7 @@ module.exports = {
     // back the roster's person search and pronoun lookups; emotes back Saku's own emote list and the
     // repair pass that rebuilds a misspelled :name: into a real one, which silently deletes emotes if
     // the cache is empty. Channels and roles arrive with the gateway payload, so they only get counted.
-    const guild = await client.guilds.fetch("719788426022617138");
+    const guild = await client.guilds.fetch(GUILD_ID);
     const [members, emojis, commands] = await Promise.all([
       guild.members.fetch(),
       guild.emojis.fetch(),
@@ -41,7 +43,7 @@ module.exports = {
 
     // Report a recent crash to the server, if any
     if (os.hostname() !== "DESKTOP-15LSGET") {
-      const channel = client.channels.cache.get("1288222696731054120");
+      const channel = client.channels.cache.get(CHANNELS.CRASH_LOG);
       checkForCrashes(channel);
     }
 
@@ -59,5 +61,11 @@ module.exports = {
     // chat path already refreshes this on its own TTL when someone talks, so a timer here was a
     // second schedule for one cache that would drift the moment that TTL changed.
     refreshServerExtras(guild);
+
+    // Catch up the starboard on everything that happened while the process was down. Reaction events
+    // only arrive while connected, so a message that crossed the threshold during a restart was
+    // never posted and one that gained stars kept a stale number. Not awaited: it walks channel
+    // history at a deliberately slow pace and nothing else needs to wait for it.
+    reconcileStarboard(client);
   },
 };

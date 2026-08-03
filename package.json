@@ -6,6 +6,9 @@
     "webapp": "pnpm --filter saku-webapp dev",
     "deploy-commands": "pnpm --filter bot deploy-commands",
     "test-chat": "pnpm --filter bot test-chat",
-    "test-graph": "pnpm --filter bot test-graph"
+    "test-graph": "pnpm --filter bot test-graph",
+    "test-starboard": "pnpm --filter bot test-starboard",
+    "starboard-backfill": "pnpm --filter bot starboard-backfill",
+    "test-birthday": "pnpm --filter bot test-birthday"
   }
 }
