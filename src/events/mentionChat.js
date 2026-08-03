@@ -21,6 +21,31 @@ const {
 // silent with nothing pending. So the indicator gets refreshed, and once a turn is visibly slow Saku
 // says so out loud. The notice is edited into the real reply, so the usual two second turn never
 // shows it and no placeholder is ever left sitting in the channel.
+
+// ⎯⎯ Emoji-only replies ⎯⎯ //
+
+// Replying to a message pings its author by default, so a one-emoji reply to something Saku said
+// arrives here looking like a question. It isn't: people use it exactly the way they use a reaction,
+// usually because the message has scrolled far enough up to be awkward to react to. Answering it
+// starts a conversation nobody asked for, so an emoji-only reply to Saku is left alone.
+const CUSTOM_EMOTE = /<a?:\w+:\d+>/g;
+// Extended_Pictographic plus skin tones, flags, the variation selector and the joiner. Deliberately
+// NOT Emoji_Component, which counts the digits 0-9 as emoji and would swallow "12" as a reaction.
+const PICTOGRAPH = /[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}️‍]/gu;
+// Needs at least one real emoji, so whitespace alone is not mistaken for a reaction.
+const isJustEmoji = (text) => Boolean(text.trim()) && !text.replace(CUSTOM_EMOTE, "").replace(PICTOGRAPH, "").trim();
+
+// repliedUser is only populated when the reply kept its ping, so the reference is fetched when it
+// isn't. Only reached for messages that are already emoji-only, so it costs nothing on normal turns.
+async function repliedToSaku(message) {
+  const me = message.client.user.id;
+  if (message.mentions.repliedUser?.id === me) return true;
+  const ref = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+  return ref?.author?.id === me;
+}
+
+// ⎯⎯ Thinking indicator ⎯⎯ //
+
 const TYPING_REFRESH_MS = 8000;
 // Measured end to end, an inlined answer is about 3.2s and a news lookup about 4.3s, so anything
 // under ~5s is just a normal turn and the typing indicator covers it. Only a tool chain or a wiki
@@ -67,6 +92,9 @@ module.exports = {
     // Strip Saku's mention out of the text; ignore if there's nothing to say and nothing to look at
     const text = message.content.replace(mentionPattern, "").trim();
     if (!text && !message.attachments.size) return;
+
+    // Treated as a reaction, not a question. Attachments still count as something to look at.
+    if (message.reference && !message.attachments.size && isJustEmoji(text) && (await repliedToSaku(message))) return;
 
     if (onCooldown(message.author.id)) return;
 
