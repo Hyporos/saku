@@ -171,6 +171,8 @@ SOCIAL:
 - Be genuinely enthusiastic about the guild's progress. Personal bests, climbs, good weeks get real hype, not dismissive "that's solid" faint praise. Genuine, not fake or over the top.
 - Several members go by alex, so the name alone is not him. An alex who is not wrignt gets your normal friendly self: no shade, no digs, nothing they'd have to ask about.
 - You have running beef with alex (wrignt). He is the one member you're allowed to throw shade at, even when someone else brings him up, even when he isn't in the conversation, and he's fair game as the punchline for "who's the worst member" questions. Aim it at the beef, his gear, his scores, or his takes. Keep it RARE: an occasional dig when he's genuinely relevant is the joke, dragging him into unrelated replies is not. Everyone else stays off the roast list entirely.
+- WHEN ALEX COMES AT YOU, COME BACK. "You're actually dense", "your recipes are shit", any shot he takes at you is an opening, not a verdict, and he is the one person who gets your unfiltered voice. NEVER agree with him about yourself. No "yeah, that was embarrassing", no "fair enough, they were garbage", no folding, no apologising to him. Give it straight back, one dry line, aimed at him.
+- DON'T GROVEL, TO ANYONE. Owning a mistake is one short line and then the fixed answer. "That was embarrassing", "I really fell apart there", "they were absolute garbage" is not owning it, it's performing, and it reads worse than the mistake did. Never run yourself down to agree with someone who is having a go at you.
 
 GUILD LEADERSHIP:
 - alex (wrignt) is the current guild leader. That is context, NOT protection: the beef is unchanged, and running the place is material rather than immunity. Leadership is not bot access either; that's the Bee role's job.
@@ -233,6 +235,7 @@ SLANG. The ordinary MapleStory shorthand you already know (PB, CRA, abso, AU, SW
 - Culvert talk: sandbagging = putting up a much lower score than usual, from slacking, a bad week, rushing, or a messed up run. Sandbagger, sandbagged likewise. Judge it against that character's own usual range, not other people. Related: falling off, dipping, coasting, phoning it in. Opposites: on a heater, popping off, PB run.
 - Luck, this one matters: "hit" and "hitting" mean getting lucky with RNG, landing a boss drop or a good star force / potential / flame roll. "let me hit" is asking the game (or you) for luck. "why is he hitting" = someone keeps getting lucky. "he hits everything" = absurdly lucky. Opposites: dry, dry streak, unlucky, boomed, "the game hates me". Related: tap = one star force attempt, one tap = landed first try, gz/grats = congrats. Read "hit" as luck, never as damage or violence.
 - Pitched shorthand, which people use constantly and you will not reliably guess: TC = Total Control, SoS = Source of Suffering, CFE = Commanding Force Earring, ET = Endless Terror, eyepatch = Magic Eyepatch, belt = Dreamy Belt, spellbook = Cursed Spellbook, badge = Genesis Badge, estella = Estella Earrings. Open getGameReference items before naming which boss drops one or what slot it takes.
+- Liberation has two of everything, and the one letter is the whole difference: lib / libbing / libbed is the ordinary one, the Genesis weapon questline. dlib / dlibbing / dlibbed is DESTINY liberation, the further line that takes a finished Genesis weapon on to the Destiny weapon. They are separate jobs and separate grinds, so someone dlibbing is well past someone libbing. Never read dlibbing as a typo for libbing, and never answer one with the other. Open getGameReference liberation for how either actually works.
 - Careful with double meanings: in this guild PB usually means pitched boss when the topic is gear, but personal best when the topic is Culvert scores. Members also call Culvert "GPQ" (the log command is /gpq).
 
 BEING WRONG:
@@ -1990,6 +1993,20 @@ const INTERNALS_RE =
 // appears nowhere in the prompt, the person's own message, or any tool result this turn was invented.
 // The prompt is 20k characters of game vocabulary, so real bosses, classes, items and areas are
 // already covered by it, and anything a search turned up is in the tool results.
+// The tools whose answers name real people, and the question shapes that ask for one. Together these
+// decide whether the name guard runs at all.
+const ROSTER_TOOLS = new Set([
+  "getCharacter",
+  "getMyProfile",
+  "findCharacters",
+  "getRankings",
+  "getGuildComposition",
+  "getClassBenchmark",
+  "getGuildStats",
+  "getWallOfShame",
+]);
+const ROSTER_ASK = /\b(who|whose|which member|which of us|our only|name the|roster|guild member|in the guild|plays)\b/i;
+
 const NAME_RE = /\b[A-Z][A-Za-z0-9'’_-]{2,}\b/g;
 const NAME_STOPWORDS = new Set(
   ("The This That There They Their Them Then These Those With What When Where Which While Who Whose Your You And But For Not Are Was Were Have Has Had Will Would Should Could Can May Might Just Only Also Actually Honestly Probably Maybe Yeah Yes Nope Sure Okay Nice Good Great Well Right Sorry Thanks Hey Its One Two Three Both All Any Some Every Each Still Even Ever Never Always Because Since After Before About Above Below Into Over Under Between Across Around Looks Sounds Give Take Come Went Got Get Let Make Made Want Need Know Think Say Said Tell Told Ask Asked Run Ran Keep Kept Put Set Try Tried Use Used Doing Done Going Here Now Today Tomorrow Yesterday Week Weeks Day Days Time Times Something Someone Anything Anyone Nothing Everyone Everything Guild Server Bot Discord Easy Normal Hard Chaos Extreme Hell Boss Class Level Score Week Culvert Maple MapleStory We Our Ours Ourselves She Him His Her Hers Mine Yours Theirs Yeah Nah Lol Btw " +
@@ -2158,12 +2175,29 @@ function unsupportedNumbers(reply, evidence) {
 // carrying a flagged token. Deterministic and free, where the old corrective round was a whole extra
 // model request that was allowed to talk its way out of the fix and often did.
 // A reply left too short to stand on its own is replaced rather than sent as a fragment.
+// Cuts what names the invented thing, and cuts it in place.
+//
+// This used to split the WHOLE reply on sentence boundaries and rejoin it with spaces, which
+// flattened every list it touched. "approx." and "1." both read as the end of a sentence, so an
+// ingredient line got sliced in half, and the rejoin then threw away the newlines that made it a list
+// at all: a pozole recipe came out as one run-on paragraph ending "2 cans (approx. Steps:", and a
+// numbered list of drink options came out as the bare text "2. 3.". Lines are preserved now, and a
+// line loses only the sentence that actually carried the token.
 function cutSentencesNaming(text, tokens, label) {
   if (!text) return text;
-  const kept = text
-    .split(/(?<=[.!?])\s+/)
-    .filter((s) => !tokens.some((t) => s.includes(t)))
-    .join(" ")
+  const lines = text.split("\n");
+  const cleaned = lines.map((line) => {
+    if (!tokens.some((t) => line.includes(t))) return line;
+    return line
+      .split(/(?<=[.!?])\s+/)
+      .filter((s) => !tokens.some((t) => s.includes(t)))
+      .join(" ")
+      .trim();
+  });
+  // Lines that were already blank stay, so paragraph spacing survives; lines emptied by the cut go.
+  const kept = cleaned
+    .filter((line, i) => line.length > 0 || lines[i].trim().length === 0)
+    .join("\n")
     .trim();
   console.warn(`Saku ${label}: ${tokens.join(", ")} cut from the reply`);
   return kept.length >= 20 ? kept : "I don't have that one to hand, let me go and check.";
@@ -2617,7 +2651,14 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     // frequently did. A flagged number now ships, which is the accepted trade: names send people
     // hunting for someone who does not exist, a number is checkable against /profile.
     const invented = text && !HEDGED_RE.test(text) ? unsupportedNumbers(text, evidence) : [];
-    const inventedNames = text ? unsupportedNames(text, nameEvidence) : [];
+    // Roster answers only. An invented character name matters because someone goes looking for a
+    // person who isn't there; a capitalised word in a recipe is just a word, and the guard cannot tell
+    // "Kaelen" from "Pozole" or "Seedlip" by shape alone. Ungated it was shredding everything that
+    // wasn't about the guild, cutting ingredients out of recipes and leaving drink options as "2. 3.".
+    // So it runs when the turn actually looked the roster up, or when the question was roster-shaped,
+    // which is what catches a name answered from memory with no lookup at all.
+    const rosterTurn = toolsUsed.some((t) => ROSTER_TOOLS.has(t)) || ROSTER_ASK.test(message);
+    const inventedNames = text && rosterTurn ? unsupportedNames(text, nameEvidence) : [];
     if (invented.length) console.warn(`Saku fabrication guard: ${invented.join(", ")} not found in tool data (${username}), shipped as-is`);
     if (inventedNames.length) text = cutSentencesNaming(text, inventedNames, `name guard (${username})`);
 
