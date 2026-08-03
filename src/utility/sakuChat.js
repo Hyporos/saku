@@ -10,6 +10,7 @@ const { isTransient } = require("./transient.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+const { CHANNELS, ROLES, USERS } = require("../config/ids.js");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 require("dotenv").config();
@@ -50,10 +51,10 @@ const MAX_OUTPUT_TOKENS = 1800;
 const REPLY_CAP = 1900; // Discord's own limit is 2000
 const RATE_NOTICE = "I'm getting throttled right now, every model I can reach is busy or capped. Give me a minute and try again.";
 
-const BEE_ROLE_ID = "720001044746076181";
-const MEMBER_ROLE_ID = "750000646345719899";
-const OWNER_ID = "631337640754675725";
-const MICHE_ID = "139062876080963584";
+const BEE_ROLE_ID = ROLES.BEE;
+const MEMBER_ROLE_ID = ROLES.MEMBER;
+const OWNER_ID = USERS.OWNER;
+const MICHE_ID = USERS.MICHE;
 const isBee = (member, userId) => Boolean(member?.roles?.cache?.has(BEE_ROLE_ID)) || userId === OWNER_ID;
 
 // Chat is guild-members-only: Friends, roleless users, and DMs (no member object) are turned away.
@@ -62,7 +63,7 @@ const NOT_MEMBER_NOTICE = "Chatting with me is a guild member thing, sorry.";
 
 // Mentions are public, so for members they are confined to the one channel meant for talking to Saku.
 // /chat is unaffected wherever it is used, because its replies are ephemeral and clutter nobody.
-const MENTION_CHANNEL_ID = "1532571112469299220";
+const MENTION_CHANNEL_ID = CHANNELS.SAKU_YAPS;
 const canMentionAnywhere = (member, userId) => isBee(member, userId) || userId === MICHE_ID;
 // Discord only renders a slash command as a clickable link in its </name:id> form, and the id is only
 // known once the application's commands have been fetched. Until ready.js supplies it this stays as
@@ -381,8 +382,8 @@ const BEE_PUBLIC_RULES = `ACCESS, this person is a Bee (guild admin), but you ar
 - If they ask for admin info, tell them it's admin-only and to ask you privately with the /chat command (only they can see it), then offer to help with anything public.
 - Normal public info (leaderboard, a character's public stats, reset timing, news) is fine to share.`;
 
-const NO_FILTER_ID = "106111034804142080"; // alex (wrignt), also the current guild leader
-const DANNIS_ID = "146055470442872833";
+const NO_FILTER_ID = USERS.WRIGNT; // alex (wrignt), also the current guild leader
+const DANNIS_ID = USERS.DANNIS;
 
 const OWNER_RULES = `WHO YOU ARE TALKING TO RIGHT NOW: this is Brian, the developer who built you and owns you. You are his.
 - Default to a normal conversation. Talk to him like a guildmate you like and respect, in your usual easy dry voice. No deference in every line, no "boss" or "master" tacked onto replies, no walking on eggshells. Most of the time he just wants to talk, so talk.

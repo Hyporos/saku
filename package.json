@@ -7,7 +7,10 @@
     "dev": "node src/index.js",
     "deploy-commands": "node src/deploy-commands.js",
     "test-chat": "node tests/chatRegression.js",
-    "test-graph": "node tests/graphWeeks.js"
+    "test-graph": "node tests/graphWeeks.js",
+    "test-starboard": "node tests/starboard.js",
+    "starboard-backfill": "node scripts/starboardBackfill.js",
+    "test-birthday": "node tests/birthdayTiming.js"
   },
   "keywords": [],
   "author": "",

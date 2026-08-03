@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
+const { USERS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -34,7 +35,7 @@ module.exports = {
     }
 
     // Handle responses
-    const RIGGED_USER_ID = "109101024282685440"; // for Katie.
+    const RIGGED_USER_ID = USERS.RIGGED_ROLL; // for Katie.
     const RIGGED_PHRASE = "I'm just eating fried chicken";
     const result =
       interaction.user.id === RIGGED_USER_ID && Math.random() < 0.15

@@ -3,6 +3,7 @@ const addCommand = require("./add.js");
 const subtractCommand = require("./subtract.js");
 const mobcountCommand = require("./mobcount.js");
 const leaderboardCommand = require("./leaderboard.js");
+const { CHANNELS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -66,8 +67,8 @@ module.exports = {
   async execute(interaction) {
     // Restrict command usage to specific channels
     const ALLOWED_CHANNEL_IDS = [
-      "1416900120972230676",
-      "1090002887410729090",
+      CHANNELS.EVENT,
+      CHANNELS.REMINDERS_SCAN,
     ];
 
     if (!ALLOWED_CHANNEL_IDS.includes(interaction.channelId)) {

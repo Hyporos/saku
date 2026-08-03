@@ -1,4 +1,5 @@
 const eventSchema = require("../../schemas/eventSchema.js");
+const { ROLES } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -11,7 +12,7 @@ module.exports = {
 
       // Only allow users with the Bee role or admins to add for other users
       if (!isSelf) {
-        if (!interaction.member.roles.cache.has("720001044746076181")) {
+        if (!interaction.member.roles.cache.has(ROLES.BEE)) {
           return await interaction.reply({ content: "Error - You do not have permission to add mob count for other users.", ephemeral: true });
         }
       }

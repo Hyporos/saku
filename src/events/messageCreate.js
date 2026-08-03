@@ -1,16 +1,17 @@
 const { Events } = require("discord.js");
 const userSchema = require("../schemas/userSchema.js");
 const { getRequiredExp } = require("../config/levels.js");
+const { CHANNELS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const EXCLUDED_CHANNELS = [
     '761406523950891059', // bot-spam
-    '1090037019557769256', // culvert
+    CHANNELS.CULVERT, // culvert
     '807320077951172659', // bees-pls
     '1178171097858973746', // dannis-fan-club
     '913840369001709608', // karuta
-    '1090002887410729090', // reminders-scan
+    CHANNELS.REMINDERS_SCAN, // reminders-scan
     '1147319860481765500', // dev
     '733468367653961760', // inactive
     '720002479005237258', // introductions

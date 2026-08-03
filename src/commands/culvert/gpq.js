@@ -3,6 +3,7 @@
 
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const { EMOJI_IDS } = require("../../config/ids.js");
 const {
   findCharacter,
   isScoreSubmitted,
@@ -190,11 +191,11 @@ module.exports = {
 
     // React to the message
     const reply = await interaction.fetchReply();
-    await reply.react("1236258713153568879"); // sakuThumbShadow for all scores
+    await reply.react(EMOJI_IDS.THUMB_SHADOW); // sakuThumbShadow for all scores
     
     // Add sakuStonks reaction for personal bests
     if (isNewPB) {
-      await reply.react("1134552911033139381"); // sakuStonks for PBs
+      await reply.react(EMOJI_IDS.STONKS); // sakuStonks for PBs
     }
   },
 };

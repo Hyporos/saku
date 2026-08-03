@@ -7,6 +7,7 @@ const { sendWeeklyChecklist } = require("./checklistUtils");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+const { CHANNELS } = require("../config/ids.js");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -44,9 +45,9 @@ const saveDstState = (offset) => {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Job definitions
 
-const remindersScanChannel = "1090002887410729090";
-const sakuChannel = "719788426022617142";
-const announcementsChannel = "720002714683179070";
+const remindersScanChannel = CHANNELS.REMINDERS_SCAN;
+const sakuChannel = CHANNELS.SAKU;
+const announcementsChannel = CHANNELS.ANNOUNCEMENTS;
 
 // Structured job registry. baseHour is the intended EST hour during Standard Time;
 // days is an array of day-of-week integers (0 = Sun … 6 = Sat), empty = every day.
