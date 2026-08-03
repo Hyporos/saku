@@ -13,7 +13,7 @@
           A Discord Bot tailored for Saku's community.
         </h3>
                  <h4 style="display: inline-block;">
-                    As a member, make use of commands such as /profile and /graph which provide you with detailed character and culvert score statistics. You can also view the overall scores with /rankings, or use fun commands such as /8ball to get some insight!
+                    As a member, make use of commands such as /profile and /graph which provide you with detailed character and culvert score statistics. You can also view the overall scores with /rankings, or use fun commands such as /roll to get some insight!
         </h4>
                             <h4 style="display: inline-block;">
                     As an administrator, work comfortably behind the scenes. Manage users and characters (CRUD), scan and input weekly scores, view top secret data, and more. 

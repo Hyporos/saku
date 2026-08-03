@@ -36,7 +36,7 @@ src/
 ├── commands/
 │   ├── culvert/           # Score tracking, profiles, rankings, scan, export, etc.
 │   ├── event/             # Guild event add/subtract/leaderboard/mobcount
-│   ├── fun/               # 8ball, roll, dannis
+│   ├── fun/               # chat, roll, dannis, starboard
 │   ├── user/              # Level card, rankings, user profile
 │   └── utility/           # Birthday, help, ping, reload, say
 ├── config/
