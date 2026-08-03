@@ -10,7 +10,8 @@
     "test-graph": "node tests/graphWeeks.js",
     "test-starboard": "node tests/starboard.js",
     "starboard-backfill": "node scripts/starboardBackfill.js",
-    "test-birthday": "node tests/birthdayTiming.js"
+    "test-birthday": "node tests/birthdayTiming.js",
+    "test-canvas": "node tests/canvas.js"
   },
   "keywords": [],
   "author": "",

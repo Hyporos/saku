@@ -1,101 +1,91 @@
 const { AttachmentBuilder } = require("discord.js");
-const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
-const { request } = require("undici");
+const { createHiDpiCanvas, loadAsset, avatarFor, displayNameOf, fitText, drawCircularImage } = require("./canvasUtils.js");
 
-// Register the Quicksand font
-GlobalFonts.registerFromPath(require.resolve("../assets/fonts/Quicksand-Regular.ttf"), "Quicksand");
+const BACKGROUNDS = {
+  first: require.resolve("../assets/canvas/user-rankings-first.png"),
+  other: require.resolve("../assets/canvas/user-rankings-other.png"),
+};
 
-// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const WIDTH = 500;
+const HEIGHT = 550;
+const AVATAR = { x: 85, size: 35 };
+const ROW_HEIGHT = 52.4;
+const ROW_TOP = 22;
+const NAME_X = AVATAR.x + AVATAR.size + 10;
+const LEVEL_X = WIDTH - 200;
+const NAME_MAX_WIDTH = LEVEL_X - NAME_X - 18;
+
+// One bulk fetch for the whole page instead of an awaited members.fetch per row, which hit the REST
+// API up to ten times to render ten lines. Failure is not fatal: whatever is already cached is used
+// and anyone missing falls back to their stored name.
+async function membersFor(guild, ids) {
+  if (!guild || !ids.length) return new Map();
+  try {
+    return await guild.members.fetch({ user: ids });
+  } catch {
+    return guild.members.cache;
+  }
+}
 
 async function generateUserRankingsCanvas(interaction, users) {
-  // Create the User Rankings canvas
-  const canvas = createCanvas(500, 550);
-  const context = canvas.getContext("2d");
+  const { canvas, context } = createHiDpiCanvas(WIDTH, HEIGHT);
 
   // Get the first user's rank to determine the page
   const isFirstPage = users.length > 0 ? users[0].rankPosition <= 10 : true;
+  const background = await loadAsset(isFirstPage ? BACKGROUNDS.first : BACKGROUNDS.other);
+  context.drawImage(background, 0, 0, WIDTH, HEIGHT);
 
-  // Load the appropriate background image
-  const backgroundPath = isFirstPage
-    ? "../assets/canvas/user-rankings-first.png"
-    : "../assets/canvas/user-rankings-other.png";
+  const members = await membersFor(
+    interaction.guild,
+    users.map((u) => u._id).filter(Boolean)
+  );
 
-  // Create and stretch the background image to fit the canvas
-  const background = await loadImage(require.resolve(backgroundPath));
-  context.drawImage(background, 0, 0, canvas.width, canvas.height);
-
-  // Draw a row for each of the top 10 users
-  for (let i = 0; i < users.length; i++) {
-    const user = users[i];
-    const rank = user.rankPosition || i + 1;
-
-    // Position values
-    const x = 85;
-    const y = 22 + i * 52.4;
-    const size = 35;
-
-    let member;
-    let avatar;
-
-    try {
-      // Fetch the member from the guild
-      member = await interaction.guild.members.fetch(user._id);
-      const avatarURL =
-        member.avatarURL({ extension: "png" }) ||
-        member.user.displayAvatarURL({ extension: "png" });
-      const { body } = await request(avatarURL);
-      avatar = await loadImage(await body.arrayBuffer());
-    } catch (error) {
-      // Use a default avatar and object for users who have left
-      const defaultAvatarURL = "https://cdn.discordapp.com/embed/avatars/0.png";
-      const { body } = await request(defaultAvatarURL);
-      avatar = await loadImage(await body.arrayBuffer());
-      member = {
-        nickname: user.username || "Unknown User",
-        user: { username: user.username || "Unknown User" },
+  // Every avatar for the page is fetched at once. These used to run one after another inside the draw
+  // loop, so a page took as long as ten round trips laid end to end.
+  const rows = await Promise.all(
+    users.map(async (user, i) => {
+      const member = members.get?.(user._id) ?? null;
+      return {
+        rank: user.rankPosition || i + 1,
+        name: member ? displayNameOf(member) : (user.username ?? "Unknown Member"),
+        level: user.level,
+        exp: user.exp,
+        avatar: await avatarFor(member, 128),
       };
-    }
+    })
+  );
+
+  // Draw a row for each user on the page
+  rows.forEach((row, i) => {
+    const y = ROW_TOP + i * ROW_HEIGHT;
+    const baseline = y + AVATAR.size / 2 + 7;
 
     // Draw the ranking number
     context.font = "18px Quicksand";
     context.fillStyle = "rgba(255, 255, 255, 0.85)";
+    context.fillText(`#${row.rank}`, 40, baseline);
 
-    context.fillText(`#${rank}`, 40, y + size / 2 + 7);
-
-    context.save();
-    context.beginPath();
-    context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2, true);
-    context.closePath();
-    context.clip();
-    context.drawImage(avatar, x, y, size, size);
-    context.restore();
+    drawCircularImage(context, row.avatar, AVATAR.x, y, AVATAR.size);
 
     context.fillStyle = "#ffffff";
-
-    const displayName = (member.nickname || member.user.username)
-      .replace(/\s*\(.*?\)\s*/g, "")
-      .replace(/\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu, "")
-      .trim();
-    context.fillText(displayName, x + size + 10, y + size / 2 + 7);
+    context.fillText(fitText(context, row.name, NAME_MAX_WIDTH), NAME_X, baseline);
 
     // Draw the user's level and exp on the same line
     context.font = "16px Quicksand";
     context.fillStyle = "#ffffff";
-    context.fillText(`Level:`, canvas.width - 200, y + size / 2 + 7);
+    context.fillText(`Level:`, LEVEL_X, baseline);
     context.fillStyle = "#ffc3c5";
-    context.fillText(`${user.level}`, canvas.width - 153, y + size / 2 + 7);
+    context.fillText(`${row.level}`, WIDTH - 153, baseline);
     context.fillStyle = "#ffffff";
-    context.fillText(`EXP:`, canvas.width - 115, y + size / 2 + 7);
+    context.fillText(`EXP:`, WIDTH - 115, baseline);
     context.fillStyle = "#ffc3c5";
-    context.fillText(`${user.exp}`, canvas.width - 78, y + size / 2 + 7);
-  }
-
-  // Create a discord attachment with the canvas
-  const attachment = new AttachmentBuilder(await canvas.encode("png"), {
-    name: "user-rankings.png",
+    context.fillText(`${row.exp}`, WIDTH - 78, baseline);
   });
 
-  return attachment;
+  // Create a discord attachment with the canvas
+  return new AttachmentBuilder(await canvas.encode("png"), { name: "user-rankings.png" });
 }
 
 module.exports = { generateUserRankingsCanvas };

@@ -19,6 +19,11 @@ const userSchema = new Schema(
       // month can't post them twice.
       type: Number,
     },
+    username: {
+      // Their display name as of the last time they earned EXP. The leaderboard has no other way to
+      // name someone who has since left the server, and used to print "Unknown Member" for them.
+      type: String,
+    },
     level: {
       type: Number,
       required: true,

@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
-const { askSaku, isBee, canChat, onCooldown, NOT_MEMBER_NOTICE } = require("../../utility/sakuChat.js");
+const { askSaku, isBee, canChat, collectImages, onCooldown, NOT_MEMBER_NOTICE } = require("../../utility/sakuChat.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -9,6 +9,11 @@ module.exports = {
     .setDescription("Chat with Saku AI — ask about your scores, rankings, or MapleStory (Saku remembers your chat)")
     .addStringOption((option) =>
       option.setName("message").setDescription("What do you want to say to Saku?").setRequired(true)
+    )
+    // Pinging Saku with a screenshot has always worked; /chat was the only way in that couldn't see one,
+    // so asking about gear or a score screen privately meant describing it in words.
+    .addAttachmentOption((option) =>
+      option.setName("image").setDescription("A screenshot for Saku to look at (gear, a boss drop, a score screen)")
     ),
 
   async execute(interaction) {
@@ -17,18 +22,34 @@ module.exports = {
     }
 
     if (onCooldown(interaction.user.id)) {
-      return interaction.reply({ content: "Slow down — give Saku a few seconds to think! 🐝", flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        content: "Slow down — give Saku a few seconds to think! 🐝",
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     const message = interaction.options.getString("message");
+    const attachment = interaction.options.getAttachment("image");
+
+    // Rejected up front rather than dropped quietly: collectImages filters out anything it can't read,
+    // and without this a PDF or a video came back as an answer that ignored the attachment entirely.
+    if (attachment && !String(attachment.contentType).startsWith("image/")) {
+      return interaction.reply({
+        content: "Error - That attachment isn't an image Saku can look at",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const username = interaction.member?.displayName || interaction.user.username;
+      const images = attachment ? await collectImages([attachment]) : [];
       const reply = await askSaku({
         userId: interaction.user.id,
         username,
         message,
+        images,
         isBee: isBee(interaction.member, interaction.user.id),
         isPrivate: true, // /chat is ephemeral
         channel: interaction.channel,
@@ -44,7 +65,9 @@ module.exports = {
       await interaction.editReply({ content: out, allowedMentions: { parse: [] }, flags: MessageFlags.SuppressEmbeds });
     } catch (err) {
       console.error("Error - /chat failed:", err);
-      await interaction.editReply("Error - Saku's brain short-circuited. Try again in a moment.");
+      // Guarded: if the failure was the interaction itself timing out, the edit throws too, and that
+      // second throw is what actually reached the console as an unhandled rejection.
+      await interaction.editReply("Error - Saku's brain short-circuited. Try again in a moment.").catch(() => {});
     }
   },
 };
