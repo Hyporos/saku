@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const levelCommand = require("./level.js");
-const rankingsCommand = require("./rankings.js");
+const leaderboardCommand = require("./leaderboard.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -21,7 +21,7 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
-        .setName("rankings")
+        .setName("leaderboard")
         .setDescription("View the server leaderboard")
     ),
 
@@ -37,8 +37,8 @@ module.exports = {
         case "level":
           await levelCommand.execute(interaction);
           break;
-        case "rankings":
-          await rankingsCommand.execute(interaction);
+        case "leaderboard":
+          await leaderboardCommand.execute(interaction);
           break;
       }
     } catch (error) {

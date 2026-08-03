@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const addCommand = require("./add.js");
 const subtractCommand = require("./subtract.js");
 const mobcountCommand = require("./mobcount.js");
@@ -74,7 +74,7 @@ module.exports = {
     if (!ALLOWED_CHANNEL_IDS.includes(interaction.channelId)) {
       return interaction.reply({
         content: "Error - You can only use this command in the designated event channels",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 

@@ -152,9 +152,15 @@ const COMMANDS = [
     name: "chat",
     cat: "Fun",
     desc: "Chat with Saku AI. Talk MapleStory (bosses, gear, progression, patches) or ask about your culvert scores, the leaderboard, and when culvert resets — Saku pulls live guild data and can search the web to answer, and remembers your conversation. `/chat` works in any channel because the reply is only visible to you. @mentioning Saku is public, so that one is limited to the Saku chat channel; bees can mention anywhere. Guild members only.",
-    params: "`[message]` - What you want to say or ask Saku",
+    params:
+      "`[message]` - What you want to say or ask Saku\n`[image]` - A screenshot for Saku to look at, such as gear, a boss drop or a score screen (optional)",
   },
-  { name: "roll", cat: "Fun", desc: "Roll a number between 1 and 100", params: "None" },
+  {
+    name: "roll",
+    cat: "Fun",
+    desc: "Roll a number between 1 and 100, or between 1 and a number you pick",
+    params: "`[max]` - Roll 1 to this number instead of 100 (optional; defaults to 100)",
+  },
   { name: "dannis", cat: "Fun", desc: "Praise the lord", params: "None" },
   {
     name: "starboard top",
@@ -181,7 +187,7 @@ const COMMANDS = [
     params: "`[user]` - The user you would like to view (optional; defaults to yourself)",
   },
   {
-    name: "user rankings",
+    name: "user leaderboard",
     cat: "User",
     desc: "View the server level leaderboard, ranked by level and EXP.",
     params: "None",

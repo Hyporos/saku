@@ -1,90 +1,72 @@
 const { AttachmentBuilder } = require("discord.js");
-const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
-const { request } = require("undici");
+const {
+  createHiDpiCanvas,
+  loadAsset,
+  avatarFor,
+  displayNameOf,
+  fitText,
+  drawCircularImage,
+  fillRoundedRect,
+} = require("./canvasUtils.js");
 
-// Register the Quicksand font
-GlobalFonts.registerFromPath(require.resolve("../assets/fonts/Quicksand-Regular.ttf"), "Quicksand");
+const BACKGROUND = require.resolve("../assets/canvas/user-level.png");
 
-// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const WIDTH = 600;
+const HEIGHT = 150;
+const AVATAR_SIZE = 120;
+const TEXT_X = 160;
+const BAR = { x: 160, y: 103, width: 405, height: 20, radius: 10 };
 
 async function generateUserLevelCanvas(targetMember, user, requiredExp, rank) {
-  // Create the User Level canvas
-  const canvas = createCanvas(600, 150);
-  const context = canvas.getContext("2d");
+  const { canvas, context } = createHiDpiCanvas(WIDTH, HEIGHT);
 
   // Create and stretch the background image to fit the canvas
-  const background = await loadImage(require.resolve("../assets/canvas/user-level.png"));
-  context.drawImage(background, 0, 0, canvas.width, canvas.height);
+  const [background, avatar] = await Promise.all([loadAsset(BACKGROUND), avatarFor(targetMember, 256)]);
+  context.drawImage(background, 0, 0, WIDTH, HEIGHT);
 
-  // Get the user's avatar image
-  const avatarURL = targetMember.avatarURL({ extension: "png" }) || targetMember.user.displayAvatarURL({ extension: "png" }); // Use the server specific avatar if available
-  const { body } = await request(avatarURL);
-  const avatar = await loadImage(await body.arrayBuffer());
-
-  // Draw the user's avatar image, clipped to a circle
-  context.save();
-
-  context.beginPath();
-  context.arc(20 + 120 / 2, (150 - 120) / 2 + 120 / 2, 120 / 2, 0, Math.PI * 2, true);
-  context.closePath();
-  context.clip();
-  context.drawImage(avatar, 20, (150 - 120) / 2, 120, 120);
-
-  context.restore();  
+  drawCircularImage(context, avatar, 20, (HEIGHT - AVATAR_SIZE) / 2, AVATAR_SIZE);
 
   // Draw the user's username
   context.font = "24px Quicksand";
   context.fillStyle = "#ffffff";
 
-  const displayName = (targetMember.nickname || targetMember.username).replace(/\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu, "").trim();
-  context.fillText(displayName, 160, 44); // Use the user's server specific nickname if available
+  const displayName = fitText(context, displayNameOf(targetMember), BAR.width);
+  context.fillText(displayName, TEXT_X, 44);
 
   // Draw a thin line below the username
   const usernameWidth = context.measureText(displayName).width;
 
   context.beginPath();
-  context.moveTo(160, 54);
-  context.lineTo(160 + usernameWidth, 54);
+  context.moveTo(TEXT_X, 54);
+  context.lineTo(TEXT_X + usernameWidth, 54);
   context.lineWidth = 2;
   context.strokeStyle = "rgba(255, 195, 197, 0.8)";
   context.stroke();
+
+  // Past the last level in the table getRequiredExp returns Infinity, which used to print literally
+  // as "EXP: 4200/Infinity" and left the bar empty. A maxed out card reads MAX and fills.
+  const maxed = !Number.isFinite(requiredExp) || requiredExp <= 0;
+  const progress = maxed ? 1 : Math.min(1, Math.max(0, user.exp / requiredExp));
 
   // Draw the user's level, exp, and rank
   context.font = "18px Quicksand";
   context.fillStyle = "rgba(255, 255, 255, 0.85)";
 
-  context.fillText(`Level: ${user.level}     EXP: ${user.exp}/${requiredExp}     Rank: ${rank}`, 160, 79);
+  const expText = maxed ? "MAX" : `${user.exp}/${requiredExp}`;
+  context.fillText(fitText(context, `Level: ${user.level}     EXP: ${expText}     Rank: ${rank}`, BAR.width), TEXT_X, 79);
 
   // Draw the progress bar background
   context.fillStyle = "#36383f";
-  context.beginPath();
-  context.moveTo(160, 103); // 2 pixels higher
-  context.arcTo(565, 103, 565, 123, 10); // Adjusted width and 2 pixels higher
-  context.arcTo(565, 123, 160, 123, 10); // 2 pixels higher
-  context.arcTo(160, 123, 160, 103, 10); // 2 pixels higher
-  context.arcTo(160, 103, 565, 103, 10); // 2 pixels higher
-  context.closePath();
-  context.fill();
+  fillRoundedRect(context, BAR.x, BAR.y, BAR.width, BAR.height, BAR.radius);
 
   // Draw the filled part of the progress bar
-  const progressBarWidth = (user.exp / requiredExp) * 395; // Adjusted width
-
   context.fillStyle = "#ffc3c5";
-  context.beginPath();
-  context.moveTo(160, 103); // 2 pixels higher
-  context.arcTo(160 + progressBarWidth, 103, 160 + progressBarWidth, 123, 10); // 2 pixels higher
-  context.arcTo(160 + progressBarWidth, 123, 160, 123, 10); // 2 pixels higher
-  context.arcTo(160, 123, 160, 103, 10); // 2 pixels higher
-  context.arcTo(160, 103, 160 + progressBarWidth, 103, 10); // 2 pixels higher
-  context.closePath();
-  context.fill();
+  fillRoundedRect(context, BAR.x, BAR.y, BAR.width * progress, BAR.height, BAR.radius);
 
   // Create a discord attachment with the canvas
-  const attachment = new AttachmentBuilder(await canvas.encode("png"), {
-    name: "user-level.png",
-  });
-
-  return attachment;
+  return new AttachmentBuilder(await canvas.encode("png"), { name: "user-level.png" });
 }
 
 module.exports = { generateUserLevelCanvas };

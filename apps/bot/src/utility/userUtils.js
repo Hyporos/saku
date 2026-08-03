@@ -17,29 +17,28 @@ async function getDiscordUser(userId) {
   }
 }
 
-
 /**
- * Get sorted user rankings from the database
- * @param {Object} options - Query options
- * @param {number} [options.limit=10] - Number of users to return
- * @param {number} [options.skip=0] - Number of users to skip
- * @returns {Promise<Array>} Array of users sorted by level and exp
+ * Get a single user's position on the level leaderboard.
+ *
+ * Counted in the database rather than by pulling every user document down and searching the array,
+ * which is what the level card used to do to work out one number.
+ *
+ * @param {{ level: number, exp: number }} user - The user to rank
+ * @returns {Promise<number|null>} - Their 1-based position, ranked by level then EXP, or null
  */
-async function getDiscordUserRankings({ skip = 0 } = {}) {
-    try {
-        const rankings = await userSchema
-            .find({})
-            .sort({ level: -1, exp: -1 })
-            .skip(skip);
-
-        return rankings;
-    } catch (error) {
-        console.error("Error - ", error);
-        return [];
-    }
+async function getDiscordUserRank({ level, exp }) {
+  try {
+    const ahead = await userSchema.countDocuments({
+      $or: [{ level: { $gt: level } }, { level, exp: { $gt: exp } }],
+    });
+    return ahead + 1;
+  } catch (error) {
+    console.error("Error - Could not rank the user:", error?.message ?? error);
+    return null;
+  }
 }
 
 module.exports = {
   getDiscordUser,
-  getDiscordUserRankings,
+  getDiscordUserRank,
 };
