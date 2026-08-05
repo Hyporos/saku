@@ -195,23 +195,6 @@ async function latestSnapshot(name) {
   return entries.find((entry) => entry.snapshot?.character?.scores?.length) ?? entries[0] ?? null;
 }
 
-// Every score a name ever recorded in a finalized week. For someone who left and came back, or who was
-// unlinked longer ago than a restore can reach, this is the only surviving record of their history:
-// the character's own scores went with the character.
-async function historyFromWeeks(name) {
-  const weeks = await weekSchema
-    .find({ finalized: true, "scores.name": nameMatch(name) }, { week: 1, scores: 1 })
-    .lean();
-
-  return weeks
-    .map((record) => ({
-      date: record.week,
-      score: record.scores.find((entry) => entry.name?.toLowerCase() === name.toLowerCase())?.score,
-    }))
-    .filter((entry) => typeof entry.score === "number")
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
 async function correctInWeek(week, name, score) {
   const record = await weekSchema.findOne({ week }, { scores: 1, submitted: 1 }).lean();
   if (!record) return false;
@@ -280,68 +263,30 @@ async function link(interaction) {
     return interaction.editReply(`Error - The character **${resolvedName}** is already linked to a user`);
   }
 
-  // Somebody who left and came back still has a history worth offering back rather than silently
-  // throwing away. Two places hold it, and the unlink snapshot is the better one where it exists: it
-  // keeps weeks that were never finalized, along with their join date and graph colour. Finalized week
-  // snapshots are the fallback, and the only source once an unlink has aged past its 90 days.
-  const archived = await latestSnapshot(resolvedName);
-  const archivedScores = archived?.snapshot?.character?.scores ?? [];
-  const history = archivedScores.length ? archivedScores : await historyFromWeeks(resolvedName);
-  const source = archivedScores.length ? "archive" : "weeks";
-
-  let character = { name: resolvedName, memberSince: joinDate, graphColor: "255,189,213", scores: [] };
-
-  if (history.length) {
-    const dates = history.map((entry) => entry.date).sort((a, b) => a.localeCompare(b));
-    const span = dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} and ${dates[dates.length - 1]}`;
-    const pick = await choose(
-      interaction,
-      `**${resolvedName}** has history in the guild: ${plural(history.length, "scored week")} ` +
-        `${dates.length === 1 ? "on" : "between"} ${span}.\n` +
-        `-# From ${
-          source === "archive"
-            ? `an unlink on ${dayjs(archived.timestamp).format("MMM DD, YYYY")}`
-            : "past finalized weeks"
-        } · bring it back, or start them from scratch?`,
-      [
-        { id: "link_history", label: `Restore ${plural(history.length, "week")}`, style: ButtonStyle.Success },
-        { id: "link_fresh", label: "Start fresh", style: ButtonStyle.Primary },
-      ]
-    );
-    if (!pick) return;
-
-    // The archive carries the whole character, so its own join date and colour come back with it.
-    if (pick === "link_history") {
-      character = archivedScores.length
-        ? { ...archived.snapshot.character, name: resolvedName, memberSince: joinDate }
-        : { ...character, scores: history };
-    }
-  }
-
-  const scores = character.scores ?? [];
-
+  // A link always starts the character from scratch. Putting an old history back is `/character
+  // restore`'s job, so it stays there rather than being offered as a side effect of linking.
   await culvertSchema.findOneAndUpdate(
     { _id: userOption.id },
-    { _id: userOption.id, $addToSet: { characters: character } },
+    {
+      _id: userOption.id,
+      $addToSet: {
+        characters: { name: resolvedName, memberSince: joinDate, graphColor: "255,189,213", scores: [] },
+      },
+    },
     { upsert: true }
   );
 
   await logAction({
     action: "Link Character",
     target: userOption.username,
-    details:
-      `Linked character ${resolvedName} to user ${userOption.username} | User: ${userOption.username} | Character: ${resolvedName}` +
-      (scores.length ? ` | Restored ${scores.length} week(s) of history` : ""),
+    details: `Linked character ${resolvedName} to user ${userOption.username} | User: ${userOption.username} | Character: ${resolvedName}`,
     category: "create",
     actorId: String(interaction.user.id),
   });
 
-  await interaction.editReply({
-    content:
-      `Linked **${resolvedName}** to ${userOption}${override ? " (override)" : ""}\nMember since: ${joinDate}` +
-      (scores.length ? `\nRestored ${scores.length} week${scores.length === 1 ? "" : "s"} of past scores` : ""),
-    components: [],
-  });
+  await interaction.editReply(
+    `Linked **${resolvedName}** to ${userOption}${override ? " (override)" : ""}\nMember since: ${joinDate}`
+  );
 
   // Let the lab rat be tested on secretly...
   if (resolvedName.toLowerCase() === "druu") return;
