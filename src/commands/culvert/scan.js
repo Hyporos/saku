@@ -15,7 +15,7 @@ require("dotenv").config();
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("scan")
-    .setDescription("Submit bulk culvert data from a screenshot")
+    .setDescription("[BEE] Submit bulk culvert data from a screenshot")
     .addAttachmentOption((option) =>
       option.setName("attach").setDescription("Image").setRequired(true)
     )

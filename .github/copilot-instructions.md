@@ -71,6 +71,7 @@ module.exports = {
 - Use `interaction.deferReply()` at the top of `execute` for any command that hits the database or does async work that may take > 3 s.
 - Use `interaction.editReply()` after deferring; use `interaction.reply()` for instant responses.
 - For error replies to the user, prefix the message with `Error - ` (matches the existing style).
+- **Always read and update `commands/utility/help.js` when a command changes.** `/help` is driven by the `COMMANDS` array there and nothing detects drift — a stale entry just shows members the wrong thing. Update the entry in the same change, whether you added a command, renamed one, changed its options, or only changed what it does (`desc` is the one most often forgotten). Bee and owner commands also carry a `[BEE]` / `[OWNER]` prefix at the start of `setDescription()`, on each subcommand as well as the parent.
 
 ## Event Structure
 

@@ -7,7 +7,7 @@ const dayjs = require("dayjs");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("finalize")
-    .setDescription("Finalize the scores for the given week")
+    .setDescription("[BEE] Finalize the scores for the given week")
     .addStringOption((option) =>
       option
         .setName("week")

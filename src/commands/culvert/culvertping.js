@@ -10,7 +10,7 @@ require("dotenv").config();
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("culvertping")
-    .setDescription("Create a pingable list of people who need to run culvert")
+    .setDescription("[BEE] Create a pingable list of people who need to run culvert")
     .addAttachmentOption((option) =>
       option.setName("attach").setDescription("Image").setRequired(true)
     ),
