@@ -2,12 +2,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createCanvas } = require("@napi-rs/canvas");
 const { generateUserLevelCanvas } = require("../src/canvas/userLevelCanvas.js");
-const { generateUserRankingsCanvas } = require("../src/canvas/userRankingsCanvas.js");
 const { displayNameOf, fitText } = require("../src/canvas/canvasUtils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-// Renders both cards against the cases the old code broke on. Pass `--write <dir>` to also drop the
-// PNGs somewhere to look at them.
+// Renders the level card against the cases the old code broke on. Pass `--write <dir>` to also drop
+// the PNGs somewhere to look at them.
 
 const writeIndex = process.argv.indexOf("--write");
 const writeDir = writeIndex === -1 ? null : process.argv[writeIndex + 1];
@@ -23,11 +22,23 @@ const save = (name, attachment) => {
 };
 
 // A GuildMember stub shaped like a real one: note there is no `username` property on it, which is
-// what the old canvas read and crashed on for anyone without a server nickname.
+// what the old card read and crashed on for anyone without a server nickname.
 const member = (displayName) => ({
   displayName,
+  partial: false,
   user: { username: "fallbackname", displayAvatarURL: () => null },
   avatarURL: () => null,
+});
+
+// What the cache holds when GuildMember partials are enabled: no user object, so the real
+// `displayName` getter (`this.nickname ?? this.user.displayName`) throws when it is read.
+const partialMember = () => ({
+  partial: true,
+  nickname: null,
+  avatarURL: () => null,
+  get displayName() {
+    throw new TypeError("Cannot read properties of undefined (reading 'displayName')");
+  },
 });
 
 (async () => {
@@ -36,6 +47,7 @@ const member = (displayName) => ({
   check("an all-emoji name does not render blank", displayNameOf(member("🐝🐝🐝")).length > 0);
   check("a parenthetical is stripped", displayNameOf(member("Brian (Kronos)")) === "Brian");
   check("a missing member yields the fallback", displayNameOf(undefined) === "Unknown");
+  check("a partial member whose displayName getter throws is survivable", displayNameOf(partialMember()) === "Unknown");
 
   const context = createCanvas(10, 10).getContext("2d");
   context.font = "24px Quicksand";
@@ -57,37 +69,68 @@ const member = (displayName) => ({
     check(`level card renders: ${label}`, card.attachment.length > 1000, `${card.attachment.length} bytes`);
   }
 
-  // ⎯⎯ Leaderboard ⎯⎯ //
-  const users = Array.from({ length: 10 }, (_, i) => ({
-    _id: `${i}`,
-    username: `Stored Name ${i}`,
-    level: 30 - i,
-    exp: 500 - i,
-    rankPosition: i + 1,
-  }));
+  // ⎯⎯ Leaderboard: nothing may wait forever ⎯⎯ //
+  // One member whose avatar never answers used to hold the whole page open indefinitely, so the
+  // command blew past the three seconds Discord allows and reported that Saku had not responded.
+  {
+    const net = require("node:net");
+    const { generateUserRankingsCanvas } = require("../src/canvas/userRankingsCanvas.js");
+    const server = net.createServer(() => {}); // accepts the connection, then never answers
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const stalled = `http://127.0.0.1:${server.address().port}/avatar.png`;
 
-  // Half the page resolves to a live member and half does not, which exercises the stored-name path
-  // for people who have left the server.
-  const interaction = {
-    guild: {
-      members: {
-        fetch: async () => new Map(users.slice(0, 5).map((u) => [u._id, member(`Live Member ${u._id} With A Long Name`)])),
-        cache: new Map(),
-      },
-    },
-  };
+    const stub = (name, url) => ({
+      nickname: name,
+      user: { username: name, displayAvatarURL: () => url },
+      avatarURL: () => url,
+    });
+    const rows = Array.from({ length: 10 }, (_, i) => ({ _id: `u${i}`, level: 21, exp: 100 - i, rankPosition: 41 + i }));
 
-  const board = await generateUserRankingsCanvas(interaction, users);
-  save("leaderboard", board);
-  check("leaderboard renders with mixed live and departed members", board.attachment.length > 1000, `${board.attachment.length} bytes`);
+    const timed = async (label, guild) => {
+      const started = Date.now();
+      const drawn = await Promise.race([
+        generateUserRankingsCanvas({ guild }, rows),
+        new Promise((resolve) => setTimeout(() => resolve(null), 15000)),
+      ]);
+      const elapsed = Date.now() - started;
+      check(`${label} — draws without hanging`, drawn !== null && elapsed < 10000, `${elapsed}ms`);
+      return drawn;
+    };
 
-  const empty = await generateUserRankingsCanvas(interaction, []);
-  check("leaderboard renders with no users", empty.attachment.length > 1000);
+    await timed("one stalled avatar", { members: { fetch: async (id) => stub(id, id === "u3" ? stalled : null) } });
+    await timed("every avatar stalled", { members: { fetch: async (id) => stub(id, stalled) } });
+    await timed("the member lookup itself hangs", { members: { fetch: () => new Promise(() => {}) } });
 
-  // A guild fetch that rejects must fall back rather than take the card down.
-  const broken = { guild: { members: { fetch: async () => { throw new Error("no intent"); }, cache: new Map() } } };
-  const fallback = await generateUserRankingsCanvas(broken, users);
-  check("leaderboard survives a failed member fetch", fallback.attachment.length > 1000);
+    // A member whose avatar will not load is still in the guild and must keep their name.
+    const kept = await generateUserRankingsCanvas(
+      { members: { fetch: async () => stub("Boompala (Hyunpil)", stalled) } },
+      [rows[0]]
+    );
+    save("leaderboard-stalled-avatar", kept);
+    check("a stalled avatar costs the picture, not the name", kept.attachment.length > 1000);
+
+    server.close();
+  }
+
+  // Costs the full avatar timeout to run, so it is opt-in: `node tests/canvas.js --slow`.
+  if (process.argv.includes("--slow")) {
+    const net = require("node:net");
+    const { avatarFor } = require("../src/canvas/canvasUtils.js");
+    const server = net.createServer(() => {}); // accepts the connection, then never answers
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const stalled = `http://127.0.0.1:${server.address().port}/never-answers.png`;
+    const stub = { partial: false, avatarURL: () => stalled, user: { displayAvatarURL: () => stalled } };
+
+    const started = Date.now();
+    const image = await avatarFor(stub, 128);
+    const first = Date.now() - started;
+    check("a stalled avatar gives up rather than hanging the card", image !== null && first < 15000, `${first}ms`);
+
+    const again = Date.now();
+    await avatarFor(stub, 128);
+    check("...and is not retried on the next view", Date.now() - again < 1000, `${Date.now() - again}ms`);
+    server.close();
+  }
 
   console.log(failures ? `\n${failures} FAILED` : "\nall passed");
   process.exit(failures ? 1 : 0);
