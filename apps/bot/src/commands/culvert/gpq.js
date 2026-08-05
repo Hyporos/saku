@@ -1,17 +1,14 @@
-//TODO - Add a streak system
-//TODO - Validate for negative and massive numbers
-
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const { EMOJI_IDS } = require("../../config/ids.js");
-const {
-  findCharacter,
-  isScoreSubmitted,
-  isCharacterLinked,
-  getResetDates,
-} = require("../../utility/culvertUtils.js");
+const { nameMatch, getResetDates } = require("../../utility/culvertUtils.js");
 
-// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+// The highest score ever recorded in this database is a little over 1.1 million, so this is roughly
+// double the real ceiling: high enough never to reject a genuine score, low enough that a
+// fat-fingered extra digit is caught before it skews the guild median and every graph reading it.
+const MAX_SCORE = 2000000;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -22,6 +19,8 @@ module.exports = {
         .setName("score")
         .setDescription("The score to be logged")
         .setRequired(true)
+        .setMinValue(0)
+        .setMaxValue(MAX_SCORE)
     )
     .addStringOption((option) =>
       option
@@ -31,171 +30,97 @@ module.exports = {
         .setAutocomplete(true)
     ),
 
-  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
+  // Only your own characters: you can only log a score to one of them.
   async autocomplete(interaction) {
-    const user = await culvertSchema.findById(
-      interaction.user.id,
-      "characters"
-    );
-
+    // A member with nothing linked has no document at all, and reading `.characters` off null threw
+    // every time one of them started typing this command.
+    const user = await culvertSchema.findById(interaction.user.id, "characters").lean();
     const value = interaction.options.getFocused().toLowerCase();
 
-    let choices = [];
-
-    user.characters.forEach((character) => {
-      choices.push(character.name);
-    });
-
-    const filtered = choices
-      .filter((choice) => choice.toLowerCase().includes(value))
+    const filtered = (user?.characters ?? [])
+      .map((character) => character.name)
+      .filter((name) => name?.toLowerCase().includes(value))
+      .sort((a, b) => a.localeCompare(b))
       .slice(0, 25);
 
-    try {
-      await interaction.respond(
-        filtered.map((choice) => ({ name: choice, value: choice }))
-      );
-    } catch (error) {
-      if (error.code !== 10062) throw error;
-    }
+    await interaction.respond(filtered.map((name) => ({ name, value: name }))).catch(() => {});
   },
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   async execute(interaction) {
     // Parse the command arguments
-    let characterOption = interaction.options.getString("character");
+    const characterOption = interaction.options.getString("character");
     const scoreOption = interaction.options.getInteger("score");
-
-    // If no character was specified, auto-select if the user only has one linked
-    if (!characterOption) {
-      const user = await culvertSchema.findById(interaction.user.id, "characters");
-      if (!user || user.characters.length === 0) {
-        return interaction.reply("Error - You have no characters linked yet.");
-      }
-      if (user.characters.length > 1) {
-        return interaction.reply("Error - You have multiple characters linked. Please specify which character to log the score for");
-      }
-      characterOption = user.characters[0].name;
-    }
 
     // Get the current reset date (Thursday 12:00 AM UTC)
     const { reset } = getResetDates();
 
-    // Check if the character is already linked to a user
-    const characterLinked = await isCharacterLinked(
-      interaction,
-      characterOption
-    );
-    if (!characterLinked) return;
-
-    // Check if the character belongs to the user
-    const characterBelongsToUser = await culvertSchema.exists({
-      _id: interaction.user.id,
-      "characters.name": { $regex: `^${characterOption}$`, $options: "i" },
-    });
-
-    if (!characterBelongsToUser) {
-      return interaction.reply(
-        `Error - The character **${characterOption}** is not linked to you`
-      );
+    // One lookup covers all of it. This used to be four separate queries against the same document:
+    // is the character linked, does it belong to you, fetch it, and does it already have a score.
+    const user = await culvertSchema.findById(interaction.user.id, "characters").lean();
+    if (!user?.characters?.length) {
+      return interaction.reply("Error - You have no characters linked yet.");
     }
 
-    // Find the specified character
-    const character = await findCharacter(interaction, characterOption);
-    if (!character) return;
+    let character;
+    if (characterOption) {
+      character = user.characters.find((entry) => entry.name.toLowerCase() === characterOption.toLowerCase());
+      if (!character) {
+        return interaction.reply(`Error - The character **${characterOption}** is not linked to you`);
+      }
+    } else {
+      // If no character was specified, auto-select if the user only has one linked
+      if (user.characters.length > 1) {
+        return interaction.reply(
+          "Error - You have multiple characters linked. Please specify which character to log the score for"
+        );
+      }
+      character = user.characters[0];
+    }
 
-    // Find the character's best (highest) score
-    const sortedScores = [...character.scores].sort(
-      (a, b) => b.score - a.score
-    );
-    const bestScore = sortedScores[0]?.score || 0;
+    const scores = character.scores ?? [];
+    const existing = scores.find((score) => score.date === reset);
 
-    // Check if a score has already been set for this week
-    const scoreExists = await isScoreSubmitted(characterOption, reset);
+    // Find the character's best (highest) score, ignoring the week being written so that correcting
+    // this week's own entry upward still reads as a personal best.
+    const bestScore = scores
+      .filter((score) => score.date !== reset)
+      .reduce((best, score) => Math.max(best, score.score), 0);
 
-    // Create or update an existing score on the selected character
-    if (!scoreExists) {
-      await culvertSchema.findOneAndUpdate(
-        {
-          _id: interaction.user.id,
-          "characters.name": {
-            $regex: `^${characterOption}$`,
-            $options: "i",
-          },
-        },
-        {
-          $addToSet: {
-            "characters.$[nameElem].scores": {
-              score: scoreOption,
-              date: reset,
-            },
-          },
-        },
-        {
-          arrayFilters: [
-            {
-              "nameElem.name": {
-                $regex: `^${characterOption}$`,
-                $options: "i",
-              },
-            },
-          ],
-          new: true,
-        }
+    if (existing) {
+      await culvertSchema.updateOne(
+        { _id: interaction.user.id, "characters.name": nameMatch(character.name) },
+        { $set: { "characters.$[nameElem].scores.$[dateElem].score": scoreOption } },
+        { arrayFilters: [{ "nameElem.name": nameMatch(character.name) }, { "dateElem.date": reset }] }
       );
     } else {
-      await culvertSchema.findOneAndUpdate(
-        {
-          _id: interaction.user.id,
-          "characters.name": {
-            $regex: `^${characterOption}$`,
-            $options: "i",
-          },
-          "characters.scores.date": reset,
-        },
-        {
-          $set: {
-            "characters.$[nameElem].scores.$[dateElem].score": scoreOption,
-          },
-        },
-        {
-          arrayFilters: [
-            {
-              "nameElem.name": {
-                $regex: `^${characterOption}$`,
-                $options: "i",
-              },
-            },
-            { "dateElem.date": reset },
-          ],
-          new: true,
-        }
+      // $addToSet compared whole objects, so the same week could be inserted twice with two different
+      // scores. There is only ever one score per week, so it is pushed once and set thereafter.
+      await culvertSchema.updateOne(
+        { _id: interaction.user.id, "characters.name": nameMatch(character.name) },
+        { $push: { "characters.$[nameElem].scores": { score: scoreOption, date: reset } } },
+        { arrayFilters: [{ "nameElem.name": nameMatch(character.name) }] }
       );
     }
 
     // Handle Responses
     const isNewPB = scoreOption > bestScore;
 
-    if (scoreExists) {
-      // If updating an existing score, clarify which week
-      await interaction.reply(
-        `${character.name}'s score has been updated to **${scoreOption}**${isNewPB ? " :trophy:" : ""} for this week! (${reset})`
-      );
-    } else {
-      // If scoring for the first time this week, clarify which week
-      await interaction.reply(
-        `${character.name} has scored **${scoreOption}**${isNewPB ? " :trophy:" : ""} for this week! (${reset})`
-      );
-    }
+    await interaction.reply(
+      existing
+        ? `${character.name}'s score has been updated to **${scoreOption}**${isNewPB ? " :trophy:" : ""} for this week! (${reset})`
+        : `${character.name} has scored **${scoreOption}**${isNewPB ? " :trophy:" : ""} for this week! (${reset})`
+    );
 
-    // React to the message
-    const reply = await interaction.fetchReply();
-    await reply.react(EMOJI_IDS.THUMB_SHADOW); // sakuThumbShadow for all scores
-    
-    // Add sakuStonks reaction for personal bests
-    if (isNewPB) {
-      await reply.react(EMOJI_IDS.STONKS); // sakuStonks for PBs
-    }
+    // React to the message. A missing or renamed emote must not fail the command after the score has
+    // already been saved and reported.
+    const reply = await interaction.fetchReply().catch(() => null);
+    if (!reply) return;
+
+    await reply.react(EMOJI_IDS.THUMB_SHADOW).catch(() => {}); // sakuThumbShadow for all scores
+    if (isNewPB) await reply.react(EMOJI_IDS.STONKS).catch(() => {}); // sakuStonks for PBs
   },
 };

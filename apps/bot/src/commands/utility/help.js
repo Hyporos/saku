@@ -34,14 +34,14 @@ const COMMANDS = [
   {
     name: "gpq",
     cat: "Culvert",
-    desc: "Log a culvert score for one of your characters. The score is set to the current weekly reset (Thursday 12:00 AM UTC). If you omit the character and have only one linked, it's picked automatically.",
-    params: "`[score]` - The score to be logged\n`[character]` - The character to log it to (optional; defaults to your only linked character)",
+    desc: "Log a culvert score for one of your characters. The score is set to the current weekly reset (Thursday 12:00 AM UTC), and logging again for the same week overwrites it rather than adding a second entry. If you omit the character and have only one linked, it's picked automatically. Beating your previous best gets a 🏆 and a reaction.",
+    params: "`[score]` - The score to be logged (0 to 2,000,000)\n`[character]` - The character to log it to (optional; defaults to your only linked character)",
   },
   {
     name: "profile",
     cat: "Culvert",
-    desc: "View the culvert profile of a user. It will show a variety of stats such as rankings, past scores, and character info (level, class)",
-    params: "`[character]` - The character's profile to be viewed",
+    desc: "View a character's culvert profile: class and level from the official rankings, join date, this week's score, personal best, the last four weeks, yearly total, and weekly/yearly rank. Leave the character empty to see your own; the autocomplete lists everyone, so you can look up any member. Ranks are worked out against the current roster, so you're only ever placed against people still in the guild. If the rankings site is unreachable the profile still loads, just without class and level.",
+    params: "`[character]` - The character to view (optional; defaults to your own, and you can view anyone's)",
   },
   {
     name: "graph",
@@ -58,14 +58,14 @@ const COMMANDS = [
   {
     name: "rankings",
     cat: "Culvert",
-    desc: "View the interactive culvert leaderboard. Switch between Weekly and Yearly rankings from the dropdown, page through the standings, and use Jump to Me to find your own character. Shows a top-3 podium with medals",
-    params: "None - choose the ranking type (Weekly, Yearly) from the interactive dropdown",
+    desc: "View the interactive culvert leaderboard. Switch between Weekly and Yearly rankings from the dropdown, page through the standings, and use Jump to Me to find your own character. Shows a top-3 podium with medals. Give it a class to rank only that class — the board is then numbered 1 to N within the class rather than showing guild-wide positions. The class list autocompletes from the classes people here actually play, so it stays current as new ones are added to the game.",
+    params: "`[class]` - Only rank characters of this class (optional; autocompletes)",
   },
   {
     name: "character link",
     cat: "Culvert",
     bee: true,
-    desc: "Link a character to a Discord ID. The name is checked against the official rankings and stored with its real capitalisation, so you can type it in any case. The join date accepts most common forms (ex: April 28 2023 or 2023-04-28) and must be a real past date. If the character isn't on the rankings — a brand new character, or one that hasn't ranked yet — use `override` to link it anyway. If the name has history in the guild — a recent unlink, or scores in past finalized weeks — you're asked whether to bring it back or start them from scratch, and told which of the two it found. A welcome message is posted in the culvert channel.",
+    desc: "Link a character to a Discord ID. The name is checked against the official rankings and stored with its real capitalisation, so you can type it in any case. The join date accepts most common forms (ex: April 28 2023 or 2023-04-28) and must be a real past date. If the character isn't on the rankings — a brand new character, or one that hasn't ranked yet — use `override` to link it anyway. The character always starts from scratch with no scores; use `/character restore` if you need an old history put back. A welcome message is posted in the culvert channel.",
     params:
       "`[character]` - The character to be linked\n`[discord_user]` - The Discord user to be paired with the character\n`[member_since]` - The date that the character joined the guild\n`[override]` - Force link the character, even if not present on rankings",
   },
@@ -145,8 +145,8 @@ const COMMANDS = [
     name: "export",
     cat: "Culvert",
     bee: true,
-    desc: "Export a .csv containing all members scores along with their dates. This file can be imported into Excel or Sheets for viewing.",
-    params: "None",
+    desc: "Export a .csv of every character's scores, one column per week, sorted by how long they've been in the guild. Opens straight into Excel or Sheets. Exports everything by default; give `weeks` a number to trim it to that many of the most recent weeks instead. Asking for more weeks than exist just gives you all of them. The file is named with today's date so a folder of exports stays sorted.",
+    params: "`[weeks]` - How many recent weeks to include (optional; defaults to all time)",
   },
   {
     name: "weekly",

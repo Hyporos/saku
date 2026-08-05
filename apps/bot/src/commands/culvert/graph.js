@@ -243,7 +243,7 @@ module.exports = {
     .addStringOption((opt) =>
       opt
         .setName("character")
-        .setDescription("The character to graph (defaults to your own; you can view anyone's)")
+        .setDescription("The character to graph (defaults to your own)")
         .setAutocomplete(true)
     ),
 

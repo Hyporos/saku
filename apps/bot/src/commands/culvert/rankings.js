@@ -10,8 +10,10 @@ const {
   MessageFlags,
 } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
+const characterMetaSchema = require("../../schemas/characterMetaSchema.js");
 const { getAllCharacters, getResetDates } = require("../../utility/culvertUtils.js");
 const { ACCENT, textPanel } = require("../../utility/culvertChart.js");
+const { EMOJIS } = require("../../config/ids.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 dayjs.extend(utc);
@@ -34,6 +36,17 @@ const METRICS = {
   weekly: { label: "Weekly", field: "thisScore" },
   yearly: { label: "Yearly", field: "yearlyThis" },
 };
+
+// Classes come from the cached rankings metadata rather than a list written down here. MapleStory has
+// well over forty jobs and gains more with every big patch, so anything hardcoded would be wrong
+// within a year — and at 46 and counting it is already past the 25 option cap a choice list allows,
+// which is why this is an autocomplete instead.
+const normalizeName = (name) => String(name).toLowerCase();
+
+async function jobsByCharacter() {
+  const metas = await characterMetaSchema.find({ job: { $ne: null } }, { name: 1, job: 1 }).lean();
+  return new Map(metas.map((meta) => [normalizeName(meta._id), meta.job]));
+}
 
 // ⎯⎯ Helpers ⎯⎯ //
 
@@ -62,22 +75,54 @@ function updatesIn(nextReset) {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
-  data: new SlashCommandBuilder().setName("rankings").setDescription("View the interactive culvert leaderboard"),
+  data: new SlashCommandBuilder()
+    .setName("rankings")
+    .setDescription("View the interactive culvert leaderboard")
+    .addStringOption((option) =>
+      option
+        .setName("class")
+        .setDescription("Only rank characters of this class")
+        .setRequired(false)
+        .setAutocomplete(true)
+    ),
+
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+  // Only classes somebody in the guild actually plays, so the list stays short and can never go stale:
+  // a class nobody plays is not worth offering, and a brand new one appears the moment its metadata is
+  // cached.
+  async autocomplete(interaction) {
+    const value = interaction.options.getFocused().toLowerCase();
+    const [jobs, docs] = await Promise.all([
+      jobsByCharacter(),
+      culvertSchema.find({}, { "characters.name": 1 }).lean(),
+    ]);
+
+    const linked = docs.flatMap((doc) => (doc.characters ?? []).map((character) => normalizeName(character.name)));
+    const classes = [...new Set(linked.map((name) => jobs.get(name)).filter(Boolean))]
+      .filter((job) => job.toLowerCase().includes(value))
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, 25);
+
+    await interaction.respond(classes.map((job) => ({ name: job, value: job }))).catch(() => {});
+  },
 
   async execute(interaction) {
+    const classOption = interaction.options.getString("class");
     await interaction.reply(textPanel("Loading rankings…"));
 
     const { lastReset, nextReset } = getResetDates();
     const thisWeek = lastReset;
 
     // One load of every character + the invoker's own names (for "you are here")
-    const [allCharacters, mineDoc] = await Promise.all([
+    const [allCharacters, mineDoc, jobs] = await Promise.all([
       getAllCharacters(),
       culvertSchema.findById(interaction.user.id, "characters").lean(),
+      classOption ? jobsByCharacter() : Promise.resolve(new Map()),
     ]);
     const mineNames = new Set((mineDoc?.characters ?? []).map((c) => c.name.toLowerCase()));
 
-    const chars = allCharacters.map((c) => {
+    const everyone = allCharacters.map((c) => {
       const asc = [...c.scores].sort((a, b) => a.date.localeCompare(b.date));
       return {
         name: c.name,
@@ -86,6 +131,24 @@ module.exports = {
         yearlyThis: asc.slice(-52).reduce((a, s) => a + s.score, 0),
       };
     });
+
+    // Filtering happens before ranking, so a class board reads 1..N within that class rather than
+    // showing everyone's guild-wide position with the gaps left in.
+    const chars = classOption
+      ? everyone.filter((c) => jobs.get(normalizeName(c.name))?.toLowerCase() === classOption.toLowerCase())
+      : everyone;
+
+    if (classOption && !chars.length) {
+      // Class comes from cached rankings data that fills in gradually, so "nobody" can also mean
+      // "nobody looked up yet" — worth saying rather than showing an empty board.
+      const known = everyone.filter((c) => jobs.has(normalizeName(c.name))).length;
+      return interaction.editReply(
+        textPanel(
+          `No **${classOption}** characters are on the board.\n` +
+            `-# Class is known for ${known}/${everyone.length} characters, so a very new one may not be recorded yet.`
+        )
+      );
+    }
 
     // Ranked entries per metric are computed once, then cached for instant switching / paging
     const cache = new Map();
@@ -115,11 +178,13 @@ module.exports = {
 
       const podiumStr =
         podium
-          .map((e, i) => `${MEDALS[i]} **${e.c.name}** — ${fmtScore(e)}${e.c.mine ? " ⟵ **you**" : ""}`)
+          .map((e, i) => `${MEDALS[i]} **${e.c.name}** — ${fmtScore(e)}${e.c.mine ? ` ${EMOJIS.STAR}` : ""}`)
           .join("\n") || "-# No scores submitted yet.";
 
       const listStr = pageRows.length
-        ? pageRows.map((e) => `\`#${e.rank}\` ${e.c.mine ? `➤ **${e.c.name}**` : e.c.name} — ${fmtScore(e)}`).join("\n")
+        ? pageRows
+            .map((e) => `\`#${e.rank}\` ${e.c.name} — ${fmtScore(e)}${e.c.mine ? ` ${EMOJIS.STAR}` : ""}`)
+            .join("\n")
         : podium.length
         ? "-# That's everyone!"
         : "-# —";
@@ -129,7 +194,11 @@ module.exports = {
 
       const container = new ContainerBuilder()
         .setAccentColor(ACCENT)
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Culvert Rankings\n-# ${meta.label} · ${context}`))
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `## Culvert Rankings${classOption ? ` — ${classOption}` : ""}\n-# ${meta.label} · ${context}`
+          )
+        )
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(podiumStr))
         .addSeparatorComponents(new SeparatorBuilder())
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(listStr))
