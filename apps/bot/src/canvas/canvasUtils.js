@@ -35,20 +35,40 @@ function loadAsset(absolutePath) {
 // changed avatar is a different URL and misses the cache on its own. The promise is what gets stored,
 // so ten rows asking for the same avatar at once share one download.
 const AVATAR_CACHE_MAX = 100;
+const AVATAR_TIMEOUT_MS = 6000;
+// How long a URL that would not load is left alone for. Without this, an avatar that stalls costs the
+// full timeout again on every single view of the page it is on.
+const RETRY_AFTER_MS = 5 * 60 * 1000;
+
 const avatars = new Map();
+const unreachable = new Map();
 
 function loadAvatar(url) {
   const key = url ?? DEFAULT_AVATAR;
   if (avatars.has(key)) return avatars.get(key);
 
+  const failedAt = unreachable.get(key);
+  if (failedAt && Date.now() - failedAt < RETRY_AFTER_MS) return Promise.reject(new Error("avatar recently unreachable"));
+
   const pending = (async () => {
-    const { body } = await request(key);
+    // Bounded on purpose, three ways. undici waits five minutes by default, and every avatar on a page
+    // is awaited together, so one download that stalls holds the entire card back long past the point
+    // where anyone is still waiting for it — which is exactly how a page came to never appear at all.
+    const { body } = await request(key, {
+      headersTimeout: AVATAR_TIMEOUT_MS,
+      bodyTimeout: AVATAR_TIMEOUT_MS,
+      // A hard ceiling on the whole thing, whichever phase is the one that stalls.
+      signal: AbortSignal.timeout(AVATAR_TIMEOUT_MS),
+    });
     return loadImage(Buffer.from(await body.arrayBuffer()));
   })();
 
   avatars.set(key, pending);
-  // A failed fetch must not be remembered as a permanent failure.
-  pending.catch(() => avatars.delete(key));
+  pending.catch(() => {
+    avatars.delete(key);
+    unreachable.set(key, Date.now());
+    if (unreachable.size > AVATAR_CACHE_MAX) unreachable.delete(unreachable.keys().next().value);
+  });
   if (avatars.size > AVATAR_CACHE_MAX) avatars.delete(avatars.keys().next().value);
   return pending;
 }
@@ -80,7 +100,14 @@ const STRIP_EMOJI = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu;
 // a server nickname produced undefined and the strip below threw. `displayName` is the real accessor
 // and already resolves nickname, then global name, then username.
 function displayNameOf(member, fallback = "Unknown") {
-  const raw = String(member?.displayName ?? member?.nickname ?? member?.user?.username ?? "");
+  let raw = "";
+  try {
+    raw = String(member?.displayName ?? member?.nickname ?? member?.user?.username ?? "");
+  } catch {
+    // `displayName` is a getter that reads through to `this.user`, which a partial member may not
+    // have. One row throwing here used to take the whole card down with it.
+    raw = String(member?.nickname ?? member?.user?.username ?? "");
+  }
   const cleaned = raw.replace(STRIP_PARENS, " ").replace(STRIP_EMOJI, "").replace(/\s+/g, " ").trim();
   // An all-emoji nickname sanitizes down to nothing, which used to render as a blank row.
   return cleaned || raw.trim() || fallback;

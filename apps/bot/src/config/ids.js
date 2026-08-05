@@ -35,7 +35,7 @@ const CHANNELS = {
   ANNOUNCEMENTS: "720002714683179070",
   CRASH_LOG: "1288222696731054120",
   LATENCY: "1463623492015620137",
-  EVENT: "1416900120972230676",
+  EVENT: "1533969784855593040",
 };
 
 // Channels that earn no levelling XP: bot spam, admin rooms, and anywhere chat is not conversation.

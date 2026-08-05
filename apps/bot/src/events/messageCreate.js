@@ -107,9 +107,6 @@ module.exports = {
         { _id: userId },
         {
           $set: {
-            // Recorded here because it costs nothing on a write that already happens, and it is the
-            // only chance to learn someone's name before they leave the server.
-            username: message.member?.displayName ?? message.author.username,
             level: newLevel,
             exp: updatedExp,
           },
