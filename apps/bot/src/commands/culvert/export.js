@@ -5,7 +5,7 @@ const culvertSchema = require("../../schemas/culvertSchema.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("export")
-    .setDescription("Export a .csv of characters' scores for their respective dates"),
+    .setDescription("[BEE] Export a .csv of characters' scores for their respective dates"),
 
   async execute(interaction) {
     try {

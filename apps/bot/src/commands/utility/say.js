@@ -6,7 +6,7 @@ const actionLogSchema = require("../../schemas/actionLogSchema.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("say")
-    .setDescription("Have Saku relay a message for you in the specified channel")
+    .setDescription("[BEE] Have Saku relay a message for you in the specified channel")
     .addStringOption((option) =>
       option.setName("message").setDescription("The message you would like Saku to send").setRequired(true)
     )

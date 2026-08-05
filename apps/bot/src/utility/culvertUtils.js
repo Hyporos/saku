@@ -7,6 +7,23 @@ dayjs.extend(updateLocale);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
+// Names used to be interpolated straight into a regex, so anything containing regex syntax either
+// matched the wrong character ("a.b" matches "axb") or threw and took the command down with it
+// ("Jo(n" is an unterminated group).
+const REGEX_CHARS = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * Build a case-insensitive exact match for a character name.
+ *
+ * @param {string} characterName - The character name to match.
+ * @returns {Object} - A MongoDB query fragment.
+ */
+
+const nameMatch = (characterName) => ({
+  $regex: `^${String(characterName).replace(REGEX_CHARS, "\\$&")}$`,
+  $options: "i",
+});
+
 /**
  * Finds a character based on the given name
  *
@@ -18,7 +35,7 @@ dayjs.extend(updateLocale);
 async function findCharacter(interaction, characterName, deferred = false) {
   const user = await culvertSchema.findOne(
     {
-      "characters.name": { $regex: `^${characterName}$`, $options: "i" },
+      "characters.name": nameMatch(characterName),
     },
     { "characters.$": 1 }
   );
@@ -46,7 +63,7 @@ async function findCharacter(interaction, characterName, deferred = false) {
 
 async function isCharacterLinked(interaction, characterName) {
   const characterLinked = await culvertSchema.exists({
-    "characters.name": { $regex: `^${characterName}$`, $options: "i" },
+    "characters.name": nameMatch(characterName),
   });
 
   if (!characterLinked) {
@@ -115,7 +132,7 @@ async function getAllCharacters() {
 
 async function getCasedName(characterName) {
   const casedName = await culvertSchema.findOne(
-    { "characters.name": { $regex: `^${characterName}$`, $options: "i" } },
+    { "characters.name": nameMatch(characterName) },
     { "characters.$": 1 }
   );
 
@@ -152,6 +169,7 @@ function getResetDates() {
 }
 
 module.exports = {
+  nameMatch,
   findCharacter,
   isCharacterLinked,
   isScoreSubmitted,

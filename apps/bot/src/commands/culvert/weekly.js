@@ -164,16 +164,16 @@ function buildGraphPanel({ metric, weeks, weeksSet, imageUrl, disabled = false }
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("weekly")
-    .setDescription("View weekly guild culvert stats and score graph")
+    .setDescription("[BEE] View weekly guild culvert stats and score graph")
     .addSubcommand((sub) =>
       sub
         .setName("stats")
-        .setDescription("View the latest finalized week's culvert statistics")
+        .setDescription("[BEE] View the latest finalized week's culvert statistics")
     )
     .addSubcommand((sub) =>
       sub
         .setName("graph")
-        .setDescription("Open the interactive guild culvert graph")
+        .setDescription("[BEE] Open the interactive guild culvert graph")
     ),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //

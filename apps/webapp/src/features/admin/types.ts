@@ -39,6 +39,18 @@ export interface UserDoc {
   role?: "bee" | "member" | null;
 }
 
+export interface ArchivedCharacter {
+  id: string;
+  name: string;
+  ownerId: string | null;
+  memberSince: string | null;
+  scoreCount: number;
+  unlinkedAt: string;
+  unlinkedBy: string | null;
+  expiresAt: string;
+  daysLeft: number;
+}
+
 export interface ExceptionDoc {
   _id: string;
   name: string;

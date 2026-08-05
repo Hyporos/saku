@@ -21,6 +21,13 @@ const actionLogSchema = new Schema(
       default: null,
       maxlength: 8000,
     },
+    snapshot: {
+      // The object an action destroyed, kept so it can be put back. `details` is prose with a length
+      // cap, which a character carrying years of scores does not fit inside, so this is stored raw.
+      // Bound by the same 90 day expiry as everything else here.
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     category: {
       type: String,
       enum: ["create", "edit", "delete", "transfer", "rename", "finalize", "scan"],

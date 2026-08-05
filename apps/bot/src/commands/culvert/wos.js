@@ -13,7 +13,7 @@ const { getAllCharacters } = require("../../utility/culvertUtils.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("wos")
-    .setDescription("View the wall of shame")
+    .setDescription("[BEE] View the wall of shame")
     .addIntegerOption((option) =>
       option
         .setName("participation_rate")

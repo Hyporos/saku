@@ -31,7 +31,7 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("subtract")
-        .setDescription("[ADMIN] Subtract mob count from a user's total")
+        .setDescription("[BEE] Subtract mob count from a user's total")
         .addIntegerOption((option) =>
           option
             .setName("count")

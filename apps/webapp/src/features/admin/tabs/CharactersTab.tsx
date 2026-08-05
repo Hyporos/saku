@@ -12,6 +12,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ListPanel } from "../components/ListPanel";
 import { RowActions } from "../components/RowActions";
 import { LinkCharacterModal } from "../components/LinkCharacterModal";
+import { ArchivedCharacters } from "../components/ArchivedCharacters";
 import { useAdminContext } from "../context";
 import { Button } from "../../../components/Button";
 
@@ -131,6 +132,8 @@ export const CharactersTab = () => {
           </tbody>
         </table>
       </ListPanel>
+
+      <ArchivedCharacters />
 
       <LinkCharacterModal isOpen={linkModalOpen} onClose={() => setLinkModalOpen(false)} />
     </>

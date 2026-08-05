@@ -7,7 +7,7 @@ const actionLogSchema = require("../../schemas/actionLogSchema.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("exception")
-    .setDescription("Add a character exception to /scan")
+    .setDescription("[BEE] Add a character exception to /scan")
     .addStringOption((option) =>
       option
         .setName("name")

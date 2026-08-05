@@ -10,6 +10,8 @@ const path = require("path");
 
 const router = express.Router();
 const MAX_ACTION_LOG_ENTRIES = 500;
+// Matches the action log's own TTL: once the entry expires, so does the ability to restore.
+const ARCHIVE_WINDOW_DAYS = 90;
 const ACTION_LOG_CATEGORIES = new Set(["create", "edit", "delete", "transfer", "rename", "finalize", "scan"]);
 const BACKUPS_DIR = path.join(__dirname, "../../backups");
 const GRAPH_COLOR_NAMES = {
@@ -994,6 +996,57 @@ router.delete("/admin/scores/by-id/:scoreId", async (req, res) => {
 });
 
 // Exceptions — exceptionSchema documents
+
+// Characters that /character unlink removed but that can still be put back. The unlink writes a full
+// snapshot into the action log, and the log expires after 90 days, so this window is exactly how long
+// a restore stays possible.
+router.get("/admin/archived-characters", async (req, res) => {
+  try {
+    const entries = await actionLogSchema
+      .find({ action: "Unlink Character", snapshot: { $ne: null } })
+      .sort({ timestamp: -1 })
+      .limit(200)
+      .lean();
+
+    const live = new Set(
+      (await culvertSchema.find({}, { "characters.name": 1 }).lean())
+        .flatMap((doc) => (doc.characters ?? []).map((character) => character.name?.toLowerCase()))
+        .filter(Boolean)
+    );
+
+    const seen = new Set();
+    const archived = [];
+
+    for (const entry of entries) {
+      const character = entry.snapshot?.character;
+      if (!character?.name) continue;
+
+      // Only the most recent unlink of a name can be restored, and a name that is linked again is no
+      // longer archived at all.
+      const key = character.name.toLowerCase();
+      if (seen.has(key) || live.has(key)) continue;
+      seen.add(key);
+
+      const expiresAt = new Date(new Date(entry.timestamp).getTime() + ARCHIVE_WINDOW_DAYS * 86400000);
+      archived.push({
+        id: String(entry._id),
+        name: character.name,
+        ownerId: entry.snapshot.ownerId ?? null,
+        memberSince: character.memberSince ?? null,
+        scoreCount: character.scores?.length ?? 0,
+        unlinkedAt: entry.timestamp,
+        unlinkedBy: entry.actorId ?? null,
+        expiresAt,
+        daysLeft: Math.max(0, Math.ceil((expiresAt - Date.now()) / 86400000)),
+      });
+    }
+
+    res.json(archived);
+  } catch (error) {
+    console.error("Error fetching archived characters:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 router.get("/admin/exceptions", async (req, res) => {
   try {

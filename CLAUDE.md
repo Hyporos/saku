@@ -61,7 +61,22 @@ module.exports = {
 - Scan endpoint accepts ISO date strings; falls back to `lastReset` if not a valid date
 - Historical week names queried from `weekSchema` for "renamed or unlinked" detection
 
-### Adding a Command to `/help`
+### `/help` — read and update it whenever a command is touched
+
+**Any change to a command is not finished until `/help` matches it.** Read `commands/utility/help.js` as part of the change, not after it, and update the entry in the same pass. This applies to every kind of edit, not just new commands:
+
+| Change | What `/help` needs |
+|---|---|
+| New command or subcommand | A new entry in `COMMANDS` |
+| Renamed command | The `name` field, using the spaced subcommand form (`"character rename"`) |
+| Added / removed / renamed an option | The `params` string |
+| Behaviour changed | The `desc` string — this is the one most often missed |
+| Deleted command | Its entry removed |
+| Access tier changed | The `bee` / `owner` flag |
+
+`desc` is user-facing documentation, so it must describe what the command *actually does now*, including behaviour that isn't visible in the options: confirmation prompts, what gets validated and rejected, what else gets written or cleaned up, and any time limit. If a command silently touches another collection, say so.
+
+Bee and owner commands also carry a `[BEE]` / `[OWNER]` prefix at the **start** of their `setDescription()` text, including on each subcommand (the parent's prefix isn't shown when Discord lists them). Discord caps a description at 100 characters — check the total after adding the prefix.
 
 `help.js` is an interactive Components V2 panel driven by a single `COMMANDS` array (the one source of truth). Add one object to that array:
 
@@ -144,7 +159,9 @@ d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" 
 
 ## Common Pitfalls
 
+- **`/help` goes stale silently**: nothing fails when `help.js` drifts from reality — no error, no failing test, just wrong documentation shown to members. Treat reading and updating it as part of every command change, including edits to an existing command's behaviour or options. See "`/help` — read and update it whenever a command is touched".
 - **help.js data source**: `/help` is data-driven — edit the `COMMANDS` array, not per-command switches or embed fields. The command dropdown is category-scoped; each category must stay under 25 commands (the select-menu cap).
+- **Deploy vs restart**: renaming a command, changing its description, or adding/removing an option all need `pnpm deploy-commands`. Only the handler body is picked up by a restart alone.
 - **ISO date fallback**: If the bot's `routes.js` does not recognize an ISO date string (old code), it silently falls back to `lastReset`. Always restart the bot after changes to routes.js.
 - **Week date is Wednesday**: The culvert week is stored/referenced by its Wednesday date, not Thursday. `getResetDates().lastReset` returns the Wednesday of last week.
 - **`dayjs().day() === 3`** checks for Wednesday. Day 4 = Thursday.

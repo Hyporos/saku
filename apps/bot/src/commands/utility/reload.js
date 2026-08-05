@@ -17,7 +17,7 @@ const categories = () =>
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("reload")
-    .setDescription("Reloads a command")
+    .setDescription("[OWNER] Reloads a command")
     .addStringOption((option) =>
       option.setName("category").setDescription("The category of the command").setRequired(true).setAutocomplete(true)
     )
