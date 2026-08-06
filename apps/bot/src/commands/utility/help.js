@@ -1,4 +1,4 @@
-const { ROLES, USERS } = require("../../config/ids.js");
+const { isBee, isOwner } = require("../../config/ids.js");
 const {
   SlashCommandBuilder,
   ContainerBuilder,
@@ -13,16 +13,11 @@ const {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const BEE_ROLE_ID = ROLES.BEE;
-const OWNER_ID = USERS.OWNER;
 const ACCENT = 0xffc3c5;
 const EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
 const BEE_EMOJI = "🐝";
 const OWNER_EMOJI = "👮";
-
-const isBeeMember = (interaction) =>
-  interaction.member.roles.cache.has(BEE_ROLE_ID) || interaction.user.id === OWNER_ID;
 
 // Category display order.
 const CATEGORIES = ["Culvert", "User", "Fun", "Utility"];
@@ -247,7 +242,7 @@ const catCommands = (cat, view) => COMMANDS.filter((c) => c.cat === cat && canSe
 
 // ⎯⎯ Panel ⎯⎯ //
 
-function render(state, isOwner, disabled = false) {
+function render(state, owner, disabled = false) {
   const container = new ContainerBuilder().setAccentColor(ACCENT);
   const cmd = state.command ? commandByName(state.command) : null;
 
@@ -306,7 +301,7 @@ function render(state, isOwner, disabled = false) {
   );
 
   // Owner-only: preview the panel as a member, a bee, or the owner
-  if (isOwner) {
+  if (owner) {
     const btn = (id, label, active) =>
       new ButtonBuilder()
         .setCustomId(id)
@@ -331,11 +326,11 @@ module.exports = {
   data: new SlashCommandBuilder().setName("help").setDescription("Display a list of all commands"),
 
   async execute(interaction) {
-    const isOwner = interaction.user.id === OWNER_ID;
-    const view = isOwner ? "owner" : isBeeMember(interaction) ? "bee" : "member";
+    const owner = isOwner(interaction.user.id);
+    const view = owner ? "owner" : isBee(interaction.member, interaction.user.id) ? "bee" : "member";
     const state = { cat: "Culvert", command: null, view };
 
-    await interaction.reply(render(state, isOwner));
+    await interaction.reply(render(state, owner));
     const message = await interaction.fetchReply();
     const collector = message.createMessageComponentCollector({ idle: 180_000 });
 
@@ -367,7 +362,7 @@ module.exports = {
         // Drop a now-hidden selection after a view change
         if (state.command && !canSee(commandByName(state.command), state.view)) state.command = null;
 
-        await i.editReply(render(state, isOwner));
+        await i.editReply(render(state, owner));
       } catch (err) {
         console.error("Error - /help interaction failed:", err);
       }
@@ -375,7 +370,7 @@ module.exports = {
 
     collector.on("end", async () => {
       try {
-        await interaction.editReply(render(state, isOwner, true));
+        await interaction.editReply(render(state, owner, true));
       } catch {
         // message may have been deleted
       }

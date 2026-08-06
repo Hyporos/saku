@@ -1,4 +1,4 @@
-const { CHANNELS } = require("../config/ids.js");
+const { CHANNELS, ROLES } = require("../config/ids.js");
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 const CHECKLIST_CHANNEL_ID = CHANNELS.REMINDERS_SCAN;
@@ -81,7 +81,7 @@ const sendWeeklyChecklist = async (client) => {
     return;
   }
 
-  await channel.send(`<@&720001044746076181>`);
+  await channel.send(`<@&${ROLES.BEE}>`);
   await channel.send(buildChecklistMessage());
 };
 

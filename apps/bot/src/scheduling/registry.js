@@ -7,7 +7,7 @@ const { sendWeeklyChecklist } = require("../lib/checklist.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
-const { CHANNELS } = require("../config/ids.js");
+const { CHANNELS, ROLES } = require("../config/ids.js");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -51,81 +51,52 @@ const announcementsChannel = CHANNELS.ANNOUNCEMENTS;
 
 // Structured job registry. baseHour is the intended EST hour during Standard Time;
 // days is an array of day-of-week integers (0 = Sun … 6 = Sat), empty = every day.
+// The 2x Ursus windows and the culvert reminders each ran to a full definition per firing time, six
+// blocks that differed only in an hour and a day. Built from a table instead, so a change to the
+// wording is one edit rather than four, and adding a time is one line.
+
+const URSUS_WINDOW_HOURS = 4;
+const ursusJob = (id, name, baseHour) => ({
+  id,
+  name,
+  channelId: sakuChannel,
+  channelName: "saku",
+  baseHour,
+  days: [], // every day
+  category: "ursus",
+  description: `Announces 2× Ursus is active for the next ${URSUS_WINDOW_HOURS} hours.`,
+  getMessage: (offset) => () => {
+    const now = dayjs().tz("America/New_York").hour(baseHour + offset).minute(0).second(0);
+    const end = now.add(URSUS_WINDOW_HOURS, "hours");
+    return `<@&${ROLES.URSUS}> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
+  },
+});
+
+const CULVERT_REMINDER = "Reminder to complete Culvert and Flag Race!";
+const culvertReminder = (id, name, baseHour, day, message = CULVERT_REMINDER) => ({
+  id,
+  name,
+  channelId: sakuChannel,
+  channelName: "saku",
+  baseHour,
+  days: [day],
+  category: "reminder",
+  description: `Reminds members to complete Culvert and Flag Race.${message === CULVERT_REMINDER ? "" : " (Image)"}`,
+  getMessage: () => message,
+});
+
+// The Sunday reminder posts an image rather than the text. Discord re-signs its own attachment URLs
+// server-side, so this keeps rendering in the channel even when the signature in it looks expired.
+const SUNDAY_REMINDER_IMAGE =
+  "https://media.discordapp.net/attachments/1147319860481765500/1435854458381668445/image.png?ex=690e23eb&is=690cd26b&hm=67db9a7562919556cccd537f67c07d353ac7658ff7e2ba2f5e42cd1818efa3ca&=&format=webp&quality=lossless";
+
 const JOB_DEFINITIONS = [
-  {
-    id: "ursus-afternoon",
-    name: "Ursus Afternoon Reminder",
-    channelId: sakuChannel,
-    channelName: "saku",
-    baseHour: 13,
-    days: [],
-    category: "ursus",
-    description: "Announces 2× Ursus is active for the next 4 hours.",
-    getMessage: (offset) => () => {
-      const now = dayjs().tz("America/New_York").hour(13 + offset).minute(0).second(0);
-      const end = now.add(4, "hours");
-      return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
-    },
-  },
-  {
-    id: "ursus-night",
-    name: "Ursus Night Reminder",
-    channelId: sakuChannel,
-    channelName: "saku",
-    baseHour: 20,
-    days: [],
-    category: "ursus",
-    description: "Announces 2× Ursus is active for the next 4 hours.",
-    getMessage: (offset) => () => {
-      const now = dayjs().tz("America/New_York").hour(20 + offset).minute(0).second(0);
-      const end = now.add(4, "hours");
-      return `<@&835222431396397058> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
-    },
-  },
-  {
-    id: "culvert-flag-mon-am",
-    name: "Culvert & Flag Reminder (Mon AM)",
-    channelId: sakuChannel,
-    channelName: "saku",
-    baseHour: 8,
-    days: [1],
-    category: "reminder",
-    description: "Reminds members to complete Culvert and Flag Race.",
-    getMessage: () => "Reminder to complete Culvert and Flag Race!",
-  },
-  {
-    id: "culvert-flag-mon-pm",
-    name: "Culvert & Flag Reminder (Mon PM)",
-    channelId: sakuChannel,
-    channelName: "saku",
-    baseHour: 20,
-    days: [1],
-    category: "reminder",
-    description: "Reminds members to complete Culvert and Flag Race.",
-    getMessage: () => "Reminder to complete Culvert and Flag Race!",
-  },
-  {
-    id: "culvert-flag-wed-am",
-    name: "Culvert & Flag Reminder (Wed AM)",
-    channelId: sakuChannel,
-    channelName: "saku",
-    baseHour: 8,
-    days: [3],
-    category: "reminder",
-    description: "Reminds members to complete Culvert and Flag Race.",
-    getMessage: () => "Reminder to complete Culvert and Flag Race!",
-  },
-  {
-    id: "culvert-flag-sun-pm",
-    name: "Culvert & Flag Reminder (Sun PM)",
-    channelId: sakuChannel,
-    channelName: "saku",
-    baseHour: 20,
-    days: [0],
-    category: "reminder",
-    description: "Reminds members to complete Culvert and Flag Race. (Image)",
-    getMessage: () => "https://media.discordapp.net/attachments/1147319860481765500/1435854458381668445/image.png?ex=690e23eb&is=690cd26b&hm=67db9a7562919556cccd537f67c07d353ac7658ff7e2ba2f5e42cd1818efa3ca&=&format=webp&quality=lossless",
-  },
+  ursusJob("ursus-afternoon", "Ursus Afternoon Reminder", 13),
+  ursusJob("ursus-night", "Ursus Night Reminder", 20),
+  culvertReminder("culvert-flag-mon-am", "Culvert & Flag Reminder (Mon AM)", 8, 1),
+  culvertReminder("culvert-flag-mon-pm", "Culvert & Flag Reminder (Mon PM)", 20, 1),
+  culvertReminder("culvert-flag-wed-am", "Culvert & Flag Reminder (Wed AM)", 8, 3),
+  culvertReminder("culvert-flag-sun-pm", "Culvert & Flag Reminder (Sun PM)", 20, 0, SUNDAY_REMINDER_IMAGE),
   {
     id: "mp-reminder",
     name: "Monster Park Reminder",
@@ -136,7 +107,7 @@ const JOB_DEFINITIONS = [
     category: "mp",
     description: "Reminds members to collect Sunday boxes from Monster Park.",
     getMessage: () => ({
-      content: "<@&962201169588019221>",
+      content: `<@&${ROLES.MONSTER_PARK}>`,
       embeds: [
         new EmbedBuilder()
           .setTitle("Spiegelmann's Watching")
@@ -155,7 +126,7 @@ const JOB_DEFINITIONS = [
     days: [2],
     category: "reminder",
     description: "Reminds bees to send the culvert ping via /culvertping.",
-    getMessage: () => `<@&${process.env.BEE_ROLE_ID}> Reminder to send out the /culvertping!`,
+    getMessage: () => `<@&${ROLES.BEE}> Reminder to send out the /culvertping!`,
   },
   {
     id: "weekly-checklist",

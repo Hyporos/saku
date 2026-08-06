@@ -5,15 +5,6 @@ const exceptionSchema = require("../schemas/exceptionSchema.js");
 // The scanner's short-lived view of characters and exceptions. It lives here rather than in scanner.js
 // because editing an exception has to invalidate it, and that route is in another file.
 
-/**
- * Normalize confusable characters for better name matching (same as scan command).
- */
-function normalizeConfusableChars(str) {
-  return str
-    .replace(/[Il1|]/g, "i")
-    .replace(/[O0]/g, "o");
-}
-
 // Short-lived cache for scan base data — coalesces concurrent parallel scan requests
 let _scanDataCache = null;
 let _scanDataCacheTime = 0;
@@ -37,4 +28,4 @@ function getScanBaseData() {
   return _scanDataCache;
 }
 
-module.exports = { normalizeConfusableChars, clearScanCache, getScanBaseData };
+module.exports = { clearScanCache, getScanBaseData };

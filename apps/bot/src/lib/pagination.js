@@ -1,4 +1,5 @@
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require("discord.js");
+const { EMOJIS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -6,7 +7,7 @@ const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require("discord.js");
 function createPaginationRow(currentPage, maxPage) {
   const previous = new ButtonBuilder()
     .setCustomId("previous")
-    .setEmoji("<:singleleftchevron:1375242927634120804>")
+    .setEmoji(EMOJIS.NAV.prev)
     .setStyle(ButtonStyle.Primary)
     .setDisabled(currentPage === 1);
 
@@ -17,7 +18,7 @@ function createPaginationRow(currentPage, maxPage) {
 
   const next = new ButtonBuilder()
     .setCustomId("next")
-    .setEmoji("<:singlerightchevron:1375242928787689693>")
+    .setEmoji(EMOJIS.NAV.next)
     .setStyle(ButtonStyle.Primary)
     .setDisabled(currentPage === maxPage);
 

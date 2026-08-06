@@ -1,6 +1,7 @@
 const express = require("express");
 const actionLogSchema = require("../schemas/actionLogSchema.js");
-const { MAX_ACTION_LOG_ENTRIES, ACTION_LOG_CATEGORIES, getActorId } = require("./shared.js");
+const { MAX_ACTION_LOG_ENTRIES, ACTION_LOG_CATEGORIES, getActorId, writeActionLog, fail, isDiscordId } = require("./shared.js");
+const { isOwner } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // The audit trail: what changed, who changed it, and undo snapshots.
@@ -35,8 +36,7 @@ router.get("/admin/action-log", async (req, res) => {
       }))
     );
   } catch (error) {
-    console.error("Error fetching action log:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching action log");
   }
 });
 
@@ -71,25 +71,24 @@ router.post("/admin/action-log", async (req, res) => {
       actorId: created.actorId ?? null,
     });
   } catch (error) {
-    console.error("Error creating action log entry:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "creating action log entry");
   }
 });
 
 router.delete("/admin/action-log", async (req, res) => {
   try {
     const actorId = getActorId(req);
-    const ownerId = String(process.env.OWNER_ID ?? process.env.VITE_OWNER_ID ?? "").trim();
+    // From the id table rather than the environment: an unset OWNER_ID left ownerId empty, which
+    // failed the check below and made this route reachable only via the proxy's own header.
     const isOwnerFromProxy = String(req.headers["x-admin-is-owner"] ?? "").toLowerCase() === "true";
-    const isOwnerById = !!actorId && /^\d{5,25}$/.test(actorId) && !!ownerId && actorId === ownerId;
+    const isOwnerById = !!actorId && isDiscordId(actorId) && isOwner(actorId);
     if (!isOwnerById && !isOwnerFromProxy) {
       return res.status(403).json({ error: "Forbidden" });
     }
     await actionLogSchema.deleteMany({});
     res.json({ success: true });
   } catch (error) {
-    console.error("Error clearing action log:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "clearing action log");
   }
 });
 

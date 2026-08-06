@@ -10,19 +10,18 @@ const {
   isThinkingRejected,
 } = require("./model.js");
 const { usageKey, usage, loadUsage, spentOn, countRequest, countTurn, modelCost, turnCost, countTokens, estimatedCost } = require("./usage.js");
-const { GoogleGenAI, Type } = require("@google/genai");
+const { Type } = require("@google/genai");
 const axios = require("axios");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const chatSchema = require("../../schemas/chatSchema.js");
-const usageSchema = require("../../schemas/usageSchema.js");
 const characterMetaSchema = require("../../schemas/characterMetaSchema.js");
-const { getResetDates, normalizeName } = require("../../domain/culvert/utils.js");
+const { getResetDates, normalizeName, RANKINGS_URL } = require("../../domain/culvert/utils.js");
 const { loadScoreIndex, computeStats } = require("../../domain/culvert/chart.js");
 const { isTransient } = require("../../lib/transient.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
-const { CHANNELS, ROLES, USERS } = require("../../config/ids.js");
+const { CHANNELS, ROLES, USERS, isBee } = require("../../config/ids.js");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 require("dotenv").config();
@@ -33,14 +32,11 @@ require("dotenv").config();
 const REPLY_CAP = 1900; // Discord's own limit is 2000
 const RATE_NOTICE = "I'm getting throttled right now, every model I can reach is busy or capped. Give me a minute and try again.";
 
-const BEE_ROLE_ID = ROLES.BEE;
-const MEMBER_ROLE_ID = ROLES.MEMBER;
 const OWNER_ID = USERS.OWNER;
 const MICHE_ID = USERS.MICHE;
-const isBee = (member, userId) => Boolean(member?.roles?.cache?.has(BEE_ROLE_ID)) || userId === OWNER_ID;
 
 // Chat is guild-members-only: Friends, roleless users, and DMs (no member object) are turned away.
-const canChat = (member, userId) => Boolean(member?.roles?.cache?.has(MEMBER_ROLE_ID)) || isBee(member, userId);
+const canChat = (member, userId) => Boolean(member?.roles?.cache?.has(ROLES.MEMBER)) || isBee(member, userId);
 const NOT_MEMBER_NOTICE = "Chatting with me is a guild member thing, sorry.";
 
 // Mentions are public, so for members they are confined to the one channel meant for talking to Saku.
@@ -954,8 +950,7 @@ const metaFresh = (entry) => Boolean(entry) && metaAge(entry) < (entry.error ? M
 const metaFor = (name) => META_CACHE.get(normalizeName(name)) ?? { found: false, job: null, level: null };
 
 async function fetchCharacterMeta(name) {
-  const url = `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${encodeURIComponent(name)}`;
-  const { data } = await axios.get(url, { timeout: 8000, headers: REQUEST_UA });
+  const { data } = await axios.get(RANKINGS_URL(name), { timeout: 8000, headers: REQUEST_UA });
   const ranks = data?.ranks ?? [];
   const hit = ranks.find((r) => normalizeName(r.characterName) === normalizeName(name)) ?? ranks[0];
   return hit ? { found: true, job: hit.jobName ?? null, level: hit.level ?? null } : { found: false, job: null, level: null };
@@ -1779,9 +1774,12 @@ async function refreshServerExtras(guild) {
     const pins = [];
     for (const channel of channels) {
       try {
-        const pinned = await channel.messages.fetchPinned();
-        for (const message of [...pinned.values()].slice(0, 2)) {
-          const said = (message.cleanContent ?? "").replace(/\s+/g, " ").trim();
+        // fetchPins, not the deprecated fetchPinned: it returns { hasMore, items } where each item
+        // wraps the message rather than being one, and it takes a limit, so only what gets read is
+        // fetched. Newest first, which is the order the old call happened to give.
+        const { items } = await channel.messages.fetchPins({ limit: 2 });
+        for (const pin of items) {
+          const said = (pin.message.cleanContent ?? "").replace(/\s+/g, " ").trim();
           if (said) pins.push(`#${channel.name}: ${said.slice(0, 220)}`);
         }
       } catch (err) {
@@ -2177,7 +2175,7 @@ function trimToBoundary(text) {
 
 // Emote rationing, the channel-request detector and the :name: repair pass all moved out together:
 // none of them referenced anything else in this file.
-const { EMOTE_RE, HAS_EMOTE, EMOTE_GAP, emoteCooldown, CHANNEL_WORD, CHANNEL_ASK, matchEmote, repairEmotes } = require("./emotes.js");
+const { EMOTE_RE, HAS_EMOTE, EMOTE_GAP, emoteCooldown, CHANNEL_WORD, CHANNEL_ASK, repairEmotes } = require("./emotes.js");
 const modelCooldowns = new Map();
 
 function availableModels() {

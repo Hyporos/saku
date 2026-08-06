@@ -1,7 +1,8 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const dayjs = require("dayjs");
-var relativeTime = require("dayjs/plugin/relativeTime");
+const relativeTime = require("dayjs/plugin/relativeTime");
 dayjs.extend(relativeTime);
+const { CHANNELS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -9,7 +10,7 @@ module.exports = {
   name: Events.GuildMemberRemove,
   async execute(member) {
     // Fetch the channels to log messages to
-    const logChannel = member.guild.channels.cache.get('804899301632770078');
+    const logChannel = member.guild.channels.cache.get(CHANNELS.MEMBER_LOG);
     await logChannel.fetch();
 
     // Fetch the roles that the user had

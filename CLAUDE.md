@@ -80,6 +80,17 @@ module.exports = {
 
 `events/interactionCreate.js` reads those and nothing else. It used to hold hardcoded name arrays, which silently drifted: `/weekly` was documented and described as bee but was never in the list, and `"subtract"` was listed but is a subcommand, so `commandName` never matched and the check could not fire. If you add or rename a command, the tier travels with it. `tests/permissions.js` asserts every `[BEE]`/`[OWNER]` description tag matches the enforced tier.
 
+### Permission checks and IDs — import them, never re-derive them
+
+- `isBee(member, userId)` and `isOwner(userId)` come from `config/ids.js`. `isBee` already counts the owner as a bee, which is exactly the half that kept getting dropped from hand-rolled checks.
+- Every role, channel, user and emoji id lives in `config/ids.js`. **Do not read them from `process.env`** — an unset variable makes `roles.cache.has(undefined)` a silent false, so a bee just quietly renders as a member. It fails as "wrong answer", never as "misconfigured".
+- **Do not alias a config value to a local const** (`const BEE_ROLE_ID = ROLES.BEE`). Use `ROLES.BEE`, or `isBee(...)` where the check is what you actually want.
+- Pagination chevrons are `EMOJIS.NAV`. The MapleStory rankings URLs are `RANKINGS_URL` / `RANKINGS_PAGE` in `domain/culvert/utils.js`.
+
+### After moving code between files, run `pnpm test-symbols`
+
+A moved block whose `require` did not follow it **passes `node --check` and still loads.** It only fails when that line runs — and if it sits inside a `catch`, possibly never visibly. Splitting `routes.js` lost three imports this way (`axios`, `writeActionLog`, `mongoose`) and each silently degraded a live route for weeks. `test-symbols` walks every scope and catches it.
+
 ### Command Pattern
 
 Every command exports exactly:
@@ -108,7 +119,7 @@ module.exports = {
 
 - Culvert week resets **Thursday 12:00 AM UTC**
 - Week is identified by its **Wednesday** date (day before reset)
-- `getResetDates()` from `culvertUtils.js` returns `{ reset, lastReset, nextReset }` — `lastReset` is the Wednesday of last week
+- `getResetDates()` from `domain/culvert/utils.js` returns `{ reset, lastReset, nextReset }` — `lastReset` is the Wednesday of last week
 - Date format stored: `"YYYY-MM-DD"` (ISO) for weeks; `"MMM DD, YYYY"` for character `memberSince`
 - Validate date option: `/^\d{4}-\d{2}-\d{2}$/.test(date)` + `dayjs(date).day() === 3` (Wednesday)
 - Use `dayjs` for date math; DST offset stored in `data/dst-state.json`

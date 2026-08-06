@@ -177,6 +177,17 @@ function buildCharPanel(state, characters, { imageUrl, note, disabled = false })
     .setAccentColor(rgbToInt(char.graphColor) ?? ACCENT)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${char.name}'s Culvert Graph`));
 
+  // Both of these views are bounded by how far back the guild has finalized data, not by how much
+  // history the character has, so the range quietly stops short of what was asked for. Saying so
+  // beats leaving someone to wonder why their 30 weeks came back as 17.
+  if (state.view !== "score" && state.cap != null) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# Guild median and rank only go back ${state.cap} ${state.cap === 1 ? "week" : "weeks"}`
+      )
+    );
+  }
+
   if (imageUrl) {
     container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl)));
   } else {
@@ -304,14 +315,19 @@ module.exports = {
       return scoreCache;
     };
 
-    const state = { charIndex: startIndex, weeks: 8, weeksSet: false, omit: false, view: "score", uncapped: null };
+    // `cap` is how far back the current view can actually reach — null in Score, which has no limit.
+    // Kept on state so the panel can say so without recomputing it.
+    const state = { charIndex: startIndex, weeks: 8, weeksSet: false, omit: false, view: "score", uncapped: null, cap: null };
     const render = () => renderCharGraph(state, characters[state.charIndex], getScoreIndex);
 
     // Rank and Median can't reach further back than the guild has data, so the week count follows the
     // view instead of silently lying: switching into one of them drops the number to that view's
     // limit, and switching back to Score puts the larger number the person picked back. `uncapped`
     // holds that original choice, so bouncing between the two limited views never loses it.
-    const reconcileWeeks = async () => applyCap(state, await viewCap(state, characters[state.charIndex], getScoreIndex));
+    const reconcileWeeks = async () => {
+      state.cap = await viewCap(state, characters[state.charIndex], getScoreIndex);
+      return applyCap(state, state.cap);
+    };
 
     let lastUrl = null;
     const first = await render();
@@ -329,6 +345,7 @@ module.exports = {
         // # of Weeks modal — showModal must be the first response, so no deferUpdate here
         if (i.customId === "graph_weeks") {
           const cap = await viewCap(state, characters[state.charIndex], getScoreIndex);
+          state.cap = cap;
           const res = await promptWeekCount(i, {
             customId: "graph_weeks_modal",
             // Asking for 52 weeks of rank when only 17 are finalized is a request that can't be met,

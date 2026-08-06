@@ -2,7 +2,7 @@ const usageSchema = require("../../schemas/usageSchema.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 dayjs.extend(utc);
-const { MODEL_CHAIN, ai } = require("./model.js");
+const { MODEL_CHAIN } = require("./model.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // What every turn costs and what the day has spent so far. Nothing here knows how a turn is built,
@@ -134,13 +134,10 @@ function estimatedCost() {
 // best model for longer hands the rest of the conversation to a weaker one for no reason.
 
 module.exports = {
-  PRICES,
-  quotaDay,
   usageKey,
   usage,
   loadUsage,
   spentOn,
-  saveUsage,
   countRequest,
   countTurn,
   modelCost,

@@ -98,6 +98,5 @@ module.exports = {
   emoteCooldown,
   CHANNEL_WORD,
   CHANNEL_ASK,
-  matchEmote,
   repairEmotes,
 };

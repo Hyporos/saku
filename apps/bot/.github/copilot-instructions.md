@@ -21,10 +21,12 @@ A Discord bot for the MapleStory guild *Saku*. It manages culvert score tracking
 | `@napi-rs/canvas` | Canvas image generation (`createCanvas`, `loadImage`, `GlobalFonts`) |
 | `undici` | HTTP requests inside canvas/image utilities |
 | `axios` | HTTP requests in commands and routes |
-| `express` + `cors` | REST API served on port 3000 |
-| `@google/generative-ai` | Gemini AI used in `culvertping` and `scan` commands |
+| `express` | REST API served on port 25637. No `cors` — nothing in a browser calls this API |
+| `@google/genai` | Gemini for Saku's chat (`features/chat/model.js`) |
+| `@google/generative-ai` | Gemini for screenshot OCR (`features/scan/ocr.js`) |
 | `dotenv` | Load `.env` — call `require("dotenv").config()` at entry points only |
 | `timezone-support` | Timezone list for the birthday command |
+| `acorn` (dev) | Scope analysis behind `pnpm test-symbols` |
 
 ## Project Structure
 
@@ -82,6 +84,9 @@ module.exports = {
 - **Declare access on the command module, never in a list elsewhere:** `tier: "bee" | "owner"` (omit for public), `culvert: true` for the Friends restriction, and `tiers: { sub: "bee" }` when only one subcommand is restricted. `events/interactionCreate.js` reads these and nothing else — it used to hold hardcoded name arrays that silently drifted out of date. `tests/permissions.js` guards it.
 - **Always read and update `commands/utility/help.js` when a command changes.** `/help` is driven by the `COMMANDS` array there and nothing detects drift — a stale entry just shows members the wrong thing. Update the entry in the same change, whether you added a command, renamed one, changed its options, or only changed what it does (`desc` is the one most often forgotten). Bee and owner commands also carry a `[BEE]` / `[OWNER]` prefix at the start of `setDescription()`, on each subcommand as well as the parent.
 
+- **Import ids and permission checks, never re-derive them.** `isBee(member, userId)` and `isOwner(userId)`, plus every role/channel/user/emoji id, live in `config/ids.js`; `isBee` already counts the owner. Never read these from `process.env` — an unset variable makes `roles.cache.has(undefined)` a silent false, so a bee renders as a plain member with nothing logged. Never alias one to a local const either (`const BEE_ROLE_ID = ROLES.BEE` buys nothing).
+- **After moving code between files, run `pnpm test-symbols`.** A moved block whose `require` did not follow it passes `node --check` and still loads; it only fails when that line runs, which may be inside a `catch` and therefore never visible. Splitting routes.js lost three imports exactly this way.
+
 ## Event Structure
 
 ```js
@@ -105,15 +110,20 @@ const name = "schemaname";
 module.exports = models[name] || model(name, schema);
 ```
 
-## Utility Functions
+## Shared Logic
 
-- All reusable logic lives in `src/utility/`.
-- Document every exported function with JSDoc (`@param`, `@returns`).
-- `culvertUtils.js` — character lookups, score queries, reset date calculation.
-- `userUtils.js` — Discord user queries.
-- `botUtils.js` — `createScheduledJob` wrapper around `CronJob`, crash detection.
-- `cronUtils.js` — birthday and anniversary cron job setup.
-- `pagination.js` — button-based pagination for embeds.
+`src/utility/` no longer exists — it had become a junk drawer of twelve unrelated files. Reusable
+logic now goes to whichever of these fits, and each exported function carries JSDoc (`@param`,
+`@returns`):
+
+- `domain/culvert/utils.js` — reset dates, name matching and normalizing, the rankings URLs.
+- `domain/culvert/chart.js` — score index, stats, QuickChart URLs.
+- `domain/culvert/scanMatch.js` — turning a name read off a screenshot into a linked character.
+- `domain/levels.js`, `domain/starboard.js` — levelling and starboard rules.
+- `scheduling/health.js` — `createScheduledJob` wrapper around `CronJob`, crash detection.
+- `scheduling/registry.js` — the cron job table and DST offset.
+- `lib/pagination.js` — button-based pagination for embeds.
+- `api/shared.js` — API validators plus `fail`, `objectId`, `getGuild`.
 
 ## Canvas Image Generation
 
@@ -137,9 +147,13 @@ These IDs are hardcoded and must remain consistent:
 
 ## Cron / Scheduling
 
-- Use `createScheduledJob(client, channelId, cronExpression, messageFn)` from `botUtils.js`.
+- Jobs are declared in the `JOB_DEFINITIONS` table in `scheduling/registry.js`, not created ad hoc.
+  Repeating times for the same job are built from a helper (see `ursusJob`, `culvertReminder`) rather
+  than written out per firing.
+- `createScheduledJob(client, channelId, cronExpression, messageFn)` lives in `scheduling/health.js`.
 - `cronExpression` uses standard cron syntax (5 fields).
-- The `dstOffset` constant in `index.js` must be adjusted manually (0 = standard time, 1 = DST).
+- The DST offset is persisted in `data/dst-state.json` and toggled from the admin panel, not edited in
+  code. `baseHour` in a job definition is the intended EST hour; the offset shifts the cron expression.
 
 ## Error Handling
 
@@ -150,6 +164,10 @@ These IDs are hardcoded and must remain consistent:
 
 ## Express API
 
-- Runs on port **3000** alongside the bot process.
-- All routes are mounted under `/api` (defined in `routes/routes.js`).
-- The webapp and bot share this server — keep routes RESTful and stateless.
+- Runs on port **25637** alongside the bot process.
+- Routes live one file per resource under `src/api/`, all mounted under `/api` by `api/index.js`.
+- The shared-secret gate is applied **once** in `api/index.js` and covers every route, read ones
+  included — `/getAll` alone returns every character and their full score history. Do not re-apply it
+  per file.
+- Catch blocks use `fail(res, error, "what was attempted")` from `api/shared.js`.
+- Adding or renaming a route means updating the list in `tests/api.js` in the same change.

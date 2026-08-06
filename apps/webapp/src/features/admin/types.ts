@@ -129,6 +129,8 @@ export type UserMemberData = {
   nickname: string | null;
   role: string | null;
   joinedAt: string | null;
+  /** 1-12. Only the month is stored — /birthday never asks for a day. */
+  birthdayMonth: number | null;
   avatarUrl: string | null;
 };
 

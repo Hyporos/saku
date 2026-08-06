@@ -1,12 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const exceptionSchema = require("../../schemas/exceptionSchema.js");
-const {
-  getAllCharacters,
-  isScoreSubmitted,
-  getResetDates,
-} = require("../../domain/culvert/utils.js");
-const { readImage, CULVERT_SCAN_PROMPT } = require("../../features/scan/ocr.js");
+const { isScoreSubmitted, getResetDates, nameMatch } = require("../../domain/culvert/utils.js");
+const { matchScannedName, loadScanRoster, parseScanEntries } = require("../../domain/culvert/scanMatch.js");
+const { readImage, fetchAttachment, CULVERT_SCAN_PROMPT } = require("../../features/scan/ocr.js");
 const dayjs = require("dayjs");
 require("dotenv").config();
 
@@ -49,46 +45,17 @@ module.exports = {
     const { lastReset, reset } = getResetDates();
     const selectedWeek = weekOption === "this_week" ? reset : lastReset;
 
-    // Get a list of all currently linked characters
-    const characterList = await getAllCharacters();
+    // Read once, not once per scanned name — this used to re-query the whole exception collection
+    // inside the parse loop, so a full guild list cost one query per line for no reason.
+    const { linkedNames, applyException } = await loadScanRoster();
 
-    // Normalize confusable characters for better matching
-    function normalizeConfusableChars(str) {
-      return str
-        .replace(/[Il1|]/g, 'i')  // Normalize I, l, 1, | to 'i'
-        .replace(/[O0]/g, 'o');    // Also handle O/0 confusion
-    }
-
-    // Find an exception for the character name. if no exception exists, keep the entry name
-    async function checkExceptions(entryName) {
-      const exceptions = await exceptionSchema.find({});
-
-      const exception = exceptions.find(
-        (entry) => entryName.toLowerCase() === entry.exception.toLowerCase()
-      );
-      const returnedName = exception ? exception.name : entryName;
-
-      return returnedName;
-    }
-
-    async function fetchBuffer(url) {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Image fetch failed");
-      return Buffer.from(await res.arrayBuffer());
-    }
-
-    // Progress tracking
-    let currentProgress = 0;
     async function updateProgress(progress, message) {
-      currentProgress = progress;
       await interaction.editReply(`${message} ${progress}%`);
     }
 
     await updateProgress(10, "Analyzing image...");
 
-    // Fetch the image and convert to base64
-    const imageBuffer = await fetchBuffer(imageOption.proxyURL || imageOption.url);
-    const base64Image = imageBuffer.toString('base64');
+    const image = await fetchAttachment(imageOption);
 
     await updateProgress(20, "Analyzing image...");
 
@@ -97,19 +64,9 @@ module.exports = {
     try {
       await updateProgress(30, "Processing image...");
 
-      const text = await readImage({
-        prompt: CULVERT_SCAN_PROMPT,
-        data: base64Image,
-        mimeType: imageOption.contentType || "image/png",
-      });
+      const text = await readImage({ prompt: CULVERT_SCAN_PROMPT, ...image });
 
       await updateProgress(60, "Processing image...");
-
-      // Log the raw AI response for debugging
-      console.log("=== SCAN DEBUG ===");
-      console.log("Raw AI Response:");
-      console.log(text);
-      console.log("==================");
 
       // Parse the AI response into the same format as OCR
       entryArray = text.trim().split(/\r?\n/);
@@ -120,175 +77,32 @@ module.exports = {
       return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image with Gemini API.");
     }
 
-    // Declare necessary variables
-    const validScores = [];
-    const NaNScores = [];
-    const zeroScores = [];
+    await updateProgress(80, "Submitting scores...");
+
+    // NaNScores and zeroScores hold the very same objects that are in validScores, so renaming an
+    // entry to its matched character updates all three at once. They used to be separate copies kept
+    // in step by name, which quietly failed whenever two scanned lines shared a name.
+    const { scores: validScores, unreadable: NaNScores, zeroed: zeroScores } =
+      parseScanEntries(entryArray, applyException);
     const notFoundChars = [];
 
     let successCount = 0;
-    let failureCount = 0;
-
-    await updateProgress(80, "Submitting scores...");
-
-    // Select name and score from each entry and push into a separate array
-    for (const entry of entryArray) {
-      const entryParts = entry.split(" ");
-      const name = entryParts[0];
-      const score = Number(entryParts.pop());
-
-      // Log parsing details for debugging
-      console.log(`Parsing entry: "${entry}" -> Name: "${name}", Score: ${score}`);
-
-      if (name) {
-        const checkedName = await checkExceptions(name);
-        if (isNaN(score)) {
-          // Log character names which have invalid scores
-          console.log(`  -> NaN score for ${checkedName}`);
-          NaNScores.push({ name: checkedName });
-        } else if (score === 0) {
-          // Log character names which have a score of 0
-          console.log(`  -> Zero score for ${checkedName}`);
-          zeroScores.push({ name: checkedName });
-        }
-        // Log character names which are valid
-        validScores.push({
-          name: checkedName,
-          score,
-          sandbag: false,
-        });
-      }
-    }
 
     await updateProgress(90, "Submitting scores...");
 
     for (const validCharacter of validScores) {
-      const matchingNames = [];
+      // Matching lives in domain/culvert/scanMatch.js, shared with /culvertping and the webapp's
+      // scanner route, so a screenshot name resolves to the same character whichever one reads it.
+      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames);
 
-      // Check if the name is truncated with ellipsis (., .., or ...)
-      const isTruncated = validCharacter.name.endsWith("...") || 
-                          validCharacter.name.endsWith("..") || 
-                          validCharacter.name.endsWith(".");
-      
-      let nameBeginning, nameEnd, truncatedPrefix;
-      
-      if (isTruncated) {
-        // For truncated names, remove the ellipsis and use the entire prefix for matching
-        if (validCharacter.name.endsWith("...")) {
-          truncatedPrefix = validCharacter.name.slice(0, -3);
-        } else if (validCharacter.name.endsWith("..")) {
-          truncatedPrefix = validCharacter.name.slice(0, -2);
-        } else {
-          truncatedPrefix = validCharacter.name.slice(0, -1);
-        }
-        nameBeginning = truncatedPrefix.substring(0, 4);
-      } else {
-        // Get the first and last 4 letters of the character name to use for better database matching
-        nameBeginning = validCharacter.name.substring(0, 4);
-        nameEnd = validCharacter.name.substring(
-          validCharacter.name.length - 4
-        );
-      }
-
-      for (const character of characterList) {
-        if (!character.name) continue;
-
-        if (isTruncated) {
-          // For truncated names, match any name that starts with the truncated prefix
-          const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
-          const normalizedPrefix = normalizeConfusableChars(truncatedPrefix.toLowerCase());
-
-          if (normalizedCharName.startsWith(normalizedPrefix)) {
-            matchingNames.push(character.name.toLowerCase());
-          }
-        } else {
-          // Normalize the character name and the search patterns
-          const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
-          const normalizedBeginning = normalizeConfusableChars(nameBeginning.toLowerCase());
-          const normalizedEnd = normalizeConfusableChars(nameEnd.toLowerCase());
-
-          // Find all names which match with the iterated nameBeginning or nameEnd
-          const isNameMatching = normalizedCharName
-            .match(new RegExp(`^${normalizedBeginning}|${normalizedEnd}$`, "gi"));
-
-          // Store matched character names in a separate array
-          if (isNameMatching && isNameMatching.length > 0) {
-            matchingNames.push(character.name.toLowerCase());
-          }
-        }
-      }
-
-      // Set the character to the the proper character in the scanned entry
-      let character;
-      let userDiscordId;
-
-      // If more than one name was matched, perform a more accurate search
-      if (matchingNames.length > 1) {
-        for (const duplicateName of matchingNames) {
-          const searchName = isTruncated
-            ? truncatedPrefix.toLowerCase()
-            : validCharacter.name.toLowerCase();
-
-          const normalizedDuplicate = normalizeConfusableChars(duplicateName);
-          const normalizedSearch = normalizeConfusableChars(searchName);
-
-          if (isTruncated) {
-            // For truncated names, find the name that starts with the prefix
-            if (normalizedDuplicate.startsWith(normalizedSearch)) {
-              // Find the specified duplicate character
-              const user = await culvertSchema.findOne(
-                {
-                  "characters.name": {
-                    $regex: `^${duplicateName}$`,
-                    $options: "i",
-                  },
-                },
-                { "characters.$": 1, _id: 1 }
-              );
-              character = user?.characters[0];
-              userDiscordId = user?._id;
-              break; // Take the first match
-            }
-          } else if (normalizedDuplicate.includes(normalizedSearch)) {
-            // Find the specified duplicate character
-            const user = await culvertSchema.findOne(
-              {
-                "characters.name": {
-                  $regex: `^${duplicateName}$`,
-                  $options: "i",
-                },
-              },
-              { "characters.$": 1, _id: 1 }
-            );
-            character = user?.characters[0];
-            userDiscordId = user?._id;
-          }
-        }
-      } else {
-        // Find the specified character, when no duplicates found
-        if (isTruncated) {
-          // For truncated names with a single match, use the matched name
-          const matchedName = matchingNames[0];
-          const user = await culvertSchema.findOne(
-            {
-              "characters.name": { $regex: `^${matchedName}$`, $options: "i" },
-            },
+      const user = matchedName
+        ? await culvertSchema.findOne(
+            { "characters.name": nameMatch(matchedName) },
             { "characters.$": 1, _id: 1 }
-          );
-          character = user?.characters[0];
-          userDiscordId = user?._id;
-        } else {
-          const namePattern = `${nameBeginning}|${nameEnd}`;
-          const user = await culvertSchema.findOne(
-            {
-              "characters.name": { $regex: `^${namePattern}$`, $options: "i" },
-            },
-            { "characters.$": 1, _id: 1 }
-          );
-          character = user?.characters[0];
-          userDiscordId = user?._id;
-        }
-      }
+          )
+        : null;
+      const character = user?.characters[0];
+      const userDiscordId = user?._id;
 
       // Perform the logic to set the score for the character
       // Don't perform any operations on characters that joined after the reset date
@@ -301,24 +115,9 @@ module.exports = {
           selectedWeek
         );
 
-        // Update the name of the validCharacter to the one found in the database
-        const oldName = validCharacter.name;
+        // Shared object, so the NaN and zero lists pick this up too.
         validCharacter.name = character.name;
         validCharacter.discordId = userDiscordId;
-
-        // Also update the NaNScores entry if this character has a NaN score
-        const nanScoreEntry = NaNScores.find(n => n.name === oldName || n.name === character.name);
-        if (nanScoreEntry) {
-          nanScoreEntry.name = character.name;
-          nanScoreEntry.discordId = userDiscordId;
-        }
-
-        // Also update the zeroScores entry if this character has a score of 0
-        const zeroScoreEntry = zeroScores.find(z => z.name === oldName || z.name === character.name);
-        if (zeroScoreEntry) {
-          zeroScoreEntry.name = character.name;
-          zeroScoreEntry.discordId = userDiscordId;
-        }
 
         if (!scoreExists) {
           // Create a new score on the selected character
@@ -390,7 +189,6 @@ module.exports = {
           validCharacter.sandbag = true;
         }
       } else {
-        failureCount++;
         notFoundChars.push({
           name: validCharacter.name,
           discordId: userDiscordId,
@@ -406,8 +204,8 @@ module.exports = {
         // If the character's name could not be read, change their score to 0 (NAN) Otherwise, add to list
         const notFoundChar = notFoundChars.find(c => c.name === character.name);
         if (!notFoundChar) {
-          const isNaN = NaNScores.find(n => n.name === character.name);
-          if (isNaN) {
+          const unreadable = NaNScores.find(n => n.name === character.name);
+          if (unreadable) {
             content = content.concat(`${character.name}: **0 (NaN)**`);
           } else {
             content = content.concat(
@@ -463,24 +261,12 @@ module.exports = {
       );
     }
 
-    // If message is longer than 2000 characters, split into multiple messages
-    function splitMessage(str, size) {
-      const numChunks = Math.ceil(str.length / size);
-      const chunks = new Array(numChunks);
-
-      for (let i = 0, c = 0; i < numChunks; ++i, c += size) {
-        chunks[i] = str.substr(c, size);
-      }
-
-      return chunks;
-    }
-
     await updateProgress(100, "Submitting scores...");
 
-    const messageChunks = splitMessage(response, 2000);
-
-    for (chunk of messageChunks) {
-      await interaction.followUp(chunk);
+    // Discord caps a message at 2000 characters and a full guild list comfortably exceeds that.
+    // `chunk` was declared with no keyword here, which quietly made it a global.
+    for (let i = 0; i < response.length; i += 2000) {
+      await interaction.followUp(response.slice(i, i + 2000));
     }
   },
 };

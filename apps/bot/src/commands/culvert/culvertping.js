@@ -1,8 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const exceptionSchema = require("../../schemas/exceptionSchema.js");
-const { getAllCharacters } = require("../../domain/culvert/utils.js");
-const { readImage } = require("../../features/scan/ocr.js");
+const { nameMatch } = require("../../domain/culvert/utils.js");
+const { matchScannedName, loadScanRoster } = require("../../domain/culvert/scanMatch.js");
+const { readImage, fetchAttachment, CULVERTPING_PROMPT } = require("../../features/scan/ocr.js");
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -29,56 +29,17 @@ module.exports = {
     // Immediately show progress
     await interaction.editReply("Preparing to analyze image...");
 
-    // Get a list of all currently linked characters
-    const characterList = await getAllCharacters();
-
-    // Find an exception for the character name. if no exception exists, keep the entry name
-    async function checkExceptions(entryName) {
-      const exceptions = await exceptionSchema.find({});
-
-      const exception = exceptions.find(
-        (entry) => entryName.toLowerCase() === entry.exception.toLowerCase()
-      );
-      const returnedName = exception ? exception.name : entryName;
-
-      return returnedName;
-    }
-
-    async function fetchBuffer(url) {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Image fetch failed");
-      return Buffer.from(await res.arrayBuffer());
-    }
+    // Read once, not once per scanned name.
+    const { linkedNames, applyException } = await loadScanRoster();
 
     await interaction.editReply("Analyzing image...");
 
-    // Fetch the image and convert to base64
-    const imageBuffer = await fetchBuffer(imageOption.proxyURL || imageOption.url);
-    const base64Image = imageBuffer.toString('base64');
-
-    const prompt = `Analyze this MapleStory guild list screenshot for the 'culvertping' utility.
-
-Your goal is to extract character names with 100% accuracy, specifically handling truncated names and column overlaps.
-
-Rules:
-- Truncation Logic: If a character name contains an ellipsis (..), stop the extraction immediately at the first dot. Do not include the dots or any text following them (e.g., 'heatherhah..Dawn' becomes 'heatherhah').
-- Column Isolation: Extract ONLY the first vertical column. Strictly ignore the Class (Adele, Night Walker, etc.), Level, and Score columns.
-- Encoding: Preserve all special characters (ö, á, etc.) exactly as they appear.
-- Formatting: Return ONLY the character names, one per line. No headers, introductory text, or blank lines.
-
-Example output:
-PlayerName1
-PlayerName2
-PlayerName3`;
+    const image = await fetchAttachment(imageOption);
 
     let nameArray;
-    
+
     try {
-      const text = await readImage({
-        prompt,
-        data: base64Image,
-        mimeType: imageOption.contentType || "image/png",
-      });
+      const text = await readImage({ prompt: CULVERTPING_PROMPT, ...image });
 
       // Parse the AI response into an array of names
       nameArray = text.trim().split(/\r?\n/).filter(name => name.length > 0);
@@ -95,122 +56,21 @@ PlayerName3`;
 
     // Process each scanned name
     for (const scannedName of nameArray) {
-      const checkedName = await checkExceptions(scannedName);
-      
-      // Check if the name is truncated with ellipsis (., .., or ...)
-      const isTruncated = checkedName.endsWith("...") || 
-                          checkedName.endsWith("..") || 
-                          checkedName.endsWith(".");
-      
-      let nameBeginning, nameEnd, truncatedPrefix;
-      
-      if (isTruncated) {
-        // For truncated names, remove the ellipsis and use the entire prefix for matching
-        if (checkedName.endsWith("...")) {
-          truncatedPrefix = checkedName.slice(0, -3);
-        } else if (checkedName.endsWith("..")) {
-          truncatedPrefix = checkedName.slice(0, -2);
-        } else {
-          truncatedPrefix = checkedName.slice(0, -1);
-        }
-        nameBeginning = truncatedPrefix.substring(0, 4);
-      } else {
-        // Get the first and last 4 letters of the character name to use for better database matching
-        nameBeginning = checkedName.substring(0, 4);
-        nameEnd = checkedName.substring(checkedName.length - 4);
-      }
+      const checkedName = applyException(scannedName);
 
-      const matchingNames = [];
+      // Matching lives in domain/culvert/scanMatch.js, shared with /scan and the webapp's scanner
+      // route. This command used to have its own copy that skipped the confusable-letter folding, so
+      // a name /scan matched happily came back "could not be found" here.
+      const { name: matchedName } = matchScannedName(checkedName, linkedNames);
 
-      for (const character of characterList) {
-        if (!character.name) continue;
-
-        if (isTruncated) {
-          // For truncated names, match any name that starts with the truncated prefix
-          if (character.name.toLowerCase().startsWith(truncatedPrefix.toLowerCase())) {
-            matchingNames.push(character.name.toLowerCase());
-          }
-        } else {
-          // Find all names which match with the iterated nameBeginning or nameEnd
-          const isNameMatching = character.name
-            .toLowerCase()
-            .match(new RegExp(`^${nameBeginning}|${nameEnd}$`, "gi"));
-
-          // Store matched character names in a separate array
-          if (isNameMatching && isNameMatching.length > 0) {
-            matchingNames.push(character.name.toLowerCase());
-          }
-        }
-      }
-
-      // Set the character to the proper character in the scanned entry
-      let character;
-      let userDiscordId;
-
-      // If more than one name was matched, perform a more accurate search
-      if (matchingNames.length > 1) {
-        for (const duplicateName of matchingNames) {
-          const searchName = isTruncated 
-            ? truncatedPrefix.toLowerCase() 
-            : checkedName.toLowerCase();
-          
-          if (isTruncated) {
-            // For truncated names, find the name that starts with the prefix
-            if (duplicateName.startsWith(searchName)) {
-              // Find the specified duplicate character
-              const user = await culvertSchema.findOne(
-                {
-                  "characters.name": {
-                    $regex: `^${duplicateName}$`,
-                    $options: "i",
-                  },
-                },
-                { "characters.$": 1, _id: 1 }
-              );
-              character = user?.characters[0];
-              userDiscordId = user?._id;
-              break; // Take the first match
-            }
-          } else if (duplicateName.includes(searchName)) {
-            // Find the specified duplicate character
-            const user = await culvertSchema.findOne(
-              {
-                "characters.name": {
-                  $regex: `^${duplicateName}$`,
-                  $options: "i",
-                },
-              },
-              { "characters.$": 1, _id: 1 }
-            );
-            character = user?.characters[0];
-            userDiscordId = user?._id;
-          }
-        }
-      } else if (matchingNames.length === 1) {
-        // Find the specified character, when no duplicates found
-        if (isTruncated) {
-          // For truncated names with a single match, use the matched name
-          const matchedName = matchingNames[0];
-          const user = await culvertSchema.findOne(
-            {
-              "characters.name": { $regex: `^${matchedName}$`, $options: "i" },
-            },
+      const user = matchedName
+        ? await culvertSchema.findOne(
+            { "characters.name": nameMatch(matchedName) },
             { "characters.$": 1, _id: 1 }
-          );
-          character = user?.characters[0];
-          userDiscordId = user?._id;
-        } else {
-          const namePattern = `${nameBeginning}|${nameEnd}`;
-          const user = await culvertSchema.findOne(
-            {
-              "characters.name": { $regex: `^${namePattern}$`, $options: "i" },
-            },
-            { "characters.$": 1, _id: 1 }
-          );
-          character = user?.characters[0];
-          userDiscordId = user?._id;
-        }
-      }
+          )
+        : null;
+      const character = user?.characters[0];
+      const userDiscordId = user?._id;
 
       // Add matched user to the list
       if (character && userDiscordId) {

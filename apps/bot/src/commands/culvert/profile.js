@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const { nameMatch, getResetDates } = require("../../domain/culvert/utils.js");
+const { nameMatch, getResetDates, RANKINGS_URL, RANKINGS_PAGE } = require("../../domain/culvert/utils.js");
 const dayjs = require("dayjs");
 const axios = require("axios");
 
@@ -9,16 +9,6 @@ const axios = require("axios");
 const ACCENT = 0xffc3c5;
 const PREVIOUS_SCORES = 4;
 const YEAR_WEEKS = 52;
-
-const RANKINGS_URL = (name) =>
-  `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${encodeURIComponent(
-    name
-  )}`;
-
-const RANKINGS_PAGE = (name) =>
-  `https://www.nexon.com/maplestory/rankings/north-america/overall-ranking/legendary?world_type=heroic&search_type=character-name&search=${encodeURIComponent(
-    name
-  )}`;
 
 // Ranks are deliberately built from the live roster rather than from the finalized week snapshots.
 // The snapshots include everyone who has since left, and placing a current member behind a string of

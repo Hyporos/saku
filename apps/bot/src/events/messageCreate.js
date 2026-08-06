@@ -1,27 +1,9 @@
 const { Events } = require("discord.js");
 const userSchema = require("../schemas/userSchema.js");
 const { getRequiredExp } = require("../config/levels.js");
-const { CHANNELS } = require("../config/ids.js");
+const { NO_XP_CHANNELS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-
-const EXCLUDED_CHANNELS = [
-    '761406523950891059', // bot-spam
-    CHANNELS.CULVERT, // culvert
-    '807320077951172659', // bees-pls
-    '1178171097858973746', // dannis-fan-club
-    '913840369001709608', // karuta
-    CHANNELS.REMINDERS_SCAN, // reminders-scan
-    '1147319860481765500', // dev
-    '733468367653961760', // inactive
-    '720002479005237258', // introductions
-    '720004340558856222', // admin-channel
-    '821763840559153174', // admin-channel
-    '1302748524110418011', // admin-channel
-    '720118849155891302', // admin-channel
-    '776872035754180610', // admin-channel 
-    '788477119000084501', // admin-channel
-];
 
 const cooldowns = new Map();
 const COOLDOWN_DURATION = 60000; // 1 minute cooldown, in milliseconds
@@ -60,7 +42,7 @@ module.exports = {
   async execute(message) {
     if (message.author.bot) return;
     if (message.content.length < 5) return;
-    if (EXCLUDED_CHANNELS.includes(message.channelId)) return;
+    if (NO_XP_CHANNELS.has(message.channelId)) return;
     if (isOnlyEmojis(message) || hasGif(message)) return;
 
     try {

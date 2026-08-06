@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const actionLogSchema = require("../schemas/actionLogSchema.js");
 const path = require("path");
 
@@ -58,6 +59,49 @@ const getActorId = (req) => {
   return actorId || null;
 };
 
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+/**
+ * Log an unexpected failure and answer with a 500.
+ *
+ * This exact three-line catch body was written out thirty times across the resource files, each with
+ * its own wording of the same message.
+ *
+ * @param {Object} res - The Express response.
+ * @param {Error} error - What went wrong.
+ * @param {string} what - What was being attempted, for the log line: "fetching users".
+ */
+const fail = (res, error, what) => {
+  console.error(`Error ${what}:`, error);
+  res.status(500).json({ error: "Internal Server Error" });
+};
+
+/**
+ * Parse a value into a Mongo ObjectId, or null if it is not one.
+ *
+ * Anything reaching these routes came off a URL, so it is a string until proven otherwise, and
+ * `new ObjectId("nope")` throws rather than returning null.
+ *
+ * @param {string} value
+ * @returns {Object|null}
+ */
+const objectId = (value) =>
+  mongoose.Types.ObjectId.isValid(value) ? new mongoose.Types.ObjectId(value) : null;
+
+/**
+ * The one guild the bot serves, from cache when it is there.
+ *
+ * @param {Object} req - The Express request, which carries the client on the app.
+ * @returns {Promise<Object|null>} - The guild, or null if it cannot be reached.
+ */
+const getGuild = async (req) => {
+  const client = req.app.get("client");
+  const guildId = process.env.SAKU_GUILD_ID;
+  return (
+    client?.guilds.cache.get(guildId) ?? (await client?.guilds.fetch(guildId).catch(() => null)) ?? null
+  );
+};
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // EVERY route below needs the shared secret, not just the admin ones.
 //
@@ -80,7 +124,6 @@ module.exports = {
   ARCHIVE_WINDOW_DAYS,
   ACTION_LOG_CATEGORIES,
   BACKUPS_DIR,
-  GRAPH_COLOR_NAMES,
   escapeRegex,
   isDiscordId,
   isIsoDate,
@@ -89,4 +132,7 @@ module.exports = {
   writeActionLog,
   getActorId,
   requireApiSecret,
+  fail,
+  objectId,
+  getGuild,
 };

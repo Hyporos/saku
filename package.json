@@ -13,6 +13,8 @@
     "test-canvas": "pnpm --filter bot test-canvas",
     "test-permissions": "pnpm --filter bot test-permissions",
     "test-api": "pnpm --filter bot test-api",
-    "test-chat-modules": "pnpm --filter bot test-chat-modules"
+    "test-chat-modules": "pnpm --filter bot test-chat-modules",
+    "test-scan-match": "pnpm --filter bot test-scan-match",
+    "test-symbols": "pnpm --filter bot test-symbols"
   }
 }

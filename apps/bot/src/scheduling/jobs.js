@@ -11,7 +11,9 @@ dayjs.extend(timezone);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const BIRTHDAY_CHANNEL_ID = CHANNELS.REMINDERS_SCAN;
+// General, alongside the anniversary announcements — a birthday is for the guild to see, not
+// something buried in the bees' reminder channel.
+const BIRTHDAY_CHANNEL_ID = CHANNELS.SAKU;
 const BIRTHDAY_TZ = "America/Los_Angeles";
 
 // Everyone born this month who hasn't been wished yet, together in one message. Runs every midnight

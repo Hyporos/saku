@@ -1,7 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const culvertSchema = require("../schemas/culvertSchema.js");
-const { escapeRegex } = require("./shared.js");
+const { RANKINGS_URL } = require("../domain/culvert/utils.js");
+const { escapeRegex, fail } = require("./shared.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Read-only lookups the webapp uses to render public pages.
@@ -14,8 +15,7 @@ router.get("/getAll", async (req, res) => {
     const culverts = await culvertSchema.find();
     res.json(culverts);
   } catch (error) {
-    console.error("Error fetching culverts:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching culverts");
   }
 });
 
@@ -34,8 +34,7 @@ router.get("/character/:name", async (req, res) => {
     }
     res.json(user.characters[0]);
   } catch (error) {
-    console.error("Error fetching culverts:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching culverts");
   }
 });
 
@@ -48,8 +47,7 @@ router.get("/user/:id", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ characters: (user.characters ?? []).map((c) => c.name) });
   } catch (error) {
-    console.error("Error fetching user characters:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching user characters");
   }
 });
 
@@ -58,24 +56,21 @@ router.get("/rankings/:name", async (req, res) => {
   try {
     const characterName = String(req.params.name ?? "").trim();
     if (!characterName) return res.status(400).json({ error: "Character name is required" });
-    const response = await axios.get(
-      `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${encodeURIComponent(characterName)}`
-    );
+    const response = await axios.get(RANKINGS_URL(characterName));
 
-    const characterImgURL = response.data.ranks[0].characterImgURL;
-    const level = response.data.ranks[0].level;
-    const characterClassName = response.data.ranks[0].characterClassName ?? null;
+    // The API answers 200 with an empty `ranks` for a name that does not exist. Reading [0] straight
+    // out of it threw, which the catch below reported as a 500 — a server fault for what is really
+    // just a character nobody has ranked.
+    const rank = response.data?.ranks?.[0];
+    if (!rank) return res.status(404).json({ error: "Character not found on the rankings" });
 
-    const characterData = {
-      characterImgURL,
-      level,
-      characterClassName,
-    };
-
-    res.json(characterData);
+    res.json({
+      characterImgURL: rank.characterImgURL ?? null,
+      level: rank.level ?? null,
+      characterClassName: rank.characterClassName ?? null,
+    });
   } catch (error) {
-    console.error("Error fetching character:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching character");
   }
 });
 

@@ -18,15 +18,16 @@ src/
   schemas/            mongoose models, one per collection
   config/             ids.js (roles, channels, emojis), levels.js
 
-  domain/             business logic with NO discord.js types
-    culvert/utils.js  reset dates, name matching/normalizing, character lookups
-    culvert/chart.js  score index, percentiles, QuickChart URLs
+  domain/               business logic with NO discord.js types
+    culvert/utils.js    reset dates, name matching/normalizing, the rankings URLs
+    culvert/chart.js    score index, percentiles, QuickChart URLs
+    culvert/scanMatch.js turning a name read off a screenshot into a linked character
     starboard.js
     levels.js
 
   features/           self-contained features that own their whole pipeline
     chat/             Saku's AI (see "The chat feature" below)
-    scan/ocr.js       Gemini OCR for score screenshots
+    scan/ocr.js       Gemini OCR: the reader, both prompts, attachment fetching
 
   scheduling/         registry.js (cron jobs + DST), jobs.js, health.js, latencyMonitor.js
   api/                the Express API the webapp consumes (see "The API" below)
@@ -164,6 +165,40 @@ that the public surface (19 names) is unchanged.
 
 ---
 
+## Reading a screenshot (`domain/culvert/scanMatch.js`)
+
+`/scan`, `/culvertping` and the webapp's scanner route all take a screenshot, read names off it, and
+match them against linked characters. That logic existed **three times** and the three had drifted:
+
+| | `/culvertping` | `/scan` | scanner route |
+|---|---|---|---|
+| folds confusable letters (l/1/I, o/0) | no | yes | yes |
+| exact-match fast path | no | no | yes |
+| I↔l retry | no | no | yes |
+| re-read the exception table per name | yes | yes | no |
+
+Whichever one you were reading, the other two were quietly worse at the same job. It is now one
+module, and the three callers keep only what genuinely differs: how they turn a matched name into a
+character (a `findOne` for the commands, an in-memory map for the route) and how they report results.
+
+Nothing in `scanMatch.js` touches Discord, and only `loadScanRoster`/`loadExceptions` touch the
+database, so the matching is testable directly — which is the point. `tests/scanMatch.js` covers it.
+
+**Three bugs the unification fixed**, all confirmed against the real 202-character roster:
+
+- An empty or `..`-only OCR line matched **whoever sorted first in the roster**. With no name to work
+  from, the pattern became `^|$`, which matches every string there is.
+- Regex metacharacters were interpolated raw, so `a+b` matched `abrese` and an unbalanced bracket
+  threw mid-scan.
+- Both commands re-queried the whole exception collection **once per scanned name** — a full guild
+  list cost ~200 queries to answer a question that cannot change mid-scan.
+
+A differential run over the real roster (994 realistic OCR inputs: clean reads, truncations, l/I and
+o/0 swaps, case drift, junk) matched the old behaviour on 991 and differed only on those three, in
+each case by correctly returning "no match" where the old code invented one.
+
+---
+
 ## Name normalizing — one function, two callers
 
 `domain/culvert/utils.js` exports `normalizeName`. It deliberately folds characters people confuse in
@@ -183,8 +218,10 @@ copy it; that duplication is what caused the bug.
 
 | Suite | Guards |
 |---|---|
+| `pnpm test-symbols` | **Every identifier is declared, imported, or a real global** |
 | `pnpm test-api` | All 35 API routes still mounted, secret gate applied once |
 | `pnpm test-permissions` | Every command's tier, and tags matching enforcement |
+| `pnpm test-scan-match` | Screenshot name matching: truncation, confusables, junk input |
 | `pnpm test-chat-modules` | Chat exports exist, no import cycles, public surface intact |
 | `pnpm test-chat` | Live model behaviour: fabrication guards, tone, tool use |
 | `pnpm test-canvas` | Level card + leaderboard rendering, stall handling |
@@ -192,6 +229,23 @@ copy it; that duplication is what caused the bug.
 
 `test-chat` calls the real model, so a run costs a little and one network-flaky case can fail on its
 own; re-run before assuming a break.
+
+### `test-symbols` is the one to run after moving code
+
+Splitting a file breaks in a way nothing else catches: the code moves, the `require` at the top does
+not follow, and **`node --check` passes and the module still loads**. The failure waits until that one
+line runs — and if it sits inside a `catch`, possibly never, visibly.
+
+Splitting `routes.js` did this three times and none of it surfaced for weeks:
+
+| File | Lost | What it looked like |
+|---|---|---|
+| `api/characters.js` | `axios` | Renames silently stopped picking up a character's real capitalisation — the `ReferenceError` landed in a `catch {}` whose comment said "fallback to requested name" |
+| `api/actionLog.js` | `writeActionLog` | `POST /admin/action-log` answered 500 |
+| `api/exceptions.js` | `mongoose` | Editing or deleting an exception answered 500 |
+
+`tests/undefinedSymbols.js` walks every file's scopes with acorn and reports any identifier that is
+neither declared, imported, nor a Node/JS global. That is why `acorn` is a devDependency.
 
 ---
 
@@ -206,3 +260,29 @@ own; re-run before assuming a break.
   history back is `/character restore`'s job.
 - **The unlink snapshot expires after 90 days; finalized week history never does.** They are different
   stores with different purposes — one is an undo button, the other is the guild's permanent record.
+- **`canvas/userRankingsCanvas.js` does not use `canvasUtils`' cached `avatarFor`, and must not.** A
+  page of thirty rows is a different problem from the level card's single avatar. Routing it through
+  the shared cache, or raising its 1500 ms deadline to match, was tried and reverted: every version
+  that shared the machinery ended with real members rendering as "Unknown Member". Only the default
+  avatar URL is shared, because a second copy of that literal is just a second thing to get wrong.
+  Its member lookups are one-at-a-time for the same reason.
+
+---
+
+## Where IDs and shared values live
+
+| Thing | Home |
+|---|---|
+| Any Discord role, channel, user or emoji id | `config/ids.js` |
+| The MapleStory rankings URLs | `domain/culvert/utils.js` |
+| The OCR prompts, the reader, attachment fetching | `features/scan/ocr.js` |
+| API validators, `fail`, `objectId`, `getGuild` | `api/shared.js` |
+| Pagination chevrons | `EMOJIS.NAV` in `config/ids.js` |
+
+**Read role and channel ids from `config/ids.js`, not from `process.env`.** Both `api/users.js` and
+`api/actionLog.js` read `process.env.BEE_ROLE_ID`/`OWNER_ID`, and an unset variable makes
+`roles.cache.has(undefined)` a silent false — every bee rendered in the admin panel as a plain member.
+It fails as "wrong answer", never as "misconfigured".
+
+**Do not alias a config value to a local constant** (`const BEE_ROLE_ID = ROLES.BEE`). Three files did
+it and it buys nothing; use `ROLES.BEE`, or `isBee(member, userId)` where the check is what you want.

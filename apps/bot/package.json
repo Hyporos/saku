@@ -14,7 +14,9 @@
     "test-canvas": "node tests/canvas.js",
     "test-permissions": "node tests/permissions.js",
     "test-api": "node tests/api.js",
-    "test-chat-modules": "node tests/chatModules.js"
+    "test-chat-modules": "node tests/chatModules.js",
+    "test-scan-match": "node tests/scanMatch.js",
+    "test-symbols": "node tests/undefinedSymbols.js"
   },
   "keywords": [],
   "author": "",
@@ -24,7 +26,6 @@
     "@google/generative-ai": "^0.24.1",
     "@napi-rs/canvas": "^0.1.65",
     "axios": "^1.5.0",
-    "cors": "^2.8.5",
     "cron": "^3.1.6",
     "dayjs": "^1.11.9",
     "discord.js": "^14.13.0",
@@ -32,5 +33,8 @@
     "express": "^4.19.2",
     "mongoose": "^7.5.0",
     "undici": "^7.2.0"
+  },
+  "devDependencies": {
+    "acorn": "^8.16.0"
   }
 }

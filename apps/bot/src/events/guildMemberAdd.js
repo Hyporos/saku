@@ -1,7 +1,8 @@
 const { Events, EmbedBuilder } = require("discord.js");
 const dayjs = require("dayjs");
-var relativeTime = require("dayjs/plugin/relativeTime");
+const relativeTime = require("dayjs/plugin/relativeTime");
 dayjs.extend(relativeTime);
+const { CHANNELS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -9,10 +10,10 @@ module.exports = {
   name: Events.GuildMemberAdd,
   async execute(member, client) {
     // Fetch the channels to send welcome messages to
-    const welcomeChannel = member.guild.channels.cache.get('720002479005237258');
+    const welcomeChannel = member.guild.channels.cache.get(CHANNELS.INTRODUCTIONS);
     await welcomeChannel.fetch();
 
-    const logChannel = member.guild.channels.cache.get('804899301632770078');
+    const logChannel = member.guild.channels.cache.get(CHANNELS.MEMBER_LOG);
     await logChannel.fetch();
 
     // Create the welcome message

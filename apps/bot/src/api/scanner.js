@@ -3,12 +3,12 @@ const fs = require("fs");
 const path = require("path");
 const dayjs = require("dayjs");
 const culvertSchema = require("../schemas/culvertSchema.js");
-const exceptionSchema = require("../schemas/exceptionSchema.js");
 const weekSchema = require("../schemas/weekSchema.js");
 const { readImage, CULVERT_SCAN_PROMPT } = require("../features/scan/ocr.js");
-const { getAllCharacters, isScoreSubmitted, getResetDates } = require("../domain/culvert/utils.js");
-const { BACKUPS_DIR, writeActionLog } = require("./shared.js");
-const { normalizeConfusableChars, getScanBaseData } = require("./scanCache.js");
+const { getResetDates } = require("../domain/culvert/utils.js");
+const { matchScannedName, parseScanEntries, exceptionMapper } = require("../domain/culvert/scanMatch.js");
+const { BACKUPS_DIR, writeActionLog, fail } = require("./shared.js");
+const { getScanBaseData } = require("./scanCache.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Bulk score entry from screenshots: OCR, matching, logging and finalizing.
@@ -37,8 +37,8 @@ router.post("/admin/scanner/scan", async (req, res) => {
       historicalWeeks.flatMap((w) => (w.scores ?? []).map((s) => s.name.toLowerCase()))
     );
 
-    // Flat list for name-matching loops (same shape as getAllCharacters())
-    const characterList = [];
+    // Lowercased names, which is what the matcher works on.
+    const linkedNames = [];
     // name(lower) → { char fields + discordId } — used instead of per-char findOne()
     const charDetailMap = new Map();
     // names that already have a score this week — replaces per-char isScoreSubmitted()
@@ -48,7 +48,7 @@ router.post("/admin/scanner/scan", async (req, res) => {
       for (const char of user.characters ?? []) {
         if (!char.name) continue;
         const key = char.name.toLowerCase();
-        characterList.push(char);
+        linkedNames.push(key);
         charDetailMap.set(key, { ...char, discordId: user._id });
         if (char.scores?.some((s) => String(s.date) === String(selectedWeek))) {
           hasScoreThisWeek.add(key);
@@ -65,170 +65,35 @@ router.post("/admin/scanner/scan", async (req, res) => {
       return res.status(502).json({ error: error.quotaExhausted ? error.message : "Failed to analyze image with Gemini AI" });
     }
 
-    // Parse entries
-    const validScores = [];
-    const NaNScores = [];
-    const zeroScores = [];
+    // Parse entries. Shared with /scan so both read a screenshot the same way; NaNScores and
+    // zeroScores hold the same objects as validScores, so renaming one renames all three.
+    const { scores: validScores, unreadable: NaNScores, zeroed: zeroScores } =
+      parseScanEntries(entryArray, exceptionMapper(exceptions));
+
     const notFoundChars = [];
     const absentChars = [];
     let totalSuccess = 0;
     let totalFailure = 0;
     let totalScanned = 0;
 
-    for (const entry of entryArray) {
-      const entryParts = entry.split(" ");
-      const name = entryParts[0];
-      const score = Number(entryParts.pop());
-      if (!name) continue;
-
-      const exception = exceptions.find(
-        (e) => name.toLowerCase() === e.exception.toLowerCase()
-      );
-      const checkedName = exception ? exception.name : name;
-
-      if (isNaN(score)) {
-        NaNScores.push({ name: checkedName });
-      } else if (score === 0) {
-        zeroScores.push({ name: checkedName });
-      }
-      validScores.push({ name: checkedName, score, sandbag: false });
-    }
-
     // Bulk write operations — collected below, executed in a single batched call
     const bulkOps = [];
 
-    // Match against DB characters
+    // Match against DB characters. The matching itself lives in domain/culvert/scanMatch.js so the
+    // /scan command and /culvertping resolve a screenshot name exactly the same way this does.
     for (const validCharacter of validScores) {
-      const matchingNames = [];
+      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames);
 
-      // Fast-path: exception-resolved names already carry the exact DB character name.
-      // A direct case-insensitive lookup avoids fuzzy-match false negatives for short names.
-      const directHit = charDetailMap.get(validCharacter.name.toLowerCase());
-      if (directHit) {
-        // Skip the entire fuzzy loop and jump straight to the success/failure block below.
-        matchingNames.push(validCharacter.name.toLowerCase());
-      }
-
-      const isTruncated =
-        validCharacter.name.endsWith("...") ||
-        validCharacter.name.endsWith("..") ||
-        validCharacter.name.endsWith(".");
-
-      let nameBeginning, nameEnd, truncatedPrefix;
-
-      if (isTruncated) {
-        truncatedPrefix = validCharacter.name.endsWith("...")
-          ? validCharacter.name.slice(0, -3)
-          : validCharacter.name.endsWith("..")
-            ? validCharacter.name.slice(0, -2)
-            : validCharacter.name.slice(0, -1);
-        nameBeginning = truncatedPrefix.substring(0, 4);
-      } else {
-        nameBeginning = validCharacter.name.substring(0, 4);
-        nameEnd = validCharacter.name.substring(validCharacter.name.length - 4);
-      }
-
-      if (matchingNames.length === 0) {
-        for (const character of characterList) {
-          if (!character.name) continue;
-          if (isTruncated) {
-            const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
-            const normalizedPrefix = normalizeConfusableChars(truncatedPrefix.toLowerCase());
-            if (normalizedCharName.startsWith(normalizedPrefix)) {
-              matchingNames.push(character.name.toLowerCase());
-            }
-          } else {
-            const normalizedCharName = normalizeConfusableChars(character.name.toLowerCase());
-            const normalizedBeginning = normalizeConfusableChars(nameBeginning.toLowerCase());
-            const normalizedEnd = normalizeConfusableChars(nameEnd.toLowerCase());
-            const isNameMatching = normalizedCharName.match(
-              new RegExp(`^${normalizedBeginning}|${normalizedEnd}$`, "gi")
-            );
-            if (isNameMatching && isNameMatching.length > 0) {
-              matchingNames.push(character.name.toLowerCase());
-            }
-          }
-        }
-      }
-
-      let character;
-      let userDiscordId;
-
-      // I ↔ l substitution fallback: if standard matching yields nothing, try swapping I and l in
-      // the scanned name. normalizeConfusableChars already maps both to 'i', but this provides an
-      // explicit second pass for any edge cases where the chosen 4-char prefix/suffix avoids the
-      // confusable letter entirely (common in MapleStory where I and l are visually identical).
-      if (matchingNames.length === 0 && /[Il]/.test(validCharacter.name)) {
-        const variants = new Set([
-          validCharacter.name.replace(/l/g, "I"),
-          validCharacter.name.replace(/I/g, "l"),
-        ]);
-        for (const variant of variants) {
-          if (variant === validCharacter.name) continue;
-          const varIsTruncated =
-            variant.endsWith("...") || variant.endsWith("..") || variant.endsWith(".");
-          const varPrefix = varIsTruncated
-            ? (variant.endsWith("...") ? variant.slice(0, -3) : variant.endsWith("..") ? variant.slice(0, -2) : variant.slice(0, -1))
-            : null;
-          const varBeginning = varIsTruncated ? varPrefix.substring(0, 4) : variant.substring(0, 4);
-          const varEnd = varIsTruncated ? null : variant.substring(variant.length - 4);
-          for (const character of characterList) {
-            if (!character.name) continue;
-            const normChar = normalizeConfusableChars(character.name.toLowerCase());
-            const normBeg = normalizeConfusableChars(varBeginning.toLowerCase());
-            let isMatch = false;
-            if (varIsTruncated) {
-              isMatch = normChar.startsWith(normalizeConfusableChars(varPrefix.toLowerCase()));
-            } else {
-              const normEnd = normalizeConfusableChars(varEnd.toLowerCase());
-              isMatch = !!normChar.match(new RegExp(`^${normBeg}|${normEnd}$`, "gi"))?.length;
-            }
-            if (isMatch && !matchingNames.includes(character.name.toLowerCase())) {
-              matchingNames.push(character.name.toLowerCase());
-            }
-          }
-          if (matchingNames.length > 0) break;
-        }
-      }
-
-      // Resolve character from in-memory map — replaces per-character culvertSchema.findOne()
-      if (matchingNames.length > 1) {
-        const searchName = isTruncated ? truncatedPrefix.toLowerCase() : validCharacter.name.toLowerCase();
-        for (const candidateName of matchingNames) {
-          const normalizedCandidate = normalizeConfusableChars(candidateName);
-          const normalizedSearch = normalizeConfusableChars(searchName);
-          const isHit = isTruncated
-            ? normalizedCandidate.startsWith(normalizedSearch)
-            : normalizedCandidate.includes(normalizedSearch);
-          if (isHit) {
-            const detail = charDetailMap.get(candidateName);
-            if (detail) {
-              character = detail;
-              userDiscordId = detail.discordId;
-              if (isTruncated) break;
-            }
-          }
-        }
-      } else if (matchingNames.length === 1) {
-        // Use charDetailMap directly — works for both normal and I↔l fallback matches
-        const detail = charDetailMap.get(matchingNames[0]);
-        if (detail) {
-          character = detail;
-          userDiscordId = detail.discordId;
-        }
-      }
+      // Resolve from the in-memory map rather than a findOne per character.
+      const character = matchedName ? charDetailMap.get(matchedName) : undefined;
+      const userDiscordId = character?.discordId;
 
       if (character && (!character.memberSince || dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, "week")))) {
         totalScanned++;
         totalSuccess++;
-        const oldName = validCharacter.name;
+        // Shared object, so the NaN and zero lists pick this up too.
         validCharacter.name = character.name;
         validCharacter.discordId = userDiscordId;
-
-        const nanEntry = NaNScores.find((n) => n.name === oldName || n.name === character.name);
-        if (nanEntry) { nanEntry.name = character.name; nanEntry.discordId = userDiscordId; }
-        const zeroEntry = zeroScores.find((z) => z.name === oldName || z.name === character.name);
-        if (zeroEntry) { zeroEntry.name = character.name; zeroEntry.discordId = userDiscordId; }
 
         const scoreValue = !isNaN(validCharacter.score) ? validCharacter.score : 0;
         // hasScoreThisWeek replaces the per-character isScoreSubmitted() aggregation pipeline
@@ -442,8 +307,7 @@ router.post("/admin/scanner/finalize", async (req, res) => {
       backupFilename,
     });
   } catch (error) {
-    console.error("Finalize error:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "Finalize error");
   }
 });
 

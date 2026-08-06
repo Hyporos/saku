@@ -24,13 +24,7 @@ const PAGE_SIZE = 10;
 const PODIUM = 3;
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-// Pagination chevrons (guild custom emojis)
-const NAV = {
-  first: "<:doubleleftchevron:1193783344996024350>",
-  prev: "<:singleleftchevron:1375242927634120804>",
-  next: "<:singlerightchevron:1375242928787689693>",
-  last: "<:doublerightchevron:1193783935071682591>",
-};
+const NAV = EMOJIS.NAV;
 
 const METRICS = {
   weekly: { label: "Weekly", field: "thisScore" },

@@ -114,6 +114,15 @@ export const UserDetail = () => {
               : "—"}
           </span>
         </div>
+        <div className="px-6 py-4 flex items-center gap-4">
+          <span className="text-xs text-tertiary uppercase tracking-wide font-medium w-32 shrink-0">Birthday</span>
+          <span className="text-sm text-tertiary">
+            {/* Month only, which is all /birthday stores. Set from Discord, not editable here. */}
+            {userMemberData?.birthdayMonth
+              ? dayjs().month(userMemberData.birthdayMonth - 1).format("MMMM")
+              : "—"}
+          </span>
+        </div>
       </div>
 
       {/* Characters table */}
