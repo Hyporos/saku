@@ -1748,11 +1748,18 @@ const EMOJI_LIMIT = 200;
 
 const pronounsOf = (member) => PRONOUN_ROLES.filter((p) => member?.roles?.cache?.some((r) => r.name === p)).join(" / ");
 
-// Pins and scheduled events need real API calls, so they're refreshed on a timer and read from cache.
-// A reply never waits on them.
+// Scheduled events need a real API call, so they're refreshed on a timer and read from cache. A reply
+// never waits on them.
+//
+// Pinned messages used to be read the same way and fed into the prompt as "the guild's own rules".
+// Measured against the real server it was not earning its place: nine channels matched the filter and
+// only an arbitrary four were read, two pins deep each, and most of those pins are images that carry
+// no text at all — so of eight slots, three had anything in them, one of which was cut off mid-sentence
+// at 220 characters. Meanwhile the notes actually worth knowing (the daily flag race times, the mule
+// guild) sat further down the same pin lists and never loaded. Fetching them cost four API calls every
+// six hours to put ~126 tokens of trivia in front of every single reply.
 const EXTRAS_TTL = 6 * 60 * 60 * 1000;
-const PIN_CHANNELS = /guide|mvp-train|culvert$|question|announcement|access/i;
-const extras = { at: 0, pins: [], events: [], loading: false };
+const extras = { at: 0, events: [], loading: false };
 
 async function refreshServerExtras(guild) {
   if (!guild || extras.loading) return;
@@ -1768,27 +1775,8 @@ async function refreshServerExtras(guild) {
         return `${e.name} (${when})${what}`;
       });
 
-    const channels = [...guild.channels.cache.values()]
-      .filter((c) => c.isTextBased?.() && !c.isThread?.() && PIN_CHANNELS.test(c.name) && !SKIP_CHANNELS.test(c.name))
-      .slice(0, 4);
-    const pins = [];
-    for (const channel of channels) {
-      try {
-        // fetchPins, not the deprecated fetchPinned: it returns { hasMore, items } where each item
-        // wraps the message rather than being one, and it takes a limit, so only what gets read is
-        // fetched. Newest first, which is the order the old call happened to give.
-        const { items } = await channel.messages.fetchPins({ limit: 2 });
-        for (const pin of items) {
-          const said = (pin.message.cleanContent ?? "").replace(/\s+/g, " ").trim();
-          if (said) pins.push(`#${channel.name}: ${said.slice(0, 220)}`);
-        }
-      } catch (err) {
-        // no read access to that channel's history, skip it
-      }
-    }
-    extras.pins = pins;
     extras.at = Date.now();
-    console.log(`Saku server context: ${extras.events.length} scheduled events, ${extras.pins.length} pinned notes cached`);
+    console.log(`Saku server context: ${extras.events.length} scheduled events cached`);
   } finally {
     extras.loading = false;
   }
@@ -1850,13 +1838,10 @@ function serverContext(guild, channel) {
     // and the caller block right after this carries a clock, so anything placed after it is fresh on
     // every request no matter how unchanging it is.
     stable: stableServerContext(guild),
-    // Moves with the channel, the member count, or the pin/event refresh, so it stays downstream.
+    // Moves with the channel, the member count, or the event refresh, so it stays downstream.
     volatile:
       `\n\nTHIS SERVER: ${guild.name}, ${guild.memberCount} members${channel?.name ? `, and you're replying in #${channel.name} right now` : ""}.` +
-      (extras.events.length ? `\nScheduled server events: ${extras.events.join(" | ")}. Mention these when someone asks what's coming up.` : "") +
-      (extras.pins.length
-        ? `\nPinned notes from key channels, treat them as the guild's own rules and answer from them rather than guessing:\n${extras.pins.map((p) => `- ${p}`).join("\n")}`
-        : ""),
+      (extras.events.length ? `\nScheduled server events: ${extras.events.join(" | ")}. Mention these when someone asks what's coming up.` : ""),
   };
 }
 
