@@ -13,7 +13,8 @@
     "test-birthday": "node tests/birthdayTiming.js",
     "test-canvas": "node tests/canvas.js",
     "test-permissions": "node tests/permissions.js",
-    "test-api": "node tests/api.js"
+    "test-api": "node tests/api.js",
+    "test-chat-modules": "node tests/chatModules.js"
   },
   "keywords": [],
   "author": "",

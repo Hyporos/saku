@@ -1,3 +1,15 @@
+const {
+  MODEL_CHAIN,
+  MAX_TOOL_ROUNDS,
+  MAX_HISTORY,
+  MAX_OUTPUT_TOKENS,
+  MODEL_COOLDOWN_MS,
+  ai,
+  THINKING_UNSUPPORTED,
+  thinkingFor,
+  isThinkingRejected,
+} = require("./model.js");
+const { usageKey, usage, loadUsage, spentOn, countRequest, countTurn, modelCost, turnCost, countTokens, estimatedCost } = require("./usage.js");
 const { GoogleGenAI, Type } = require("@google/genai");
 const axios = require("axios");
 const culvertSchema = require("../../schemas/culvertSchema.js");
@@ -18,36 +30,6 @@ require("dotenv").config();
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Shared "Saku AI" brain used by both the /chat command and @Saku mentions.
 
-// Tried in order, dropping to the next whenever one is rate limited or down. With billing on the key
-// there is no daily cap to ration, so this is an outage chain now rather than a budget one, and the
-// order is purely about which model should answer when they're all available. SAKU_CHAT_MODEL jumps
-// the queue for a session, and the full flash models the scanner uses are valid choices there if
-// adherence ever justifies the bill: quota is shared per project rather than reserved, so nothing is
-// off limits, but they cost about five times what a flash-lite request does on input.
-const MODEL_CHAIN = [
-  ...new Set(
-    [
-      process.env.SAKU_CHAT_MODEL,
-      // 3.1 leads on measured cost, not preference: 3.5-flash-lite returns zero cached tokens on
-      // every request (Flash-Lite isn't in Google's implicit-caching table at all), while 3.1 caches
-      // ~75% of a turn at the same price and the same latency. That's the whole input bill halved.
-      "gemini-3.1-flash-lite",
-      "gemini-3.5-flash-lite",
-    ].filter(Boolean)
-  ),
-];
-// Every round re-sends the entire prompt, so a turn's cost is roughly (rounds + 1) x the prompt, and
-// five rounds meant one indecisive turn could cost six. Three is where measurement landed: at two, a
-// compound question ("how much would Etel need, and what class is the top scorer") answered the first
-// half and gave up on the second, because it spent both rounds on the arithmetic. Most turns use none
-// or one, so the cap only prices the tail. The last round also carries an answer-now instruction, so
-// a model that would have asked for another doesn't cost a separate closeout request on top.
-const MAX_TOOL_ROUNDS = 3;
-const MAX_HISTORY = 30; // rolling window of stored turns (~15 exchanges); older turns fold into a summary
-// Generous ceilings, because brevity is the prompt's job. A tight token cap doesn't produce short
-// replies, it produces replies that stop mid-word: thinking tokens count against maxOutputTokens, so
-// a thinking model can spend the whole budget before it writes anything visible.
-const MAX_OUTPUT_TOKENS = 1800;
 const REPLY_CAP = 1900; // Discord's own limit is 2000
 const RATE_NOTICE = "I'm getting throttled right now, every model I can reach is busy or capped. Give me a minute and try again.";
 
@@ -87,31 +69,6 @@ function onCooldown(userId) {
   return false;
 }
 
-// A capped timeout with few retries matters more than squeezing out a slow success: when the API is
-// busy, failing fast lets the model chain move on instead of leaving someone staring at nothing.
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_CHAT_API_KEY || process.env.GEMINI_API_KEY,
-  httpOptions: { timeout: 30000, retryOptions: { attempts: 2 } },
-});
-
-// Thinking on defaults costs seconds per reply, which is far too slow for chat. The two families take
-// different knobs (3.x wants thinkingLevel, 2.5 wants thinkingBudget and rejects thinkingLevel with a
-// 400), and any model that refuses its knob gets remembered here and retried without one.
-//
-// Thinking bills at the OUTPUT rate, and measured on real turns it was 91% of billed output: ~1350
-// thinking tokens to produce ~130 visible ones, including on "hey whats up". "low" is not the floor,
-// "minimal" is, so that's the default. SAKU_THINKING_LEVEL raises it back if answers get shallow.
-const THINKING_UNSUPPORTED = new Set();
-const THINKING_LEVEL = process.env.SAKU_THINKING_LEVEL || "minimal";
-
-function thinkingFor(modelId, level = THINKING_LEVEL) {
-  if (THINKING_UNSUPPORTED.has(modelId)) return undefined;
-  if (/^gemini-3/.test(modelId)) return { thinkingLevel: level };
-  if (/^gemini-2\.5/.test(modelId)) return { thinkingBudget: 0 };
-  return undefined;
-}
-
-const isThinkingRejected = (err) => Number(err?.status) === 400 && /thinking/i.test(err?.message ?? "");
 
 // ⎯⎯ Persona + guardrails ⎯⎯ //
 
@@ -2217,221 +2174,10 @@ function trimToBoundary(text) {
 }
 
 
-// ⎯⎯ Daily usage accounting ⎯⎯ //
 
-// The chat key is on billing, so there is no daily ceiling to ration and nothing to run out of. What
-// used to live here was a whole rationing layer for the free tier (per-model daily caps read off the
-// AI Studio dashboard, a SAKU_DAILY_LIMITS override, a percentage, 10% milestone announcements, a
-// "no more chat until midnight" notice, and benching a model as spent for the rest of the day). All
-// of it was already switched off by a GEMINI_PAID flag and none of it had run in months, so it is
-// gone rather than maintained. Counting stays: it is the only record of what a day actually cost.
-
-// USD per 1,000,000 tokens, read off https://ai.google.dev/gemini-api/docs/pricing on 2026-07-30.
-// Correct them there, not from memory. `cached` is the context-caching input rate, which applies to
-// whatever share of the prompt came back as cachedContentTokenCount. Thinking bills at the output
-// rate, so it lands in `out` with the visible reply. A model missing here costs nothing in the
-// estimate rather than guessing, and gets flagged so the table can be filled in.
-const PRICES = {
-  "gemini-3.6-flash": { in: 1.5, out: 7.5, cached: 0.15 },
-  "gemini-3.5-flash": { in: 1.5, out: 9.0, cached: 0.15 },
-  "gemini-3.5-flash-lite": { in: 0.3, out: 2.5, cached: 0.03 },
-  // 3.1 is NOT priced like 3.5, which is what this row said until it was checked against the pricing
-  // page on 2026-08-02. It is cheaper on both sides, and since it answers almost every turn the error
-  // ran through everything downstream: getUsage, the 💳 card and the daily total all read about a
-  // fifth high, output nearly 70% high.
-  "gemini-3.1-flash-lite": { in: 0.25, out: 1.5, cached: 0.025 },
-  "gemini-3-flash-preview": { in: 0.5, out: 3.0, cached: 0.05 },
-  "gemini-2.5-flash": { in: 0.3, out: 2.5, cached: 0.03 },
-  "gemini-2.5-flash-lite": { in: 0.1, out: 0.4, cached: 0.01 },
-};
-
-const quotaDay = () => dayjs().tz("America/Los_Angeles").format("YYYY-MM-DD");
-// Model ids contain dots, and a dot in a Mongo field path means "nest me", so flatten them first.
-const usageKey = (model) => model.replace(/\./g, "_");
-
-let usage = null;
-
-async function loadUsage() {
-  const day = quotaDay();
-  if (usage?.day === day) return usage;
-  const doc = await usageSchema.findById(day).lean().catch(() => null);
-  usage = { day, requests: { ...(doc?.requests ?? {}) }, tokens: { ...(doc?.tokens ?? {}) } };
-  return usage;
-}
-
-const spentOn = (model) => usage.requests[usageKey(model)] ?? 0;
-
-const saveUsage = (update) => usageSchema.updateOne({ _id: usage.day }, { ...update, $set: { ...update.$set, updatedAt: new Date() } }, { upsert: true }).catch((err) => console.error("Error - Saku usage write failed:", err?.message));
-
-function countRequest(model) {
-  if (!usage) return;
-  const key = usageKey(model);
-  usage.requests[key] = (usage.requests[key] ?? 0) + 1;
-  saveUsage({ $inc: { [`requests.${key}`]: 1 } }); // fire and forget, a counter isn't worth the latency
-}
-
-// Called with the usageMetadata off every response, chat turns and summaries alike. cachedContentTokenCount
-// is the slice of promptTokenCount that came back from cache, so it's tracked separately and subtracted
-// when pricing rather than double counted.
-// Per-turn accounting, kept alongside the daily totals so a single reply can account for itself when
-// someone asks. The sink is passed in rather than held in a module variable because turns interleave:
-// two people talking at once would otherwise bill each other's tokens.
-function countTurn(sink, model, meta) {
-  if (!sink || !meta) return;
-  const add = {
-    requests: 1,
-    prompt: meta.promptTokenCount ?? 0,
-    output: meta.candidatesTokenCount ?? 0,
-    thinking: meta.thoughtsTokenCount ?? 0,
-    cached: meta.cachedContentTokenCount ?? 0,
-  };
-  // Kept per model as well as in total. A turn that escalated ran on two models at very different
-  // rates, and the totals alone can't say which one the money went to.
-  const per = (sink.byModel[model] ??= { requests: 0, prompt: 0, output: 0, thinking: 0, cached: 0 });
-  for (const [field, value] of Object.entries(add)) {
-    sink[field] += value;
-    per[field] += value;
-  }
-}
-
-// Priced per model rather than per turn. This used to take the first model's rate and apply it to
-// everything, so an escalated turn was billed entirely at the cheap rate and read far too low.
-function modelCost(model, t) {
-  const price = PRICES[model] ?? PRICES["gemini-3.1-flash-lite"];
-  const fresh = Math.max(0, t.prompt - t.cached);
-  return (fresh * price.in + t.cached * price.cached + (t.output + t.thinking) * price.out) / 1_000_000;
-}
-
-const turnCost = (turn) => Object.entries(turn.byModel).reduce((sum, [model, t]) => sum + modelCost(model, t), 0);
-
-function countTokens(model, meta) {
-  if (!usage || !meta) return;
-  const key = usageKey(model);
-  const add = {
-    prompt: meta.promptTokenCount ?? 0,
-    output: meta.candidatesTokenCount ?? 0,
-    thinking: meta.thoughtsTokenCount ?? 0,
-    cached: meta.cachedContentTokenCount ?? 0,
-  };
-  const current = (usage.tokens[key] ??= { prompt: 0, output: 0, thinking: 0, cached: 0 });
-  const inc = {};
-  // All four go in every time, zeros included. A cached count of 0 is the single most useful number
-  // here, and skipping it would leave the field absent and indistinguishable from never measured.
-  for (const [field, value] of Object.entries(add)) {
-    current[field] = (current[field] ?? 0) + value;
-    inc[`tokens.${key}.${field}`] = value;
-  }
-  saveUsage({ $inc: inc });
-}
-
-// Sums the day's tokens against PRICES. Returns the models it couldn't price so a missing entry shows
-// up as a gap to fix instead of quietly understating the bill.
-function estimatedCost() {
-  let usd = 0;
-  const unpriced = [];
-  for (const [key, t] of Object.entries(usage?.tokens ?? {})) {
-    const model = MODEL_CHAIN.find((m) => usageKey(m) === key) ?? key.replace(/_/g, ".");
-    if (!PRICES[model]) {
-      unpriced.push(model);
-      continue;
-    }
-    usd += modelCost(model, { prompt: t.prompt ?? 0, cached: t.cached ?? 0, output: t.output ?? 0, thinking: t.thinking ?? 0 });
-  }
-  return { usd: Math.round(usd * 10000) / 10000, unpriced };
-}
-
-// Remember which model just failed, so an outage costs one wasted call instead of one per message.
-// A minute, because on billing the only thing a 429 can mean is a per-minute burst, and benching the
-// best model for longer hands the rest of the conversation to a weaker one for no reason.
-const MODEL_COOLDOWN_MS = 60 * 1000;
-
-// How many emote-free replies a person gets after Saku uses one. Custom emotes only: plain unicode
-// emoji are governed by the prompt, not by this.
-const EMOTE_RE = /<a?:\w+:\d+>/g;
-const HAS_EMOTE = /<a?:\w+:\d+>/; // separate and non-global: .test() on a /g regex carries lastIndex
-const EMOTE_GAP = 4;
-const emoteCooldown = new Map();
-
-// Asking for a channel has to be caught here, because a miss is not a small one: no roll gets put in
-// front of the model, the guard further down then strips the channel it named anyway, and the person
-// who asked a direct question gets a non-answer about luck instead. The old verb list missed real
-// requests ("could you give me the real channel for pitched drops?" contains none of them, and
-// "going" doesn't match \bgo\b), so any question mentioning a channel now counts.
-const CHANNEL_WORD = /\bch(?:annel)?s?\b/i;
-// Request words only. Topic words like "drop" or "pitched" belong to the question mark branch:
-// putting them here made a plain statement ("i just got a drop on ch 12") look like a request, which
-// is how Saku started volunteering channels at people who hadn't asked.
-const CHANNEL_ASK =
-  /\b(what|whats|which|good|best|where|try|go|going|use|using|lucky|luck|recommend|suggest|should|give|gimme|can|could|would|tell|pick|roll|need|want|any|real|another|other|different|next)\b/i;
-
-// Discord renders a custom emote ONLY as <:name:id>. The model writes two near misses: the bare
-// :name: that people type, and a half-formed <:name:> with the id dropped. Both ship as literal text.
-// Repair whichever resolve to a real guild emote and DELETE the ones that don't, including names the
-// model invented outright, because a stray ":sakuHammer:" sitting in a sentence reads worse than no
-// emote at all. Exported for the regression suite: the model can't be made to misformat on demand.
-// Edit distance, capped work: only used to rescue a near-miss emote name.
-function editDistance(a, b) {
-  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    let corner = prev[0];
-    prev[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const next = Math.min(prev[j] + 1, prev[j - 1] + 1, corner + (a[i - 1] === b[j - 1] ? 0 : 1));
-      corner = prev[j];
-      prev[j] = next;
-    }
-  }
-  return prev[b.length];
-}
-
-// Deleting an emote that doesn't resolve leaves the sentence around it broken ("I'll give you a
-// instead"), which is worse than the glitch it was meant to fix. Most misses are near misses, so the
-// name is matched loosely first: case, punctuation, a dropped or added letter. Only a name with no
-// plausible match at all is dropped.
-function matchEmote(name, cache) {
-  if (!cache) return null;
-  const list = [...cache.values()];
-  const flat = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const want = flat(name);
-
-  const exact = list.find((e) => e.name.toLowerCase() === name.toLowerCase()) ?? list.find((e) => flat(e.name) === want);
-  if (exact) return exact;
-
-  // Saku's own set only: a near miss should never land on some unrelated server emote.
-  const own = list.filter((e) => /^saku/i.test(e.name));
-  const shortest = (a, b) => a.name.length - b.name.length;
-
-  const overlap = own.filter((e) => flat(e.name).startsWith(want) || want.startsWith(flat(e.name))).sort(shortest);
-  if (overlap.length) return overlap[0];
-
-  const near = own
-    .map((e) => ({ e, d: editDistance(flat(e.name), want) }))
-    .filter((x) => x.d <= 2)
-    .sort((a, b) => a.d - b.d || shortest(a.e, b.e));
-  return near.length ? near[0].e : null;
-}
-
-function repairEmotes(reply, guild) {
-  const cache = guild?.emojis?.cache ?? null;
-  const resolve = (name) => matchEmote(name, cache);
-
-  return String(reply)
-    // Anything in angle brackets is rebuilt from the real emote rather than trusted, because the id
-    // is invented as readily as the name is, and Discord renders a wrong id as literal text too.
-    // With no cache to check against, a well-formed tag is left alone and only broken ones go.
-    .replace(/<a?:([A-Za-z0-9_]+):[^<>]*>/g, (whole, name) => {
-      const hit = resolve(name);
-      if (hit) return hit.toString();
-      return !cache && /^<a?:[A-Za-z0-9_]+:\d+>$/.test(whole) ? whole : "";
-    })
-    // Bare :name:. Only saku* is touched, so "3:4:5" and clock times are left alone.
-    .replace(/(?<!<):([A-Za-z0-9_]+):(?!\d)/g, (whole, name) =>
-      /^saku/i.test(name) ? (resolve(name)?.toString() ?? "") : whole
-    )
-    .replace(/ {2,}/g, " ") // spaces only: collapsing \s would eat the line breaks
-    .replace(/ +([,.!?])/g, "$1")
-    .trim();
-}
+// Emote rationing, the channel-request detector and the :name: repair pass all moved out together:
+// none of them referenced anything else in this file.
+const { EMOTE_RE, HAS_EMOTE, EMOTE_GAP, emoteCooldown, CHANNEL_WORD, CHANNEL_ASK, matchEmote, repairEmotes } = require("./emotes.js");
 const modelCooldowns = new Map();
 
 function availableModels() {

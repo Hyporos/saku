@@ -23,6 +23,8 @@ apps/
 
 ### Folder structure — follow it, don't invent alongside it
 
+**Read `apps/bot/ARCHITECTURE.md` before moving a file or adding a folder.** It documents the layout, why each split was made, the traps each one sprung, and the deliberate decisions that look like bugs.
+
 ```
 src/
   index.js            entry point: client, express, cron bootstrap
