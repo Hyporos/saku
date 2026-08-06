@@ -1,4 +1,5 @@
 const { Events, EmbedBuilder } = require("discord.js");
+const { CHANNELS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -9,7 +10,7 @@ module.exports = {
     if (oldMember.nickname === newMember.nickname) return;
 
     // Fetch the channel to log messages to
-    const logChannel = await oldMember.guild.channels.fetch('804899301632770078').catch(() => null);
+    const logChannel = await oldMember.guild.channels.fetch(CHANNELS.MEMBER_LOG).catch(() => null);
     if (!logChannel) return;
 
     // Check if the user nickname was changed

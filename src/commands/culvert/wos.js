@@ -7,6 +7,7 @@ const {
   ComponentType,
 } = require("discord.js");
 const { getAllCharacters } = require("../../domain/culvert/utils.js");
+const { EMOJIS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -36,22 +37,22 @@ module.exports = {
     // Create pagination buttons and action row
     const previous = new ButtonBuilder()
       .setCustomId("previous")
-      .setEmoji("<:singleleftchevron:1375242927634120804>")
+      .setEmoji(EMOJIS.NAV.prev)
       .setStyle(ButtonStyle.Primary);
 
     const next = new ButtonBuilder()
       .setCustomId("next")
-      .setEmoji("<:singlerightchevron:1375242928787689693>")
+      .setEmoji(EMOJIS.NAV.next)
       .setStyle(ButtonStyle.Primary);
 
     const first = new ButtonBuilder()
       .setCustomId("first")
-      .setEmoji("<:doubleleftchevron:1193783344996024350>")
+      .setEmoji(EMOJIS.NAV.first)
       .setStyle(ButtonStyle.Secondary);
 
     const last = new ButtonBuilder()
       .setCustomId("last")
-      .setEmoji("<:doublerightchevron:1193783935071682591>")
+      .setEmoji(EMOJIS.NAV.last)
       .setStyle(ButtonStyle.Secondary);
 
     const pagination = new ActionRowBuilder().addComponents(

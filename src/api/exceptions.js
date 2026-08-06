@@ -1,6 +1,6 @@
 const express = require("express");
 const exceptionSchema = require("../schemas/exceptionSchema.js");
-const { writeActionLog } = require("./shared.js");
+const { writeActionLog, fail, objectId } = require("./shared.js");
 const { clearScanCache } = require("./scanCache.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -13,8 +13,7 @@ router.get("/admin/exceptions", async (req, res) => {
     const exceptions = await exceptionSchema.find();
     res.json(exceptions);
   } catch (error) {
-    console.error("Error fetching exceptions:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching exceptions");
   }
 });
 
@@ -33,16 +32,13 @@ router.post("/admin/exceptions", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error creating exception:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "creating exception");
   }
 });
 
 router.patch("/admin/exceptions/:id", async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ error: "Invalid exception id" });
-    }
+    if (!objectId(req.params.id)) return res.status(400).json({ error: "Invalid exception id" });
     const name = String(req.body?.name ?? "").trim();
     const exception = String(req.body?.exception ?? "").trim();
     if (!name) return res.status(400).json({ error: "Name is required" });
@@ -66,16 +62,13 @@ router.patch("/admin/exceptions/:id", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error updating exception:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "updating exception");
   }
 });
 
 router.delete("/admin/exceptions/:id", async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ error: "Invalid exception id" });
-    }
+    if (!objectId(req.params.id)) return res.status(400).json({ error: "Invalid exception id" });
     const existing = await exceptionSchema.findById(req.params.id, { name: 1, exception: 1 }).lean();
     await exceptionSchema.findByIdAndDelete(req.params.id);
     await writeActionLog(req, {
@@ -86,8 +79,7 @@ router.delete("/admin/exceptions/:id", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting exception:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "deleting exception");
   }
 });
 

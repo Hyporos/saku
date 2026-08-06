@@ -149,8 +149,6 @@ module.exports = {
   DEFAULT_AVATAR,
   createHiDpiCanvas,
   loadAsset,
-  loadAvatar,
-  avatarUrlOf,
   avatarFor,
   displayNameOf,
   fitText,

@@ -14,7 +14,7 @@ const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const weekSchema = require("../../schemas/weekSchema.js");
 const userSchema = require("../../schemas/userSchema.js");
 const starboardSchema = require("../../schemas/starboardSchema.js");
-const { nameMatch, getResetDates } = require("../../domain/culvert/utils.js");
+const { nameMatch, getResetDates, RANKINGS_URL } = require("../../domain/culvert/utils.js");
 const { CHANNELS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -34,11 +34,6 @@ const MAX_SCORE = 2000000;
 
 // How far back a restore can reach, matching the action log's own expiry.
 const RESTORE_WINDOW_DAYS = 90;
-
-const RANKINGS_URL = (name) =>
-  `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${encodeURIComponent(
-    name
-  )}`;
 
 /**
  * Look a character up on the official rankings.

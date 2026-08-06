@@ -30,12 +30,16 @@ app.use("/api", routes);
 
 // Create a new client instance
 const client = new Client({
-  intents:
-    [GatewayIntentBits.Guilds] |
-    [GatewayIntentBits.GuildMembers] |
-    [GatewayIntentBits.MessageContent] |
-    [GatewayIntentBits.GuildMessages] |
-    [GatewayIntentBits.GuildMessageReactions],
+  // Each of these used to be wrapped in its own array and bitwise-OR'd together. That happened to
+  // produce the right number — a one-element array coerces to its element — but only because every
+  // intent is a single value. discord.js takes the plain list.
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
+  ],
   // Message and Reaction partials are what let a reaction on an older message fire at all: without
   // them Discord drops the event whenever the message has left the cache, which the sweeper below
   // makes routine. The handler fetches whatever arrives partial before reading it.

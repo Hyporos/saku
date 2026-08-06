@@ -1,65 +1,39 @@
-<div id="user-content-toc">
-  <ul>
-    <summary align="center">
-        <h1 style="display: inline-block;">
-          Saku
-        </h1>
-    </summary>
-        <summary align="center">
-      <img src="src/assets/avatar.png" alt="Calculator UI"/>
-    </summary>
-        <summary align="center">
-        <h3 style="display: inline-block;">
-          A Discord Bot tailored for Saku's community.
-        </h3>
-                 <h4 style="display: inline-block;">
-                    As a member, make use of commands such as /profile and /graph which provide you with detailed character and culvert score statistics. You can also view the overall scores with /rankings, or use fun commands such as /roll to get some insight!
-        </h4>
-                            <h4 style="display: inline-block;">
-                    As an administrator, work comfortably behind the scenes. Manage users and characters (CRUD), scan and input weekly scores, view top secret data, and more. 
-        </h4>
-    </summary>
-    <hr></hr>
-  </ul>
-</div>
+# Saku
 
-<h2 align="center">Profile</h2>
+A Discord bot tailored for Saku's community.
 
-<div align="center">
-  <img src="src/assets/profile.png" alt="Calculator UI"/>
-</div>
+As a member, use commands like `/profile` and `/graph` for detailed character and culvert score
+statistics, `/rankings` for the guild leaderboard, or fun ones like `/roll`. Run `/help` to browse
+every command by category.
 
-<h2 align="center">Graph</h2>
+As an administrator, work behind the scenes: manage users and characters, scan and submit weekly
+scores from a screenshot, and view the data members don't see.
 
-<div align="center">
-  <img src="src/assets/graph.png" alt="Tools UI"/>
-</div>
+---
 
-<h2 align="center">Rankings</h2>
+## Documentation
 
-<div align="center">
-  <img src="src/assets/rankings.png" alt="Overview UI"/>
-</div>
+| | |
+|---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | How the bot is laid out and why — read before moving a file or adding a folder |
+| [`../../CLAUDE.md`](../../CLAUDE.md) | Working rules: command patterns, access tiers, date logic, common pitfalls |
+| `/help` in Discord | The live command reference, driven by the `COMMANDS` array in `commands/utility/help.js` |
 
-<h2 align="center">Help</h2>
+## Running it
 
-<div align="center">
-  <img src="src/assets/help.png" alt="Graph UI"/>
-</div>
+```
+pnpm bot               # start the bot
+pnpm deploy-commands   # register slash commands with Discord (needed after any name or option change)
+```
 
-<h2 align="center">Scan (and related commands)</h2>
+## Tests
 
-<div align="center">
-  <img src="src/assets/scan.png" alt="Graph UI"/>
-</div>
-
-<div id="user-content-toc">
-  <ul>
-    <hr></hr>
-    <summary align="center">
-        <h2 style="display: inline-block;">
-          Check the code to see more of the commands and how they work!
-        </h1>
-    </summary>
-  </ul>
-</div>
+```
+pnpm --filter bot test-symbols        # every identifier is declared or imported
+pnpm --filter bot test-api            # all API routes still mounted
+pnpm --filter bot test-permissions    # command access tiers match their descriptions
+pnpm --filter bot test-scan-match     # screenshot name matching
+pnpm --filter bot test-chat-modules   # chat module exports and import cycles
+pnpm --filter bot test-canvas         # level card and leaderboard rendering
+pnpm --filter bot test-chat           # live model behaviour (calls the real API)
+```

@@ -16,6 +16,8 @@ const ROLES = {
   BEE: "720001044746076181", // guild admins
   MEMBER: "750000646345719899",
   FRIEND: "720006084252663868", // no access to culvert commands
+  URSUS: "835222431396397058", // opt-in ping for the 2x Ursus windows
+  MONSTER_PARK: "962201169588019221", // opt-in ping for the Sunday box reminder
 };
 
 const USERS = {
@@ -29,33 +31,36 @@ const USERS = {
 const CHANNELS = {
   STARBOARD: "1069832131938897950",
   SAKU_YAPS: "1532571112469299220", // the one channel members may @mention Saku in
-  SAKU: "719788426022617142", // general, also where anniversaries post
+  SAKU: "719788426022617142", // general, also where anniversaries and birthdays post
   CULVERT: "1090037019557769256",
-  REMINDERS_SCAN: "1090002887410729090", // scan reminders, the checklist, and birthdays
+  REMINDERS_SCAN: "1090002887410729090", // scan reminders and the checklist
   ANNOUNCEMENTS: "720002714683179070",
   CRASH_LOG: "1288222696731054120",
   LATENCY: "1463623492015620137",
   EVENT: "1533969784855593040",
+  MEMBER_LOG: "804899301632770078", // joins, leaves and nickname changes
+  INTRODUCTIONS: "720002479005237258", // also where new members are welcomed
 };
 
 // Channels that earn no levelling XP: bot spam, admin rooms, and anywhere chat is not conversation.
-const NO_XP_CHANNELS = [
+// A Set because the only thing ever asked of it is whether one channel is in it.
+const NO_XP_CHANNELS = new Set([
   "761406523950891059", // bot-spam
-  "1090037019557769256", // culvert
+  CHANNELS.CULVERT,
   "807320077951172659", // bees-pls
   "1178171097858973746", // dannis-fan-club
   "913840369001709608", // karuta
-  "1090002887410729090", // reminders-scan
+  CHANNELS.REMINDERS_SCAN,
   "1147319860481765500", // dev
   "733468367653961760", // inactive
-  "720002479005237258", // introductions
+  CHANNELS.INTRODUCTIONS,
   "720004340558856222", // admin-channel
   "821763840559153174", // admin-channel
   "1302748524110418011", // admin-channel
   "720118849155891302", // admin-channel
   "776872035754180610", // admin-channel
   "788477119000084501", // admin-channel
-];
+]);
 
 // Raw ids where a bare id is wanted (message.react takes one), and the rendered <:name:id> form
 // where the emote goes into text. Discord only renders the second form.
@@ -88,7 +93,10 @@ const EMOJIS = {
 
 // The two permission checks that appear all over the command tree, written once. `member` may be
 // null in a DM, which is why every call is optional-chained rather than assumed.
+//
+// The owner counts as a bee everywhere, so `isBee` folds that in rather than leaving each caller to
+// remember the `|| userId === OWNER` half — which is exactly the half that kept getting dropped.
 const isBee = (member, userId) => Boolean(member?.roles?.cache?.has(ROLES.BEE)) || userId === USERS.OWNER;
 const isOwner = (userId) => userId === USERS.OWNER;
 
-module.exports = { GUILD_ID, ROLES, USERS, CHANNELS, NO_XP_CHANNELS, EMOJI_IDS, EMOJIS, STAR_UNICODE, isUnicodeStar, isBee, isOwner };
+module.exports = { GUILD_ID, ROLES, USERS, CHANNELS, NO_XP_CHANNELS, EMOJI_IDS, EMOJIS, isUnicodeStar, isBee, isOwner };

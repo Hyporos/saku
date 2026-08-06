@@ -1,6 +1,8 @@
 const express = require("express");
 const culvertSchema = require("../schemas/culvertSchema.js");
-const { escapeRegex, isDiscordId, writeActionLog } = require("./shared.js");
+const userSchema = require("../schemas/userSchema.js");
+const { isDiscordId, writeActionLog, fail, getGuild } = require("./shared.js");
+const { ROLES } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Guild members and their linked accounts.
@@ -9,14 +11,12 @@ const router = express.Router();
 
 // Users — culvertSchema documents (keyed by Discord user ID)
 
-const BEE_ROLE_ID = process.env.BEE_ROLE_ID;
-const MEMBER_ROLE_ID = process.env.MEMBER_ROLE_ID;
+// Read from the id table rather than the environment: an unset BEE_ROLE_ID made `roles.cache.has`
+// take undefined, which is never a hit, so every bee quietly rendered in the panel as a plain member.
 
 router.get("/admin/users", async (req, res) => {
   try {
-    const discordClient = req.app.get("client");
-    const guild = discordClient?.guilds.cache.get(process.env.SAKU_GUILD_ID)
-                  || await discordClient.guilds.fetch(process.env.SAKU_GUILD_ID).catch(() => null);
+    const guild = await getGuild(req);
 
     // Load all DB records
     const dbUsers = await culvertSchema.find({}, { _id: 1, characters: 1 });
@@ -55,7 +55,7 @@ router.get("/admin/users", async (req, res) => {
       const userId = String(dbUser._id);
       const member = memberMap.get(userId) ?? null;
       const role = member
-        ? (member.roles.cache.has(BEE_ROLE_ID) ? "bee" : (member.roles.cache.has(MEMBER_ROLE_ID) ? "member" : null))
+        ? (member.roles.cache.has(ROLES.BEE) ? "bee" : (member.roles.cache.has(ROLES.MEMBER) ? "member" : null))
         : null;
       const avatarUrl = member ? member.displayAvatarURL({ extension: "webp", size: 128 }) : null;
 
@@ -80,8 +80,7 @@ router.get("/admin/users", async (req, res) => {
     });
     res.json(results);
   } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching users");
   }
 });
 
@@ -96,8 +95,7 @@ router.patch("/admin/users/:id", async (req, res) => {
     await culvertSchema.findByIdAndUpdate(req.params.id, { $set: { "characters.$[].graphColor": graphColor } });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "updating user");
   }
 });
 
@@ -113,19 +111,14 @@ router.delete("/admin/users/:id", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting user:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "deleting user");
   }
 });
 
 // Fetch a single guild member by Discord ID — server avatar + nickname, no role filter
 router.get("/admin/member/:id", async (req, res) => {
   try {
-    const discordClient = req.app.get("client");
-    
-    // 1. Fetch the guild instead of just checking cache
-    const guild = discordClient.guilds.cache.get(process.env.SAKU_GUILD_ID) 
-                  || await discordClient.guilds.fetch(process.env.SAKU_GUILD_ID).catch(() => null);
+    const guild = await getGuild(req);
 
     if (!guild) return res.status(503).json({ error: "Guild not found/unavailable" });
 
@@ -137,18 +130,22 @@ router.get("/admin/member/:id", async (req, res) => {
     // 3. Robust Avatar Logic: Server Avatar -> Global Avatar -> Default Blurple
     const avatarUrl = member.displayAvatarURL({ extension: "png", size: 256 });
 
-    const role = member.roles.cache.has(BEE_ROLE_ID) ? "bee" : "member";
+    // Only the month is stored — /birthday never asks for a day, because birthdays are announced
+    // together on the 1st and the day was never used for anything.
+    const stored = await userSchema.findById(req.params.id, { birthdayMonth: 1 }).lean();
+
+    const role = member.roles.cache.has(ROLES.BEE) ? "bee" : "member";
     res.json({
       _id: req.params.id,
       username: member.user.username,
       nickname: member.nickname || member.user.globalName || member.user.username,
       joinedAt: member.joinedAt?.toISOString() ?? null,
+      birthdayMonth: stored?.birthdayMonth ?? null,
       role,
       avatarUrl,
     });
   } catch (error) {
-    console.error("Error fetching member:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching member");
   }
 });
 
@@ -156,9 +153,7 @@ router.get("/admin/member/:id", async (req, res) => {
 
 router.get("/admin/guild-members", async (req, res) => {
   try {
-    const discordClient = req.app.get("client");
-    const guild = discordClient?.guilds.cache.get(process.env.SAKU_GUILD_ID)
-                  || await discordClient.guilds.fetch(process.env.SAKU_GUILD_ID).catch(() => null);
+    const guild = await getGuild(req);
 
     if (!guild) return res.status(503).json({ error: "Guild not available" });
 
@@ -175,8 +170,7 @@ router.get("/admin/guild-members", async (req, res) => {
     list.sort((a, b) => (a.nickname ?? a.username).localeCompare(b.nickname ?? b.username));
     res.json(list);
   } catch (error) {
-    console.error("Error fetching guild members:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching guild members");
   }
 });
 

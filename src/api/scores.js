@@ -1,24 +1,35 @@
 const express = require("express");
 const culvertSchema = require("../schemas/culvertSchema.js");
-const mongoose = require("mongoose");
-const { escapeRegex, isIsoDate, writeActionLog } = require("./shared.js");
+const { escapeRegex, isIsoDate, writeActionLog, fail, objectId } = require("./shared.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Individual culvert scores, by character+date or by score id.
 
 const router = express.Router();
 
+// Case-insensitive match on a character name, which every route in this file needs.
+const named = (safeName) => ({ $regex: `^${safeName}$`, $options: "i" });
+
+// The score a character already has for a week, or undefined. Read before an edit or a delete so the
+// action log can say what the value actually was, which is the only reason the write is preceded by a
+// read at all.
+async function existingScoreFor(safeCharacter, safeDate) {
+  const doc = await culvertSchema
+    .findOne({ "characters.name": named(safeCharacter), "characters.scores.date": safeDate }, { "characters.$": 1 })
+    .lean();
+  return doc?.characters?.[0]?.scores?.find((s) => s.date === safeDate);
+}
+
 router.get("/admin/scores/:character", async (req, res) => {
   try {
     const safeCharacter = escapeRegex(req.params.character);
     const user = await culvertSchema.findOne(
-      { "characters.name": { $regex: `^${safeCharacter}$`, $options: "i" } },
+      { "characters.name": named(safeCharacter) },
       { "characters.$": 1 }
     );
     res.json(user?.characters[0]?.scores ?? []);
   } catch (error) {
-    console.error("Error fetching scores:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching scores");
   }
 });
 
@@ -32,7 +43,7 @@ router.post("/admin/scores", async (req, res) => {
     }
     const safeCharacter = escapeRegex(character);
     await culvertSchema.findOneAndUpdate(
-      { "characters.name": { $regex: `^${safeCharacter}$`, $options: "i" } },
+      { "characters.name": named(safeCharacter) },
       { $push: { "characters.$.scores": { date, score } } }
     );
     await writeActionLog(req, {
@@ -43,8 +54,7 @@ router.post("/admin/scores", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error adding score:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "adding score");
   }
 });
 
@@ -56,22 +66,15 @@ router.patch("/admin/scores/:character/:date(\\d{4}-\\d{2}-\\d{2})", async (req,
     if (!isIsoDate(safeDate) || !Number.isFinite(score) || score < 0) {
       return res.status(400).json({ error: "Invalid score payload" });
     }
-    const existingDoc = await culvertSchema.findOne(
-      {
-        "characters.name": { $regex: `^${safeCharacter}$`, $options: "i" },
-        "characters.scores.date": safeDate,
-      },
-      { "characters.$": 1 }
-    ).lean();
-    const existingScore = existingDoc?.characters?.[0]?.scores?.find((s) => s.date === safeDate);
+    const existingScore = await existingScoreFor(safeCharacter, safeDate);
 
     await culvertSchema.findOneAndUpdate(
       {
-        "characters.name": { $regex: `^${safeCharacter}$`, $options: "i" },
+        "characters.name": named(safeCharacter),
         "characters.scores.date": safeDate,
       },
       { $set: { "characters.$[c].scores.$[s].score": score } },
-      { arrayFilters: [{ "c.name": { $regex: `^${safeCharacter}$`, $options: "i" } }, { "s.date": safeDate }] }
+      { arrayFilters: [{ "c.name": named(safeCharacter) }, { "s.date": safeDate }] }
     );
     await writeActionLog(req, {
       action: "Edit Score",
@@ -81,8 +84,7 @@ router.patch("/admin/scores/:character/:date(\\d{4}-\\d{2}-\\d{2})", async (req,
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error updating score:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "updating score");
   }
 });
 
@@ -92,17 +94,10 @@ router.delete("/admin/scores/:character/:date(\\d{4}-\\d{2}-\\d{2})", async (req
     const safeDate = String(req.params.date ?? "").trim();
     if (!isIsoDate(safeDate)) return res.status(400).json({ error: "Invalid score date" });
 
-    const existingDoc = await culvertSchema.findOne(
-      {
-        "characters.name": { $regex: `^${safeCharacter}$`, $options: "i" },
-        "characters.scores.date": safeDate,
-      },
-      { "characters.$": 1 }
-    ).lean();
-    const existingScore = existingDoc?.characters?.[0]?.scores?.find((s) => s.date === safeDate);
+    const existingScore = await existingScoreFor(safeCharacter, safeDate);
 
     await culvertSchema.findOneAndUpdate(
-      { "characters.name": { $regex: `^${safeCharacter}$`, $options: "i" } },
+      { "characters.name": named(safeCharacter) },
       { $pull: { "characters.$.scores": { date: safeDate } } }
     );
     await writeActionLog(req, {
@@ -113,8 +108,7 @@ router.delete("/admin/scores/:character/:date(\\d{4}-\\d{2}-\\d{2})", async (req
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting score:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "deleting score");
   }
 });
 
@@ -123,10 +117,8 @@ router.delete("/admin/scores/:character/:date(\\d{4}-\\d{2}-\\d{2})", async (req
 
 router.patch("/admin/scores/by-id/:scoreId", async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.scoreId)) {
-      return res.status(400).json({ error: "Invalid score id" });
-    }
-    const scoreId = new mongoose.Types.ObjectId(req.params.scoreId);
+    const scoreId = objectId(req.params.scoreId);
+    if (!scoreId) return res.status(400).json({ error: "Invalid score id" });
     const scoreProvided = req.body?.score !== undefined;
     const dateProvided = req.body?.date !== undefined;
     if (!scoreProvided && !dateProvided) {
@@ -200,17 +192,14 @@ router.patch("/admin/scores/by-id/:scoreId", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error updating score by id:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "updating score by id");
   }
 });
 
 router.delete("/admin/scores/by-id/:scoreId", async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.scoreId)) {
-      return res.status(400).json({ error: "Invalid score id" });
-    }
-    const scoreId = new mongoose.Types.ObjectId(req.params.scoreId);
+    const scoreId = objectId(req.params.scoreId);
+    if (!scoreId) return res.status(400).json({ error: "Invalid score id" });
 
     const ownerDoc = await culvertSchema.findOne(
       { "characters.scores._id": scoreId },
@@ -244,8 +233,7 @@ router.delete("/admin/scores/by-id/:scoreId", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting score by id:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "deleting score by id");
   }
 });
 

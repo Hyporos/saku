@@ -24,22 +24,14 @@ const {
   promptWeekCount,
 } = require("../../domain/culvert/chart.js");
 const dayjs = require("dayjs");
-const { ROLES, USERS } = require("../../config/ids.js");
+const { isBee, EMOJIS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const BEE_ROLE_ID = ROLES.BEE;
-const OWNER_ID = USERS.OWNER;
-
 // Renders a stat with a bracketed week-over-week delta, e.g. "1,234 (🔺 56)"
-const UPTREND = "<:uptrend:1532546386497765416>";
-const DOWNTREND = "<:downtrend:1532546371712848013>";
-
-// Pagination chevrons (guild custom emojis), same pair /rankings and /wos use
-const CHEVRON = {
-  prev: "<:singleleftchevron:1375242927634120804>",
-  next: "<:singlerightchevron:1375242928787689693>",
-};
+const UPTREND = EMOJIS.UPTREND;
+const DOWNTREND = EMOJIS.DOWNTREND;
+const CHEVRON = EMOJIS.NAV;
 
 function statField(current, prev) {
   const value = current.toLocaleString();
@@ -182,10 +174,7 @@ module.exports = {
 
   async execute(interaction) {
     // Restrict to bees and owner only
-    const isBee =
-      interaction.member.roles.cache.has(BEE_ROLE_ID) ||
-      interaction.user.id === OWNER_ID;
-    if (!isBee) {
+    if (!isBee(interaction.member, interaction.user.id)) {
       return interaction.reply({
         content: "Error - You do not have permission to use this command.",
         ephemeral: true,

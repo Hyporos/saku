@@ -1,8 +1,9 @@
 const express = require("express");
+const axios = require("axios");
 const culvertSchema = require("../schemas/culvertSchema.js");
 const actionLogSchema = require("../schemas/actionLogSchema.js");
-const mongoose = require("mongoose");
-const { ARCHIVE_WINDOW_DAYS, escapeRegex, isDiscordId, isIsoDate, isStoredDate, graphColorName, writeActionLog } = require("./shared.js");
+const { RANKINGS_URL } = require("../domain/culvert/utils.js");
+const { ARCHIVE_WINDOW_DAYS, escapeRegex, isDiscordId, isIsoDate, isStoredDate, graphColorName, writeActionLog, fail } = require("./shared.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Creating, editing, transferring and removing characters, plus the restorable archive.
@@ -40,8 +41,7 @@ router.post("/admin/characters", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error creating character:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "creating character");
   }
 });
 
@@ -65,9 +65,7 @@ router.patch("/admin/characters/:userId/:name", async (req, res) => {
     let canonicalName = nextName;
     if (nextName.toLowerCase() !== currentName.toLowerCase()) {
       try {
-        const rankingsRes = await axios.get(
-          `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${encodeURIComponent(nextName)}`
-        );
+        const rankingsRes = await axios.get(RANKINGS_URL(nextName));
         const topRank = rankingsRes?.data?.ranks?.[0] ?? null;
         const rankedName = String(
           topRank?.characterName ?? topRank?.character_name ?? topRank?.name ?? ""
@@ -142,8 +140,7 @@ router.patch("/admin/characters/:userId/:name", async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error("Error updating character:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "updating character");
   }
 });
 
@@ -204,8 +201,7 @@ router.post("/admin/characters/transfer", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Error transferring character:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "transferring character");
   }
 });
 
@@ -262,8 +258,7 @@ router.delete("/admin/characters/batch", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Error batch unlinking characters:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "batch unlinking characters");
   }
 });
 
@@ -293,8 +288,7 @@ router.delete("/admin/characters/:userId/:name", async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting character:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "deleting character");
   }
 });
 
@@ -346,8 +340,7 @@ router.get("/admin/archived-characters", async (req, res) => {
 
     res.json(archived);
   } catch (error) {
-    console.error("Error fetching archived characters:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    fail(res, error, "fetching archived characters");
   }
 });
 

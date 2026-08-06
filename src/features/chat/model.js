@@ -73,7 +73,6 @@ module.exports = {
   MODEL_COOLDOWN_MS,
   ai,
   THINKING_UNSUPPORTED,
-  THINKING_LEVEL,
   thinkingFor,
   isThinkingRejected,
 };

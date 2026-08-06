@@ -1,7 +1,7 @@
 const { AttachmentBuilder } = require("discord.js");
 const { loadImage } = require("@napi-rs/canvas");
 const { request } = require("undici");
-const { createHiDpiCanvas, loadAsset, displayNameOf, fitText, drawCircularImage } = require("./canvasUtils.js");
+const { createHiDpiCanvas, loadAsset, displayNameOf, fitText, drawCircularImage, DEFAULT_AVATAR } = require("./canvasUtils.js");
 
 const BACKGROUNDS = {
   first: require.resolve("../assets/canvas/user-rankings-first.png"),
@@ -28,7 +28,12 @@ const MEMBER_DEADLINE_MS = 4000;
 
 // Pictures are the one thing on a clock. undici waits five minutes by default and image decoding has
 // no limit at all, so one avatar that never answers used to hold the whole page open.
-const DEFAULT_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/0.png";
+//
+// This does NOT use canvasUtils' cached avatarFor, and that is deliberate. Routing the leaderboard
+// through the shared cache — or lengthening this deadline to match it — was tried and reverted: a page
+// of thirty rows is a completely different problem from the level card's single avatar, and every
+// version that shared the machinery ended with real members rendering as Unknown Member. Only the URL
+// is shared, because a second copy of that literal is just a second thing to get wrong.
 const DEADLINE_MS = 1500;
 
 const withDeadline = (work, ms = DEADLINE_MS) =>
@@ -50,7 +55,7 @@ let defaultAvatar = null;
 async function getDefaultAvatar() {
   if (defaultAvatar) return defaultAvatar;
   try {
-    defaultAvatar = await withDeadline(fetchImage(DEFAULT_AVATAR_URL));
+    defaultAvatar = await withDeadline(fetchImage(DEFAULT_AVATAR));
   } catch {
     defaultAvatar = null;
   }
@@ -71,7 +76,7 @@ async function resolveRow(guild, user) {
   try {
     const avatarURL = member
       ? member.avatarURL({ extension: "png" }) || member.user.displayAvatarURL({ extension: "png" })
-      : DEFAULT_AVATAR_URL;
+      : DEFAULT_AVATAR;
     avatar = await withDeadline(fetchImage(avatarURL));
   } catch {
     avatar = await getDefaultAvatar();

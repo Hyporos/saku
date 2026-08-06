@@ -49,6 +49,41 @@ PlayerName1 63100
 PlayerName2 62918
 PlayerName3 0`;
 
+// /culvertping reads the same screenshot for names alone, so its prompt lives beside the one above
+// rather than inline in the command — the two share the ellipsis and column rules, and those are
+// exactly the rules that get tuned.
+const CULVERTPING_PROMPT = `Analyze this MapleStory guild list screenshot for the 'culvertping' utility.
+
+Your goal is to extract character names with 100% accuracy, specifically handling truncated names and column overlaps.
+
+Rules:
+- Truncation Logic: If a character name contains an ellipsis (..), stop the extraction immediately at the first dot. Do not include the dots or any text following them (e.g., 'heatherhah..Dawn' becomes 'heatherhah').
+- Column Isolation: Extract ONLY the first vertical column. Strictly ignore the Class (Adele, Night Walker, etc.), Level, and Score columns.
+- Encoding: Preserve all special characters (ö, á, etc.) exactly as they appear.
+- Formatting: Return ONLY the character names, one per line. No headers, introductory text, or blank lines.
+
+Example output:
+PlayerName1
+PlayerName2
+PlayerName3`;
+
+/**
+ * Fetch a Discord attachment and return it as base64, ready for readImage.
+ *
+ * @param {Object} attachment - The attachment from interaction.options.getAttachment.
+ * @returns {Promise<{data: string, mimeType: string}>}
+ */
+async function fetchAttachment(attachment) {
+  // proxyURL first: it is the CDN copy, and it keeps working when the original URL's signature has
+  // aged out from under a slow interaction.
+  const response = await fetch(attachment.proxyURL || attachment.url);
+  if (!response.ok) throw new Error("Image fetch failed");
+  return {
+    data: Buffer.from(await response.arrayBuffer()).toString("base64"),
+    mimeType: attachment.contentType || "image/png",
+  };
+}
+
 /**
  * Reads an image with the first model that answers.
  *
@@ -102,4 +137,4 @@ async function readImage({ prompt, data, mimeType = "image/png", temperature }) 
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-module.exports = { readImage, CULVERT_SCAN_PROMPT };
+module.exports = { readImage, fetchAttachment, CULVERT_SCAN_PROMPT, CULVERTPING_PROMPT };

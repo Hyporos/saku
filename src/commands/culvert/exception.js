@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
 const actionLogSchema = require("../../schemas/actionLogSchema.js");
+const { nameMatch } = require("../../domain/culvert/utils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -34,10 +35,7 @@ module.exports = {
 
     // Check if the exception has already been made
     const exceptionExists = await exceptionSchema.exists({
-      exception: {
-        $regex: `^${exceptionOption}$`,
-        $options: "i",
-      },
+      exception: nameMatch(exceptionOption),
     });
 
     if (exceptionExists) {

@@ -12,6 +12,21 @@ dayjs.extend(updateLocale);
 // ("Jo(n" is an unterminated group).
 const REGEX_CHARS = /[.*+?^${}()|[\]\\]/g;
 
+// The official rankings, which is where a character's real capitalisation, class and level come from.
+// This query string was written out in five separate files — /character, /profile, Saku's chat, and
+// two API routes — so the day Nexon changes it, five things break and four of them are somewhere
+// nobody thought to look. Each caller still applies its own timeout and reads its own fields, because
+// those genuinely differ; only the address is shared.
+//
+// Callers must treat an empty `ranks` array as "not found": the API answers 200 for a name that does
+// not exist, so a rejected promise is not the miss signal.
+const RANKINGS_URL = (name) =>
+  `https://www.nexon.com/api/maplestory/no-auth/ranking/v2/na?type=overall&id=legendary&reboot_index=1&page_index=1&character_name=${encodeURIComponent(name)}`;
+
+// The human-facing page for the same character, for linking out to.
+const RANKINGS_PAGE = (name) =>
+  `https://www.nexon.com/maplestory/rankings/north-america/overall-ranking/legendary?world_type=heroic&search_type=character-name&search=${encodeURIComponent(name)}`;
+
 /**
  * The key a character name is stored under in the cached rankings metadata.
  *
@@ -45,86 +60,24 @@ const nameMatch = (characterName) => ({
 });
 
 /**
- * Finds a character based on the given name
- *
- * @param {Object} interaction - The interaction object from Discord.js.
- * @param {string} characterName - The character name to be used for the query.
- * @param {boolean} deferred - Whether the interaction has been deferred (default: false).
- */
-
-async function findCharacter(interaction, characterName, deferred = false) {
-  const user = await culvertSchema.findOne(
-    {
-      "characters.name": nameMatch(characterName),
-    },
-    { "characters.$": 1 }
-  );
-
-  if (!user) {
-    const errorMessage = `Error - The character **${characterName}** is not linked to any user`;
-    if (deferred) {
-      await interaction.editReply(errorMessage);
-    } else {
-      await interaction.reply(errorMessage);
-    }
-    return null;
-  }
-
-  return user.characters[0];
-}
-
-
-/**
- * Check if a character already exists in the database (is linked to a user)
- *
- * @param {Object} interaction - The interaction object from Discord.js.
- * @param {string} characterName - The character name to be used for the query.
- */
-
-async function isCharacterLinked(interaction, characterName) {
-  const characterLinked = await culvertSchema.exists({
-    "characters.name": nameMatch(characterName),
-  });
-
-  if (!characterLinked) {
-    await interaction.reply(
-      `Error - The character **${characterName}** is not linked to any user`
-    );
-    return false;
-  }
-
-  return true;
-}
-
-/**
  * Check if a character has a submitted score on the given date
  *
- * @param {Object} characterName - The character name to be used for the query.
+ * @param {string} characterName - The character name to be used for the query.
  * @param {string} scoreDate - The date to check for scores
+ * @returns {Promise<boolean>} - Whether a score already exists for that week.
  */
 
 async function isScoreSubmitted(characterName, scoreDate) {
-  const scoreExistsResult = await culvertSchema.aggregate([
-    {
-      $unwind: "$characters",
-    },
-    {
-      $unwind: "$characters.scores",
-    },
-    {
-      $match: {
-        "characters.name": {
-          $regex: `^${characterName}$`,
-          $options: "i",
+  return Boolean(
+    await culvertSchema.exists({
+      characters: {
+        $elemMatch: {
+          name: nameMatch(characterName),
+          "scores.date": scoreDate,
         },
-        "characters.scores.date": scoreDate,
       },
-    },
-  ]);
-
-  const scoreExists = scoreExistsResult.length >= 1
-
-  return scoreExists;
+    })
+  );
 }
 
 
@@ -141,22 +94,6 @@ async function getAllCharacters() {
       $replaceRoot: { newRoot: "$characters" },
     },
   ]);
-}
-
-
-/**
- * Return the properly cased name of a character
- *
- * @param {string} characterName - The character name to be used for the query.
- */
-
-async function getCasedName(characterName) {
-  const casedName = await culvertSchema.findOne(
-    { "characters.name": nameMatch(characterName) },
-    { "characters.$": 1 }
-  );
-
-  return casedName.characters[0].name;
 }
 
 
@@ -191,10 +128,9 @@ function getResetDates() {
 module.exports = {
   normalizeName,
   nameMatch,
-  findCharacter,
-  isCharacterLinked,
+  RANKINGS_URL,
+  RANKINGS_PAGE,
   isScoreSubmitted,
   getAllCharacters,
-  getCasedName,
   getResetDates,
 };
