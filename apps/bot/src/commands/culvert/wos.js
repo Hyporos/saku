@@ -6,11 +6,13 @@ const {
   ActionRowBuilder,
   ComponentType,
 } = require("discord.js");
-const { getAllCharacters } = require("../../utility/culvertUtils.js");
+const { getAllCharacters } = require("../../domain/culvert/utils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("wos")
     .setDescription("[BEE] View the wall of shame")

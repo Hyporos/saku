@@ -12,7 +12,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const { GRAPH_COLOR, buildLineChart, textPanel, rgbToInt } = require("../../utility/culvertChart.js");
+const { GRAPH_COLOR, buildLineChart, textPanel, rgbToInt } = require("../../domain/culvert/chart.js");
 const dayjs = require("dayjs");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -110,6 +110,7 @@ function buildColorPanel(state, { imageUrl, disabled = false }) {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("graphcolor")
     .setDescription("Change the color of your progression graph area"),

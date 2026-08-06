@@ -1134,8 +1134,8 @@ router.delete("/admin/exceptions/:id", async (req, res) => {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Scanner routes
 
-const { readImage, CULVERT_SCAN_PROMPT } = require("../utility/ocr.js");
-const { getAllCharacters, isScoreSubmitted, getResetDates } = require("../utility/culvertUtils.js");
+const { readImage, CULVERT_SCAN_PROMPT } = require("../features/scan/ocr.js");
+const { getAllCharacters, isScoreSubmitted, getResetDates } = require("../domain/culvert/utils.js");
 const dayjs = require("dayjs");
 
 /**

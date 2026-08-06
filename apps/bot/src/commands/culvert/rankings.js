@@ -11,8 +11,8 @@ const {
 } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const characterMetaSchema = require("../../schemas/characterMetaSchema.js");
-const { getAllCharacters, getResetDates, normalizeName } = require("../../utility/culvertUtils.js");
-const { ACCENT, textPanel } = require("../../utility/culvertChart.js");
+const { getAllCharacters, getResetDates, normalizeName } = require("../../domain/culvert/utils.js");
+const { ACCENT, textPanel } = require("../../domain/culvert/chart.js");
 const { EMOJIS } = require("../../config/ids.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
@@ -76,6 +76,7 @@ function updatesIn(nextReset) {
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("rankings")
     .setDescription("View the interactive culvert leaderboard")

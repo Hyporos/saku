@@ -30,25 +30,33 @@ A Discord bot for the MapleStory guild *Saku*. It manages culvert score tracking
 
 ```
 src/
-├── index.js               # Entry point — client setup, Express, cron jobs, event loader
-├── deploy-commands.js     # One-time slash command registration script
-├── canvas/                # Canvas image generators (userLevelCanvas, userRankingsCanvas)
-├── commands/
-│   ├── culvert/           # Score tracking, profiles, rankings, scan, export, etc.
-│   ├── event/             # Guild event add/subtract/leaderboard/mobcount
-│   ├── fun/               # chat, roll, dannis, starboard
-│   ├── user/              # Level card, rankings, user profile
-│   └── utility/           # Birthday, help, ping, reload, say
-├── config/
-│   └── levels.js          # XP thresholds for the leveling system
-├── events/                # discord.js event handlers
-├── routes/
-│   └── routes.js          # Express router (getAll, character/:name, rankings/:name)
-├── schemas/               # Mongoose schemas: culvert, event, exception, user
-├── services/
-│   └── latencyMonitor.js  # Writes latency data to JSON
-└── utility/               # Shared helpers: botUtils, cronUtils, culvertUtils, userUtils, pagination, starboardCache
+├── index.js            # Entry point — client setup, Express, cron bootstrap, loaders
+├── deploy-commands.js  # One-time slash command registration script
+├── api/                # Express router the webapp consumes
+├── canvas/             # Canvas image generators (@napi-rs/canvas)
+├── commands/           # One file per TOP-LEVEL command; subcommands live in that same file
+│   ├── culvert/  event/  fun/  user/  utility/
+├── config/             # ids.js (roles, channels, emojis), levels.js
+├── domain/             # Business logic, no discord.js types — testable on its own
+│   ├── culvert/        # utils.js (reset dates, name matching), chart.js
+│   ├── starboard.js
+│   └── levels.js
+├── events/             # discord.js event handlers, auto-loaded
+├── features/           # Self-contained features owning their whole pipeline
+│   ├── chat/           # Saku's AI: persona, tools, context, memory, usage
+│   └── scan/           # OCR
+├── lib/                # Genuinely generic helpers: pagination, checklist, transient
+├── scheduling/         # registry.js, jobs.js, health.js, latencyMonitor.js
+└── schemas/            # Mongoose models, one per collection
 ```
+
+**Follow this layout; do not invent parallel folders.**
+
+- No `utils/`, `helpers/`, `types/`, `constants/` or `middleware/` — every one of those has a home above. A folder named after a part of speech describes nothing.
+- **Never create a folder for a single file.** If it has no siblings and won't get any, it belongs in an existing folder.
+- **`domain/` must not import discord.js.** That is what makes it testable without a client.
+- **The command loaders read exactly one level deep** (`index.js`, `deploy-commands.js`, `/reload`). Subfolders under a command category are silently ignored.
+- **One file per top-level command.** A file under `commands/` without `data`/`execute` makes both loaders log a warning.
 
 ## Command Structure
 
@@ -71,6 +79,7 @@ module.exports = {
 - Use `interaction.deferReply()` at the top of `execute` for any command that hits the database or does async work that may take > 3 s.
 - Use `interaction.editReply()` after deferring; use `interaction.reply()` for instant responses.
 - For error replies to the user, prefix the message with `Error - ` (matches the existing style).
+- **Declare access on the command module, never in a list elsewhere:** `tier: "bee" | "owner"` (omit for public), `culvert: true` for the Friends restriction, and `tiers: { sub: "bee" }` when only one subcommand is restricted. `events/interactionCreate.js` reads these and nothing else — it used to hold hardcoded name arrays that silently drifted out of date. `tests/permissions.js` guards it.
 - **Always read and update `commands/utility/help.js` when a command changes.** `/help` is driven by the `COMMANDS` array there and nothing detects drift — a stale entry just shows members the wrong thing. Update the entry in the same change, whether you added a command, renamed one, changed its options, or only changed what it does (`desc` is the one most often forgotten). Bee and owner commands also carry a `[BEE]` / `[OWNER]` prefix at the start of `setDescription()`, on each subcommand as well as the parent.
 
 ## Event Structure

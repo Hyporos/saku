@@ -11,7 +11,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const starboardSchema = require("../../schemas/starboardSchema.js");
-const { STAR_EMOJI, THRESHOLD, messageUrl } = require("../../utility/starboard.js");
+const { STAR_EMOJI, THRESHOLD, messageUrl } = require("../../domain/starboard.js");
 const { GUILD_ID, CHANNELS, EMOJIS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -20,7 +20,7 @@ const ACCENT = 0xffc3c5;
 const PAGE_SIZE = 10;
 const PODIUM = 3;
 const MEDALS = ["🥇", "🥈", "🥉"];
-const OTHER_POSTS = 3; // runners-up listed under someone's best
+const TOP_POSTS = 3; // how many of someone's best posts to list
 
 // Windows for the leaderboard. `days: null` is all time.
 const RANGES = {
@@ -185,25 +185,22 @@ async function user(interaction) {
   }
 
   const sorted = [...authored].sort((a, b) => scoreOf(b) - scoreOf(a));
-  const best = sorted[0];
   const totalStars = authored.reduce((sum, e) => sum + scoreOf(e), 0);
 
   embed.addFields(
     { name: "Posts", value: `**${authored.length}**`, inline: true },
-    { name: "Stars earned", value: `${STAR_EMOJI} **${totalStars.toLocaleString()}**`, inline: true },
-    { name: "Best", value: `${STAR_EMOJI} **${scoreOf(best)}**`, inline: true },
-    // Every link here goes to the original message, not the starboard copy: the copy is a screenshot
-    // of the moment, and what people want is the conversation it came from.
-    { name: "Top post", value: jump(best) }
+    { name: "Stars earned", value: `${STAR_EMOJI} **${totalStars.toLocaleString()}**`, inline: true }
   );
 
-  const others = sorted.slice(1, 1 + OTHER_POSTS);
-  if (others.length) {
-    embed.addFields({
-      name: "Other posts",
-      value: others.map((e) => `${STAR_EMOJI} **${scoreOf(e)}** · ${jump(e)}`).join("\n"),
-    });
-  }
+  // One list rather than a stat plus a link plus a runners-up field: the best post's star count is
+  // already the first row below, so naming it twice said nothing new.
+  // Every link goes to the original message, not the starboard copy: the copy is a screenshot of the
+  // moment, and what people want is the conversation it came from.
+  const top = sorted.slice(0, TOP_POSTS);
+  embed.addFields({
+    name: top.length === 1 ? "Top post" : "Top posts",
+    value: top.map((e) => `${STAR_EMOJI} **${scoreOf(e)}** · ${jump(e)}`).join("\n"),
+  });
 
   await interaction.editReply({ embeds: [embed] });
 }

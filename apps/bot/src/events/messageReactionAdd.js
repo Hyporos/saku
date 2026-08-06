@@ -1,6 +1,6 @@
 const { Events } = require("discord.js");
-const { syncStarboard, isStarEmoji, fetchFullReaction, starRejection, rejectStar, STARBOARD_CHANNEL_ID } = require("../utility/starboard.js");
-const { recallTurn, formatTurnUsage, explainTurn, onCooldown } = require("../utility/sakuChat.js");
+const { syncStarboard, isStarEmoji, fetchFullReaction, starRejection, rejectStar, STARBOARD_CHANNEL_ID } = require("../domain/starboard.js");
+const { recallTurn, formatTurnUsage, explainTurn, onCooldown } = require("../features/chat/index.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 

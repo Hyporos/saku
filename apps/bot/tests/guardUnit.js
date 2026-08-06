@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { unsupportedNumbers, unsupportedNames } = require("../src/utility/sakuChat.js");
+const { unsupportedNumbers, unsupportedNames } = require("../src/features/chat/index.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Deterministic cases for the fabrication guard. It fires on maybe one live turn in three, so the

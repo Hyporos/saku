@@ -7,8 +7,8 @@ const culvertSchema = require("../src/schemas/culvertSchema.js");
 const weekSchema = require("../src/schemas/weekSchema.js");
 const characterMetaSchema = require("../src/schemas/characterMetaSchema.js");
 const chatSchema = require("../src/schemas/chatSchema.js");
-const { askSaku } = require("../src/utility/sakuChat.js");
-const { getResetDates } = require("../src/utility/culvertUtils.js");
+const { askSaku } = require("../src/features/chat/index.js");
+const { getResetDates } = require("../src/domain/culvert/utils.js");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);

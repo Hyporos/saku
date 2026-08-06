@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
-const { nameMatch, getResetDates } = require("../../utility/culvertUtils.js");
+const { nameMatch, getResetDates } = require("../../domain/culvert/utils.js");
 const dayjs = require("dayjs");
 const axios = require("axios");
 
@@ -68,6 +68,7 @@ function previousScores(scores, reset) {
 }
 
 module.exports = {
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("profile")
     .setDescription("View the culvert profile of a character")

@@ -21,6 +21,63 @@ apps/
 
 ## Bot (`apps/bot/`)
 
+### Folder structure — follow it, don't invent alongside it
+
+```
+src/
+  index.js            entry point: client, express, cron bootstrap
+  deploy-commands.js  one-off slash command registration
+  commands/<cat>/     one file per TOP-LEVEL command (culvert, event, fun, user, utility)
+  events/             discord.js event handlers, auto-loaded
+  schemas/            mongoose models, one per collection
+  config/             ids.js (roles, channels, emojis), levels.js
+  domain/             business logic with NO discord.js types — testable on its own
+    culvert/          utils.js (reset dates, name matching), chart.js (graph building)
+    starboard.js
+    levels.js
+  features/           self-contained features that own their whole pipeline
+    chat/             Saku's AI: persona, tools, context, memory, usage
+    scan/             OCR
+  scheduling/         registry.js, jobs.js, health.js, latencyMonitor.js
+  api/                the Express API the webapp consumes
+  canvas/             image generation (@napi-rs/canvas)
+  lib/                genuinely generic helpers only: pagination, checklist, transient
+```
+
+**Where new code goes:**
+
+| It is… | Put it in |
+|---|---|
+| A slash command | `commands/<category>/<name>.js` — one file per top-level command |
+| Logic about culvert/starboard/levels that doesn't touch `interaction` | `domain/` |
+| A whole feature with its own prompt, API calls and state | `features/<name>/` |
+| A cron job or health check | `scheduling/` |
+| An HTTP route | `api/` |
+| A helper used by 3+ unrelated places, with no domain knowledge | `lib/` |
+
+**Rules that matter more than the layout:**
+
+- **Don't create a folder for one file.** If it doesn't have siblings and isn't going to, it belongs in an existing folder. `lib/` is for genuinely shared things, not a second junk drawer.
+- **`domain/` must not import discord.js.** That's the whole point — it stays testable without a client.
+- **The command loaders read exactly one level deep.** `index.js`, `deploy-commands.js` and `/reload` all `readdirSync(commands/<cat>)`. Nesting deeper means files are silently ignored. Do not add subfolders under a command category.
+- **One file per top-level command.** Subcommands live in that same file (see `character.js`, `starboard.js`), not as sibling files — a file with no `data`/`execute` export makes both loaders log a warning.
+- **No `utils/`, `helpers/`, `types/`, `constants/` or `middleware/`.** Those names describe nothing; the folders above already have homes for all of it.
+
+### Command access tiers
+
+Access is declared **on the command module**, never in a list elsewhere:
+
+```js
+module.exports = {
+  tier: "bee",              // "bee" | "owner" — omit for public
+  culvert: true,            // subject to the Friends-role restriction
+  tiers: { subtract: "bee" }, // per-subcommand, when only part of a command is restricted
+  data: ..., execute: ...,
+};
+```
+
+`events/interactionCreate.js` reads those and nothing else. It used to hold hardcoded name arrays, which silently drifted: `/weekly` was documented and described as bee but was never in the list, and `"subtract"` was listed but is a subcommand, so `commandName` never matched and the check could not fire. If you add or rename a command, the tier travels with it. `tests/permissions.js` asserts every `[BEE]`/`[OWNER]` description tag matches the enforced tier.
+
 ### Command Pattern
 
 Every command exports exactly:

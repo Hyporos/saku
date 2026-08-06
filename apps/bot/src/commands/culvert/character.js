@@ -14,7 +14,7 @@ const actionLogSchema = require("../../schemas/actionLogSchema.js");
 const weekSchema = require("../../schemas/weekSchema.js");
 const userSchema = require("../../schemas/userSchema.js");
 const starboardSchema = require("../../schemas/starboardSchema.js");
-const { nameMatch, getResetDates } = require("../../utility/culvertUtils.js");
+const { nameMatch, getResetDates } = require("../../domain/culvert/utils.js");
 const { CHANNELS } = require("../../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -703,6 +703,8 @@ async function correct(interaction) {
 const SUBCOMMANDS = { link, unlink, restore, rename, changeid, correct };
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("character")
     .setDescription("[BEE] Manage the culvert roster")

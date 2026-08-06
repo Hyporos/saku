@@ -1,13 +1,15 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
-const { getAllCharacters } = require("../../utility/culvertUtils.js");
-const { readImage } = require("../../utility/ocr.js");
+const { getAllCharacters } = require("../../domain/culvert/utils.js");
+const { readImage } = require("../../features/scan/ocr.js");
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("culvertping")
     .setDescription("[BEE] Create a pingable list of people who need to run culvert")
