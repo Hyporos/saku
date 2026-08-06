@@ -15,6 +15,7 @@ const categories = () =>
     .map((entry) => entry.name);
 
 module.exports = {
+  tier: "owner",
   data: new SlashCommandBuilder()
     .setName("reload")
     .setDescription("[OWNER] Reloads a command")

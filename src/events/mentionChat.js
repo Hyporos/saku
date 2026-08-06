@@ -10,7 +10,7 @@ const {
   MENTION_CHANNEL_ID,
   NOT_MEMBER_NOTICE,
   wrongChannelNotice,
-} = require("../utility/sakuChat.js");
+} = require("../features/chat/index.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Pinging @Saku in a message triggers the same AI chat as /chat (shared brain + per-user memory).

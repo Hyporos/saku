@@ -5,14 +5,16 @@ const {
   getAllCharacters,
   isScoreSubmitted,
   getResetDates,
-} = require("../../utility/culvertUtils.js");
-const { readImage, CULVERT_SCAN_PROMPT } = require("../../utility/ocr.js");
+} = require("../../domain/culvert/utils.js");
+const { readImage, CULVERT_SCAN_PROMPT } = require("../../features/scan/ocr.js");
 const dayjs = require("dayjs");
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("scan")
     .setDescription("[BEE] Submit bulk culvert data from a screenshot")

@@ -1,5 +1,5 @@
 const { Events } = require("discord.js");
-const { buildChecklistMessage, parseCompletionsFromMessage } = require("../utility/checklistUtils.js");
+const { buildChecklistMessage, parseCompletionsFromMessage } = require("../lib/checklist.js");
 const { ROLES, USERS } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -19,68 +19,30 @@ module.exports = {
         return;
       }
 
-      // Create a list of culvert commands
-      const culvertCommands = [
-        "gpq",
-        "profile",
-        "graph",
-        "graphcolor",
-        "rankings",
-        "character",
-        "exception",
-        "export",
-        "scan",
-        "finalize",
-        "wos",
-        "culvertping",
-      ];
-
-      // Create a list of bee-exclusive and owner-exclusive commands
-      const beeCommands = [
-        "character",
-        "exception",
-        "scan",
-        "culvertping",
-        "finalize",
-        "wos",
-        "export",
-        "say",
-        "guildprofile",
-        "subtract",
-      ];
-      const ownerCommands = ["reload"];
+      // Access comes off the command module itself (`tier`, `tiers`, `culvert`), not from lists kept
+      // here. Those lists had to be edited whenever a command was added, renamed or merged, and
+      // forgetting meant a bee command silently became public with nothing to catch it. Two real
+      // examples it was hiding: /weekly was described and documented as bee but never appeared in the
+      // list, and "subtract" was listed but is a subcommand of /event, so commandName never matched
+      // it and that check could not fire at all.
+      const subcommand = interaction.options.getSubcommand(false);
+      const tier = (subcommand && command.tiers?.[subcommand]) || command.tier || "public";
 
       // Display an error message if Friends try to use culvert commands
-      if (
-        interaction.member.roles.cache.has(ROLES.FRIEND) &&
-        culvertCommands.includes(interaction.commandName)
-      ) {
-        interaction.reply(
-          `Error - Friends do not have permission to use this command`
-        );
-        return;
-      }
-
-      // Display an error message if members try to use bee commands
-      if (
-        !interaction.member.roles.cache.has(ROLES.BEE) &&
-        interaction.user.id !== USERS.OWNER && // Add myself as an exception to use the bee commands
-        beeCommands.includes(interaction.commandName)
-      ) {
-        interaction.reply(
-          `Error - Members do not have permission to use this command`
-        );
+      if (command.culvert && interaction.member.roles.cache.has(ROLES.FRIEND)) {
+        interaction.reply(`Error - Friends do not have permission to use this command`);
         return;
       }
 
       // Display an error message if members try to use owner commands
-      if (
-        interaction.user.id !== USERS.OWNER &&
-        ownerCommands.includes(interaction.commandName)
-      ) {
-        interaction.reply(
-          `Error - You do not have permission to use this command`
-        );
+      if (tier === "owner" && interaction.user.id !== USERS.OWNER) {
+        interaction.reply(`Error - You do not have permission to use this command`);
+        return;
+      }
+
+      // Display an error message if members try to use bee commands. The owner is an exception.
+      if (tier === "bee" && !interaction.member.roles.cache.has(ROLES.BEE) && interaction.user.id !== USERS.OWNER) {
+        interaction.reply(`Error - Members do not have permission to use this command`);
         return;
       }
 

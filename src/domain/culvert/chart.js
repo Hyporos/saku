@@ -8,8 +8,8 @@ const {
   TextInputStyle,
   ActionRowBuilder,
 } = require("discord.js");
-const culvertSchema = require("../schemas/culvertSchema.js");
-const weekSchema = require("../schemas/weekSchema.js");
+const culvertSchema = require("../../schemas/culvertSchema.js");
+const weekSchema = require("../../schemas/weekSchema.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Shared culvert chart + stats helpers, used by /weekly and the character graph.

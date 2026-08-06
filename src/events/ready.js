@@ -1,11 +1,11 @@
 const { Events } = require("discord.js");
 const mongoose = require("mongoose");
 const os = require("os");
-const { checkForCrashes } = require("../utility/botUtils");
-const { setBirthdays, setAnniversaries } = require("../utility/cronUtils");
-const { startLatencyMonitor } = require("../services/latencyMonitor");
-const { refreshRosterMeta, refreshServerExtras, setChatCommandId } = require("../utility/sakuChat");
-const { reconcileStarboard } = require("../utility/starboard");
+const { checkForCrashes } = require("../scheduling/health.js");
+const { setBirthdays, setAnniversaries } = require("../scheduling/jobs.js");
+const { startLatencyMonitor } = require("../scheduling/latencyMonitor.js");
+const { refreshRosterMeta, refreshServerExtras, setChatCommandId } = require("../features/chat/index.js");
+const { reconcileStarboard } = require("../domain/starboard.js");
 const { CHANNELS, GUILD_ID } = require("../config/ids.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //

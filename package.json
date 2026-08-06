@@ -11,7 +11,8 @@
     "test-starboard": "node tests/starboard.js",
     "starboard-backfill": "node scripts/starboardBackfill.js",
     "test-birthday": "node tests/birthdayTiming.js",
-    "test-canvas": "node tests/canvas.js"
+    "test-canvas": "node tests/canvas.js",
+    "test-permissions": "node tests/permissions.js"
   },
   "keywords": [],
   "author": "",

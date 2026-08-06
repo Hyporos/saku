@@ -8,8 +8,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 require("dotenv").config();
 const express = require("express");
-const routes = require("./routes/routes");
-const { loadDstOffset, saveDstState, JOB_DEFINITIONS, computeNextRun, startAllJobs } = require("./utility/cronRegistry");
+const routes = require("./api/routes.js");
+const { loadDstOffset, saveDstState, JOB_DEFINITIONS, computeNextRun, startAllJobs } = require("./scheduling/registry.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -52,7 +52,7 @@ const client = new Client({
 app.set("client", client);
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-// DST state & cron registry (see utility/cronRegistry.js)
+// DST state & cron registry (see scheduling/registry.js)
 
 let dstOffset = loadDstOffset();
 

@@ -26,6 +26,8 @@ const csvCell = (value) => {
 };
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("export")
     .setDescription("[BEE] Export a .csv of characters' scores for their respective dates")

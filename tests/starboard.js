@@ -2,7 +2,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const assert = require("node:assert");
 const starboardSchema = require("../src/schemas/starboardSchema.js");
-const { syncStarboard, forgetStarred, trackEdit, countStars, STAR_EMOJI_ID, STARBOARD_CHANNEL_ID } = require("../src/utility/starboard.js");
+const { syncStarboard, forgetStarred, trackEdit, countStars, STAR_EMOJI_ID, STARBOARD_CHANNEL_ID } = require("../src/domain/starboard.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // The starboard's failures were all state failures: a count produced two different ways, a cache that

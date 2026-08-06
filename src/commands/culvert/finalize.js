@@ -1,10 +1,12 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const weekSchema = require("../../schemas/weekSchema.js");
-const { getResetDates } = require("../../utility/culvertUtils.js");
+const { getResetDates } = require("../../domain/culvert/utils.js");
 const dayjs = require("dayjs");
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("finalize")
     .setDescription("[BEE] Finalize the scores for the given week")

@@ -11,7 +11,7 @@ const {
 const {
   generateUserRankingsCanvas,
 } = require("../../canvas/userRankingsCanvas.js");
-const { createPaginationRow } = require("../../utility/pagination.js");
+const { createPaginationRow } = require("../../lib/pagination.js");
 const userSchema = require("../../schemas/userSchema.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //

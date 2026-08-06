@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const { EMOJI_IDS } = require("../../config/ids.js");
-const { nameMatch, getResetDates } = require("../../utility/culvertUtils.js");
+const { nameMatch, getResetDates } = require("../../domain/culvert/utils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -11,6 +11,7 @@ const { nameMatch, getResetDates } = require("../../utility/culvertUtils.js");
 const MAX_SCORE = 2000000;
 
 module.exports = {
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("gpq")
     .setDescription("Log your culvert score for this week")

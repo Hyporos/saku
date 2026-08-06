@@ -11,7 +11,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const weekSchema = require("../../schemas/weekSchema.js");
-const { getResetDates } = require("../../utility/culvertUtils.js");
+const { getResetDates } = require("../../domain/culvert/utils.js");
 const {
   ACCENT,
   GRAPH_COLOR,
@@ -22,7 +22,7 @@ const {
   buildSpreadUrl,
   textPanel,
   promptWeekCount,
-} = require("../../utility/culvertChart.js");
+} = require("../../domain/culvert/chart.js");
 const dayjs = require("dayjs");
 const { ROLES, USERS } = require("../../config/ids.js");
 
@@ -162,6 +162,8 @@ function buildGraphPanel({ metric, weeks, weeksSet, imageUrl, disabled = false }
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
 module.exports = {
+  tier: "bee",
+  culvert: true,
   data: new SlashCommandBuilder()
     .setName("weekly")
     .setDescription("[BEE] View weekly guild culvert stats and score graph")

@@ -61,7 +61,7 @@ const cutoff = DAYS ? Date.now() - DAYS * 24 * 60 * 60 * 1000 : null;
   const guild = await client.guilds.fetch(GUILD_ID);
   await guild.channels.fetch();
   const board = await guild.channels.fetch(CHANNELS.STARBOARD);
-  const { syncStarboard, starrersOf, snapshot, originalIdOf } = require("../src/utility/starboard.js");
+  const { syncStarboard, starrersOf, snapshot, originalIdOf } = require("../src/domain/starboard.js");
 
   console.log(`Mode: ${POST ? "POST missing + adopt" : ADOPT ? "ADOPT existing only" : "DRY RUN (nothing will be written)"}`);
   console.log(`Threshold: ${THRESHOLD} stars${DAYS ? ` · last ${DAYS} days` : " · all history"}\n`);

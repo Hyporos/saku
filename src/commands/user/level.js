@@ -1,5 +1,5 @@
 const { generateUserLevelCanvas } = require("../../canvas/userLevelCanvas.js");
-const { getDiscordUser, getDiscordUserRank } = require("../../utility/userUtils.js");
+const { getDiscordUser, getDiscordUserRank } = require("../../domain/levels.js");
 const { getRequiredExp } = require("../../config/levels.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
