@@ -41,6 +41,10 @@ const RANK_NA_FORMATTER =
 
 const VIEWS = { score: "Score", scoremedian: "Score + Median", rank: "Rank" };
 
+// What the "only dates back N weeks" note calls the limited thing, per view. Score isn't here: it is
+// the character's own history and has no guild-data limit to report.
+const REACH_LABEL = { scoremedian: "Guild median", rank: "Guild rank" };
+
 // The character's most recent `weeks` score entries (oldest→newest), optionally dropping
 // missed (0) weeks.
 // `usable` narrows the pool BEFORE the slice, so a view that can't draw certain weeks still gets the
@@ -179,11 +183,12 @@ function buildCharPanel(state, characters, { imageUrl, note, disabled = false })
 
   // Both of these views are bounded by how far back the guild has finalized data, not by how much
   // history the character has, so the range quietly stops short of what was asked for. Saying so
-  // beats leaving someone to wonder why their 30 weeks came back as 17.
-  if (state.view !== "score" && state.cap != null) {
+  // beats leaving someone to wonder why their 30 weeks came back as 17. Named for the view actually
+  // on screen rather than listing both, since only one of them is drawn at a time.
+  if (state.cap != null && REACH_LABEL[state.view]) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `-# Guild median and rank only go back ${state.cap} ${state.cap === 1 ? "week" : "weeks"}`
+        `-# ${REACH_LABEL[state.view]} only dates back ${state.cap} ${state.cap === 1 ? "week" : "weeks"}`
       )
     );
   }
