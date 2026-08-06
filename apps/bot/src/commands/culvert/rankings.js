@@ -11,7 +11,7 @@ const {
 } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const characterMetaSchema = require("../../schemas/characterMetaSchema.js");
-const { getAllCharacters, getResetDates } = require("../../utility/culvertUtils.js");
+const { getAllCharacters, getResetDates, normalizeName } = require("../../utility/culvertUtils.js");
 const { ACCENT, textPanel } = require("../../utility/culvertChart.js");
 const { EMOJIS } = require("../../config/ids.js");
 const dayjs = require("dayjs");
@@ -41,8 +41,9 @@ const METRICS = {
 // well over forty jobs and gains more with every big patch, so anything hardcoded would be wrong
 // within a year — and at 46 and counting it is already past the 25 option cap a choice list allows,
 // which is why this is an autocomplete instead.
-const normalizeName = (name) => String(name).toLowerCase();
-
+//
+// Keyed with the shared normalizeName, not a plain toLowerCase: that collection folds l/1/i and o/0
+// together, so lowercasing missed 73 of the 202 linked characters outright.
 async function jobsByCharacter() {
   const metas = await characterMetaSchema.find({ job: { $ne: null } }, { name: 1, job: 1 }).lean();
   return new Map(metas.map((meta) => [normalizeName(meta._id), meta.job]));
@@ -132,6 +133,13 @@ module.exports = {
       };
     });
 
+    // The option is free text, so someone can type "adele" instead of picking "Adele" off the
+    // dropdown. Resolved back to the spelling the game uses, from the same data the dropdown is built
+    // from, so the header never echoes whatever case was typed.
+    const className = classOption
+      ? [...new Set(jobs.values())].find((job) => job.toLowerCase() === classOption.toLowerCase()) ?? classOption
+      : null;
+
     // Filtering happens before ranking, so a class board reads 1..N within that class rather than
     // showing everyone's guild-wide position with the gaps left in.
     const chars = classOption
@@ -144,7 +152,7 @@ module.exports = {
       const known = everyone.filter((c) => jobs.has(normalizeName(c.name))).length;
       return interaction.editReply(
         textPanel(
-          `No **${classOption}** characters are on the board.\n` +
+          `No **${className}** characters are on the board.\n` +
             `-# Class is known for ${known}/${everyone.length} characters, so a very new one may not be recorded yet.`
         )
       );
@@ -196,7 +204,7 @@ module.exports = {
         .setAccentColor(ACCENT)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `## Culvert Rankings${classOption ? ` — ${classOption}` : ""}\n-# ${meta.label} · ${context}`
+            `## Culvert Rankings${className ? ` — ${className}` : ""}\n-# ${meta.label} · ${context}`
           )
         )
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(podiumStr))

@@ -4,7 +4,7 @@ const culvertSchema = require("../schemas/culvertSchema.js");
 const chatSchema = require("../schemas/chatSchema.js");
 const usageSchema = require("../schemas/usageSchema.js");
 const characterMetaSchema = require("../schemas/characterMetaSchema.js");
-const { getResetDates } = require("./culvertUtils.js");
+const { getResetDates, normalizeName } = require("./culvertUtils.js");
 const { loadScoreIndex, computeStats } = require("./culvertChart.js");
 const { isTransient } = require("./transient.js");
 const dayjs = require("dayjs");
@@ -717,14 +717,8 @@ function streaks(asc, upTo) {
 // (F/P)" matches "archmagefp" and "Night Walker" matches "nightwalker".
 const alnum = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-function normalizeName(s) {
-  return String(s ?? "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[il1|!]/g, "i")
-    .replace(/[o0]/g, "o");
-}
+// Shared with anything else that reads the cached rankings metadata, since keying that collection two
+// different ways silently loses whichever names the two disagree about.
 
 // weekly is the guild's scores for thisWeek, descending. It's passed in rather than rebuilt here
 // because a profile with several characters would otherwise re-rank the whole roster once per
