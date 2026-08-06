@@ -11,6 +11,7 @@
     "starboard-backfill": "pnpm --filter bot starboard-backfill",
     "test-birthday": "pnpm --filter bot test-birthday",
     "test-canvas": "pnpm --filter bot test-canvas",
-    "test-permissions": "pnpm --filter bot test-permissions"
+    "test-permissions": "pnpm --filter bot test-permissions",
+    "test-api": "pnpm --filter bot test-api"
   }
 }
