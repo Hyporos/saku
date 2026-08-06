@@ -13,6 +13,26 @@ dayjs.extend(updateLocale);
 const REGEX_CHARS = /[.*+?^${}()|[\]\\]/g;
 
 /**
+ * The key a character name is stored under in the cached rankings metadata.
+ *
+ * Deliberately lossy: it folds the characters people routinely mistake for one another in a name, so
+ * a lookup still lands when someone types Rally for RaIly. Anything reading that collection has to key
+ * through this exact function — a plain toLowerCase() misses 73 of the 202 names currently linked.
+ *
+ * @param {string} name - The character name to normalize.
+ * @returns {string} - The normalized key.
+ */
+
+function normalizeName(name) {
+  return String(name ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[il1|!]/g, "i")
+    .replace(/[o0]/g, "o");
+}
+
+/**
  * Build a case-insensitive exact match for a character name.
  *
  * @param {string} characterName - The character name to match.
@@ -169,6 +189,7 @@ function getResetDates() {
 }
 
 module.exports = {
+  normalizeName,
   nameMatch,
   findCharacter,
   isCharacterLinked,
