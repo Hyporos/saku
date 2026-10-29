@@ -20,6 +20,8 @@ const PRICES = {
   "claude-opus-5-5": { in: 4, out: 20, cached: 0.2 },
   "claude-sonnet-5-5": { in: 2, out: 10, cached: 0.2 },
   "claude-opus-5": { in: 5, out: 25, cached: 0.5 },
+  // Prompts over 100K tokens bill at 0.5 / 2.5; a chat request never gets near that.
+  "claude-haiku-5-5": { in: 0.1, out: 0.5, cached: 0.01 },
 };
 const CACHE_WRITE_MULTIPLIER = 1.25;
 
