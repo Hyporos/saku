@@ -16,6 +16,7 @@ scores from a screenshot, and view the data members don't see.
 | | |
 |---|---|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | How the bot is laid out and why — read before moving a file or adding a folder |
+| [`CULL.md`](CULL.md) | What to cut or simplify next, and the commit it was reviewed up to |
 | [`../../CLAUDE.md`](../../CLAUDE.md) | Working rules: command patterns, access tiers, date logic, common pitfalls |
 | `/help` in Discord | The live command reference, driven by the `COMMANDS` array in `commands/utility/help.js` |
 
