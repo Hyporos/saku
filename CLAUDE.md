@@ -15,7 +15,7 @@ apps/
 **Root scripts** (pnpm):
 - `pnpm bot` — start bot
 - `pnpm webapp` — start webapp (Vite :5173 + backend :8000)
-- `pnpm deploy-commands` — register slash commands with Discord
+- `pnpm deploy-commands` — register slash commands with Discord (the bot also does this on every start)
 
 ---
 
@@ -231,10 +231,9 @@ d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" 
 
 - **`/help` goes stale silently**: nothing fails when `help.js` drifts from reality — no error, no failing test, just wrong documentation shown to members. Treat reading and updating it as part of every command change, including edits to an existing command's behaviour or options. See "`/help` — read and update it whenever a command is touched".
 - **help.js data source**: `/help` is data-driven — edit the `COMMANDS` array, not per-command switches or embed fields. The command dropdown is category-scoped; each category must stay under 25 commands (the select-menu cap).
-- **Deploy vs restart**: renaming a command, changing its description, or adding/removing an option all need `pnpm deploy-commands`. Only the handler body is picked up by a restart alone.
+- **Deploy vs restart**: the bot registers every slash command globally on startup (`events/ready.js`), so a restart picks up renamed, new or changed commands. `pnpm deploy-commands` does the same without starting the bot.
 - **ISO date fallback**: If the bot's `routes.js` does not recognize an ISO date string (old code), it silently falls back to `lastReset`. Always restart the bot after changes to routes.js.
 - **Week date is Wednesday**: The culvert week is stored/referenced by its Wednesday date, not Thursday. `getResetDates().lastReset` returns the Wednesday of last week.
 - **`dayjs().day() === 3`** checks for Wednesday. Day 4 = Thursday.
 - **UTC rendering**: `new Date("YYYY-MM-DD")` parses as UTC midnight. Rendering it in a local UTC- timezone shifts the display by one day. Always use `timeZone: "UTC"` when formatting these dates.
-- **Deploy commands**: Adding new slash commands requires running `pnpm deploy-commands` — the bot restart alone does not register new commands with Discord.
 - **TypeScript build errors block deploys**: Run `npm run build` in `apps/webapp` to catch type errors before assuming webapp changes are safe.
