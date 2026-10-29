@@ -40,6 +40,7 @@ src/
   features/           self-contained features that own their whole pipeline
     chat/             Saku's AI on Claude (@anthropic-ai/sdk): persona, tools, context, memory, usage
     scan/             OCR on Claude vision (same SDK, same ANTHROPIC_API_KEY)
+                      both fall back to Gemini (GEMINI_API_KEY) only while the Anthropic credits are out
   scheduling/         registry.js, jobs.js, health.js, latencyMonitor.js
   api/                the Express API the webapp consumes
   canvas/             image generation (@napi-rs/canvas)

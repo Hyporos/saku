@@ -14,14 +14,18 @@ const { MODEL_CHAIN } = require("./model.js");
 // USD per 1,000,000 tokens, from Anthropic's model pricing on 2026-10-29. Correct them there, not
 // from memory. `cached` is the cache-read rate; cache writes (5-minute TTL) bill at 1.25x `in`.
 // Thinking bills at the output rate and is already inside output_tokens. claude-opus-5 is here
-// because it is where a refusal fallback can land. A model missing here is priced at the dearest
-// chain rate rather than guessed low, and gets flagged so the table can be filled in.
+// because it is where a refusal fallback can land, and Gemini because an empty balance lands there.
+// A model missing here is priced at the dearest chain rate rather than guessed low, and gets flagged
+// so the table can be filled in.
 const PRICES = {
   "claude-opus-5-5": { in: 4, out: 20, cached: 0.2 },
   "claude-sonnet-5-5": { in: 2, out: 10, cached: 0.2 },
   "claude-opus-5": { in: 5, out: 25, cached: 0.5 },
   // Prompts over 100K tokens bill at 0.5 / 2.5; a chat request never gets near that.
   "claude-haiku-5-5": { in: 0.1, out: 0.5, cached: 0.01 },
+  // The out-of-credits fallback, from https://ai.google.dev/gemini-api/docs/pricing (checked 2026-08-02).
+  "gemini-3.1-flash-lite": { in: 0.25, out: 1.5, cached: 0.025 },
+  "gemini-3.5-flash-lite": { in: 0.3, out: 2.5, cached: 0.03 },
 };
 const CACHE_WRITE_MULTIPLIER = 1.25;
 

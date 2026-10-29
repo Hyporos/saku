@@ -27,7 +27,7 @@ src/
 
   features/           self-contained features that own their whole pipeline
     chat/             Saku's AI (see "The chat feature" below)
-    scan/ocr.js       Claude OCR: the reader, both prompts, attachment fetching
+    scan/ocr.js       Claude OCR (Gemini when credits are out): the reader, both prompts, attachment fetching
 
   scheduling/         registry.js (cron jobs + DST), jobs.js, health.js, latencyMonitor.js
   api/                the Express API the webapp consumes (see "The API" below)
@@ -121,8 +121,9 @@ served. If you add or rename a route, update that list in the same change.
 
 | File | Lines | Purpose |
 |---|---|---|
-| `model.js` | ~84 | Which Claude models to try and in what order, effort, the client, refusal fallback and response helpers |
-| `usage.js` | ~127 | Daily cost ledger: prices a request, tracks what the day has spent |
+| `model.js` | ~92 | Which Claude models to try and in what order, effort, the client, refusal fallback and response helpers |
+| `gemini.js` | ~136 | Out-of-credits fallback: takes the Claude request body, answers in Claude's shape |
+| `usage.js` | ~133 | Daily cost ledger: prices a request, tracks what the day has spent |
 | `emotes.js` | ~103 | Emote rationing, the channel-request detector, `:name:` repair |
 | `index.js` | ~2,515 | Everything else, including `askSaku` — the turn loop |
 
@@ -147,7 +148,7 @@ Splitting it further would move the same graph behind more `require` calls witho
 
 `model.js` had to come out **before** `usage.js`: the ledger needs the model chain to
 price a request, and importing it from `index.js` would have been a cycle.
-`tests/chatModules.js` asserts there are no cycles between these four files.
+`tests/chatModules.js` asserts there are no cycles between these files.
 
 ### What is genuinely still worth doing
 

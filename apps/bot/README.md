@@ -39,6 +39,7 @@ Read from `.env` at startup.
 | `SAKU_GUILD_ID` | The guild the API resolves members against |
 | `PORT` | API port, default `25637` |
 | `ANTHROPIC_API_KEY` | Claude API key, used by Saku's chat and the screenshot OCR |
+| `GEMINI_API_KEY` | Optional. Only used when the Anthropic credits run out: chat and OCR switch to Gemini for 10 minutes at a time. Unset, an empty balance surfaces as an error |
 | `SAKU_CHAT_MODEL` | Optional model id tried first by chat, ahead of `claude-opus-5-5` then `claude-sonnet-5-5` |
 | `SAKU_THINKING_LEVEL` | Optional chat effort: `low` (default), `medium`, `high`, `xhigh`, `max` |
 | `SAKU_CHAT_DEBUG` | Set to log every chat tool call and result |
