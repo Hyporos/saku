@@ -48,7 +48,7 @@ src/
 │   ├── chat/           # Saku's AI: persona, tools, context, memory, usage
 │   └── scan/           # OCR
 ├── lib/                # Genuinely generic helpers: pagination, checklist, transient
-├── scheduling/         # registry.js, jobs.js, health.js, latencyMonitor.js
+├── scheduling/         # registry.js, jobs.js, health.js
 └── schemas/            # Mongoose models, one per collection
 ```
 

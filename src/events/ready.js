@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const os = require("os");
 const { checkForCrashes } = require("../scheduling/health.js");
 const { setBirthdays, setAnniversaries } = require("../scheduling/jobs.js");
-const { startLatencyMonitor } = require("../scheduling/latencyMonitor.js");
 const { refreshRosterMeta, refreshServerExtras, setChatCommandId } = require("../features/chat/index.js");
 const { reconcileStarboard } = require("../domain/starboard.js");
 const { CHANNELS, GUILD_ID } = require("../config/ids.js");
@@ -53,9 +52,6 @@ module.exports = {
 
     await setBirthdays(client);
     setAnniversaries(client);
-
-    // Start the server latency monitor
-    await startLatencyMonitor(client);
 
     // Top up Saku's cached class/level data for the roster (slow, in the background)
     refreshRosterMeta();

@@ -29,7 +29,7 @@ src/
     chat/             Saku's AI (see "The chat feature" below)
     scan/ocr.js       Claude OCR (Gemini when credits are out): the reader, both prompts, attachment fetching
 
-  scheduling/         registry.js (cron jobs + DST), jobs.js, health.js, latencyMonitor.js
+  scheduling/         registry.js (cron jobs + DST), jobs.js, health.js
   api/                the Express API the webapp consumes (see "The API" below)
   canvas/             image generation (@napi-rs/canvas)
   lib/                genuinely generic helpers: pagination, checklist, transient
