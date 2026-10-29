@@ -26,6 +26,23 @@ pnpm bot               # start the bot
 pnpm deploy-commands   # register slash commands with Discord (the bot also does this on every start)
 ```
 
+## Environment
+
+Read from `.env` at startup.
+
+| Variable | Purpose |
+|---|---|
+| `DISCORD_TOKEN` | Bot token |
+| `CLIENT_ID` | Discord application id, for `pnpm deploy-commands` |
+| `MONGO_URI` | MongoDB connection string |
+| `ADMIN_API_SECRET` | Shared secret the webapp sends to the bot API |
+| `SAKU_GUILD_ID` | The guild the API resolves members against |
+| `PORT` | API port, default `25637` |
+| `ANTHROPIC_API_KEY` | Claude API key, used by Saku's chat and the screenshot OCR |
+| `SAKU_CHAT_MODEL` | Optional model id tried first by chat, ahead of `claude-opus-5-5` then `claude-sonnet-5-5` |
+| `SAKU_THINKING_LEVEL` | Optional chat effort: `low` (default), `medium`, `high`, `xhigh`, `max` |
+| `SAKU_CHAT_DEBUG` | Set to log every chat tool call and result |
+
 ## Tests
 
 ```

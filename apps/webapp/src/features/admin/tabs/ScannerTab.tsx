@@ -79,7 +79,7 @@ async function computeFingerprint(file: File): Promise<string> {
   });
 }
 
-/** Convert a File to { data: base64, mimeType } for the Gemini API. */
+/** Convert a File to { data: base64, mimeType } for the scan API. */
 function fileToBase64(file: File): Promise<{ data: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

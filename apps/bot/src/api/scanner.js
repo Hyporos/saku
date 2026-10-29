@@ -58,11 +58,11 @@ router.post("/admin/scanner/scan", async (req, res) => {
 
     let entryArray;
     try {
-      const text = await readImage({ prompt: CULVERT_SCAN_PROMPT, data: image.data, mimeType: image.mimeType || "image/png", temperature: 0 });
+      const text = await readImage({ prompt: CULVERT_SCAN_PROMPT, data: image.data, mimeType: image.mimeType || "image/png" });
       entryArray = text.trim().split(/\r?\n/);
     } catch (error) {
-      console.error("Gemini API Error:", error);
-      return res.status(502).json({ error: error.quotaExhausted ? error.message : "Failed to analyze image with Gemini AI" });
+      console.error("Error - OCR failed:", error);
+      return res.status(502).json({ error: error.quotaExhausted ? error.message : "Failed to analyze the image" });
     }
 
     // Parse entries. Shared with /scan so both read a screenshot the same way; NaNScores and

@@ -46,8 +46,8 @@ module.exports = {
 
       await interaction.editReply("Processing names...");
     } catch (error) {
-      console.error("Gemini API Error:", error);
-      return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image with Gemini API.");
+      console.error("Error - OCR failed:", error);
+      return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image.");
     }
 
     // Array to store users who need to run culvert

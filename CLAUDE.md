@@ -38,8 +38,8 @@ src/
     starboard.js
     levels.js
   features/           self-contained features that own their whole pipeline
-    chat/             Saku's AI: persona, tools, context, memory, usage
-    scan/             OCR
+    chat/             Saku's AI on Claude (@anthropic-ai/sdk): persona, tools, context, memory, usage
+    scan/             OCR on Claude vision (same SDK, same ANTHROPIC_API_KEY)
   scheduling/         registry.js, jobs.js, health.js, latencyMonitor.js
   api/                the Express API the webapp consumes
   canvas/             image generation (@napi-rs/canvas)
