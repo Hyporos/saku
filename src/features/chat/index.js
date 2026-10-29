@@ -1,16 +1,5 @@
-const {
-  MODEL_CHAIN,
-  MAX_TOOL_ROUNDS,
-  MAX_HISTORY,
-  MAX_OUTPUT_TOKENS,
-  MODEL_COOLDOWN_MS,
-  ai,
-  THINKING_UNSUPPORTED,
-  thinkingFor,
-  isThinkingRejected,
-} = require("./model.js");
-const { usageKey, usage, loadUsage, spentOn, countRequest, countTurn, modelCost, turnCost, countTokens, estimatedCost } = require("./usage.js");
-const { Type } = require("@google/genai");
+const { MODEL_CHAIN, MAX_TOOL_ROUNDS, MAX_HISTORY, MAX_OUTPUT_TOKENS, MODEL_COOLDOWN_MS, createMessage, textOf, servedBy, echoContent, isMissingModel } = require("./model.js");
+const { usageKey, loadUsage, spentOn, countRequest, countTurn, modelCost, turnCost, countTokens, estimatedCost } = require("./usage.js");
 const axios = require("axios");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const chatSchema = require("../../schemas/chatSchema.js");
@@ -31,6 +20,7 @@ require("dotenv").config();
 
 const REPLY_CAP = 1900; // Discord's own limit is 2000
 const RATE_NOTICE = "I'm getting throttled right now, every model I can reach is busy or capped. Give me a minute and try again.";
+const REFUSAL_REPLY = "Not touching that one, sorry. Ask me something else?";
 
 const OWNER_ID = USERS.OWNER;
 const MICHE_ID = USERS.MICHE;
@@ -54,7 +44,7 @@ const wrongChannelNotice = () =>
   `Ping me over in <#${MENTION_CHANNEL_ID}> and I'll answer you there, or use ${chatCommandMention} to speak to me privately.`;
 
 // One rate limit per person, shared by /chat and @mentions. It lives here rather than in each entry
-// point because the thing being rationed is a Gemini request, not a transport: a map per entry point
+// point because the thing being rationed is a model request, not a transport: a map per entry point
 // meant alternating between the two handed out double the intended rate.
 const CHAT_COOLDOWN_MS = 6000;
 const chatCooldowns = new Map();
@@ -438,10 +428,10 @@ const BASE_TOOLS = [
     name: "getGameReference",
     description:
       "Your deeper MapleStory notes. Open the matching topic BEFORE answering in detail on boss drops, gear order, star force, symbols, HEXA, Legion, dailies, party and drop rules, guild skills, recurring events. For one boss's phases, a class's skills, or a map, use searchMapleStory instead.",
-    parameters: {
-      type: Type.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        topic: { type: Type.STRING, enum: Object.keys(GAME_REFERENCE), description: "Which set of notes to open." },
+        topic: { type: "string", enum: Object.keys(GAME_REFERENCE), description: "Which set of notes to open." },
       },
       required: ["topic"],
     },
@@ -450,20 +440,20 @@ const BASE_TOOLS = [
     name: "getUsage",
     description:
       "Your own usage so far today, broken down per model: requests, prompt tokens, how many were cached, output tokens and cost each, plus the day's total and average per request. Use for 'how much have you used', 'what do you cost', 'which model costs the most', 'are you near a limit'. When someone asks what you cost, give the breakdown and not just the total. The result says whether a limit exists at all, so read it before implying one does.",
-    parameters: { type: Type.OBJECT, properties: {} },
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "getRankings",
     description:
       "Culvert leaderboard, highest first. weekly = one week's scores, yearly = last 52 summed. Reaches ANY rank and ANY past week: fromRank pages deeper (rank 57 = fromRank 57, limit 1), week or weeksAgo picks an older one. For the bottom of the board use findCharacters with order asc.",
-    parameters: {
-      type: Type.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        metric: { type: Type.STRING, enum: ["weekly", "yearly"], description: "weekly or yearly" },
-        week: { type: Type.STRING, description: "A specific week as a Wednesday date, YYYY-MM-DD. Omit for the last completed week." },
-        weeksAgo: { type: Type.NUMBER, description: "How many weeks back instead of a date: 1 = last week (the last completed week), 4 = four weeks ago. Ignored if week is given." },
-        fromRank: { type: Type.NUMBER, description: "Rank to start from, 1 = first place. Use this to reach any position, e.g. fromRank 57 with limit 1 for the 57th highest." },
-        limit: { type: Type.NUMBER, description: "How many entries to return from fromRank onward (default 10, max 25)." },
+        metric: { type: "string", enum: ["weekly", "yearly"], description: "weekly or yearly" },
+        week: { type: "string", description: "A specific week as a Wednesday date, YYYY-MM-DD. Omit for the last completed week." },
+        weeksAgo: { type: "number", description: "How many weeks back instead of a date: 1 = last week (the last completed week), 4 = four weeks ago. Ignored if week is given." },
+        fromRank: { type: "number", description: "Rank to start from, 1 = first place. Use this to reach any position, e.g. fromRank 57 with limit 1 for the 57th highest." },
+        limit: { type: "number", description: "How many entries to return from fromRank onward (default 10, max 25)." },
       },
       required: ["metric"],
     },
@@ -471,49 +461,49 @@ const BASE_TOOLS = [
   {
     name: "getCharacter",
     description: "Public culvert stats for one character by name (loose/accent-insensitive match). Returns the character's stats, or a list of similar-name suggestions if there's no clear match. Use for characters that are NOT the current person's own.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: { name: { type: Type.STRING, description: "The character name (as the user typed it)" } },
+    input_schema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The character name (as the user typed it)" } },
       required: ["name"],
     },
   },
   {
     name: "getMyProfile",
     description: "Culvert stats for the person currently talking to you, covering all of their own linked characters.",
-    parameters: { type: Type.OBJECT, properties: {} },
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "findCharacters",
     description:
       "Search the roster by class, branch, level, performance or player. For 'strongest Bishop', 'best mage', 'who improved most', 'highest level', 'newest members', 'how many pirates', 'the strongest alex'. Branch names (pirates, mages, archers, thieves, warriors) work in jobs. Class and level come from Nexon rankings, so a few are unresolved.",
-    parameters: {
-      type: Type.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
         person: {
-          type: Type.STRING,
+          type: "string",
           description: "Loose match on the player's Discord name or the character name. Each result's player field is that Discord name: use it naturally, never say a character is 'owned by' anyone.",
         },
         jobs: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+          type: "array",
+          items: { type: "string" },
           description: "Job names, or a branch that expands automatically ('Pirate', 'mages'). Omit for all jobs.",
         },
         sortBy: {
-          type: Type.STRING,
+          type: "string",
           enum: ["weekly", "yearly", "personalBest", "improvement", "level", "memberSince", "openWeek", "nearPB", "streak"],
           description:
             "weekly = last completed week (default, = 'last week'). openWeek = week in progress ('who logged already'). yearly = last 52. improvement = change vs the week before. memberSince = join date. nearPB = percent of their own best. streak = consecutive weeks logged.",
         },
         order: {
-          type: Type.STRING,
+          type: "string",
           enum: ["desc", "asc"],
           description:
             "desc (default) = biggest first: highest score, highest level, NEWEST member. asc = smallest first: LOWEST score, lowest level, OLDEST member. Pass asc for any 'lowest', 'worst', 'oldest' or 'been here longest' question.",
         },
-        minLevel: { type: Type.NUMBER, description: "At or above this level." },
-        maxLevel: { type: Type.NUMBER, description: "At or below this level." },
-        minScore: { type: Type.NUMBER, description: "Score for the chosen metric at or above this." },
-        limit: { type: Type.NUMBER, description: "How many to return (default 5, max 15)." },
+        minLevel: { type: "number", description: "At or above this level." },
+        maxLevel: { type: "number", description: "At or below this level." },
+        minScore: { type: "number", description: "Score for the chosen metric at or above this." },
+        limit: { type: "number", description: "How many to return (default 5, max 15)." },
       },
     },
   },
@@ -521,16 +511,16 @@ const BASE_TOOLS = [
     name: "getClassBenchmark",
     description:
       "Per-class scoreboard: count, average, median, high/low and the best character for each class last week, already ranked by average, next to the guild-wide figures. OMIT jobs to get EVERY class on the roster in one call, which is the right way to answer 'which class scores best', 'rank the classes' or 'top performing classes'. Never call this repeatedly for one class at a time. Pair with getMyProfile or getCharacter to place someone in the range.",
-    parameters: {
-      type: Type.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
         jobs: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+          type: "array",
+          items: { type: "string" },
           description: "Optional. Job names to limit to, loosely matched. Leave this out entirely to get every class at once.",
         },
         minCharacters: {
-          type: Type.NUMBER,
+          type: "number",
           description: "Optional. Only include classes with at least this many characters on the roster, for questions like 'classes with at least 5 members'.",
         },
       },
@@ -540,15 +530,15 @@ const BASE_TOOLS = [
     name: "getGuildComposition",
     description:
       "Class spread and level spread: counts per job, pre-summed counts per class branch, and how many sit at each level with the median and highest. Use for 'how many bishops', 'how many pirates', 'what classes are in the guild', and anything about levels. Required before any claim about how much of the roster is at a level.",
-    parameters: { type: Type.OBJECT, properties: {} },
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "searchMapleStory",
     description:
       "Search the web for any MapleStory thing you are not fully sure of: newer bosses, regions, gear tiers past Genesis and Eternal, boss mechanics, class skills and reworks, drop sources, systems, or terminology. Use this instead of guessing, hedging, or saying you don't know. Returns a grounded answer with sources.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: { query: { type: Type.STRING, description: "What to look up, phrased as a specific question." } },
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "What to look up, phrased as a specific question." } },
       required: ["query"],
     },
   },
@@ -558,28 +548,27 @@ const BEE_TOOLS = [
   {
     name: "getGuildStats",
     description: "[Bee only] Guild-wide culvert stats for a week: total score, submitted count, average, median, and percentiles.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: { week: { type: Type.STRING, description: "Wednesday date YYYY-MM-DD. Omit for the last completed week." } },
+    input_schema: {
+      type: "object",
+      properties: { week: { type: "string", description: "Wednesday date YYYY-MM-DD. Omit for the last completed week." } },
     },
   },
   {
     name: "getWallOfShame",
     description: "[Bee only] Members whose culvert participation rate is at or below a threshold (the 'wall of shame'). Use for admin questions about who is inactive or missing scores.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: { maxParticipation: { type: Type.NUMBER, description: "Max participation percent to include (default 60)." } },
+    input_schema: {
+      type: "object",
+      properties: { maxParticipation: { type: "number", description: "Max participation percent to include (default 60)." } },
     },
   },
 ];
 
-// Two tools that are irrelevant to almost every message and cost uncached tokens on all of them, so
-// they only ship when the message plausibly wants them. searchMapleStory is deliberately NOT gated:
-// it's the fallback the whole prompt leans on instead of guessing, and any pattern loose enough to be
-// safe would match nearly everything anyway, so gating it would buy nothing and risk a lot.
-// The roster tools are 1,411 tokens of schema, and schema is never cached: it is billed fresh on
-// every single request, whether or not the message could possibly want it. Chit-chat and pure game
-// questions don't need any of it.
+// Tools that are irrelevant to almost every message only ship when the message plausibly wants them.
+// searchMapleStory is deliberately NOT gated: it's the fallback the whole prompt leans on instead of
+// guessing, and any pattern loose enough to be safe would match nearly everything anyway, so gating
+// it would buy nothing and risk a lot. The roster tools are ~1,400 tokens of schema. Tools render
+// ahead of the system prompt and cache with it, but each distinct tool set is its own cache entry,
+// so the gate trades a few extra cache writes for keeping chit-chat and pure game questions lean.
 //
 // This gate is deliberately generous, because the two failure modes are not equal. Shipping the tools
 // when they weren't needed costs a fraction of a cent. Withholding them when they were means Saku
@@ -1105,16 +1094,16 @@ async function runTool(name, args, ctx) {
   }
 
   if (name === "getUsage") {
-    await loadUsage();
+    const usage = await loadUsage();
     const used = MODEL_CHAIN.reduce((sum, m) => sum + spentOn(m), 0);
     const totals = Object.values(usage.tokens ?? {}).reduce(
       (sum, t) => ({
         prompt: sum.prompt + (t.prompt ?? 0),
         output: sum.output + (t.output ?? 0),
-        thinking: sum.thinking + (t.thinking ?? 0),
         cached: sum.cached + (t.cached ?? 0),
+        written: sum.written + (t.written ?? 0),
       }),
-      { prompt: 0, output: 0, thinking: 0, cached: 0 }
+      { prompt: 0, output: 0, cached: 0, written: 0 }
     );
     const cost = estimatedCost();
     return {
@@ -1129,21 +1118,22 @@ async function runTool(name, args, ctx) {
       perModel: Object.entries(usage.tokens ?? {})
         .map(([key, t]) => {
           const model = MODEL_CHAIN.find((m) => usageKey(m) === key) ?? key.replace(/_/g, ".");
-          const fresh = Math.max(0, (t.prompt ?? 0) - (t.cached ?? 0));
+          const fresh = Math.max(0, (t.prompt ?? 0) - (t.cached ?? 0) - (t.written ?? 0));
           return {
             model,
             requests: spentOn(model),
             promptTokens: t.prompt ?? 0,
             cachedTokens: t.cached ?? 0,
+            cacheWriteTokens: t.written ?? 0,
             freshTokens: fresh,
-            outputTokens: (t.output ?? 0) + (t.thinking ?? 0),
-            costUsd: Math.round(modelCost(model, { prompt: t.prompt ?? 0, cached: t.cached ?? 0, output: t.output ?? 0, thinking: t.thinking ?? 0 }) * 1e6) / 1e6,
+            outputTokens: t.output ?? 0,
+            costUsd: Math.round(modelCost(model, { prompt: t.prompt ?? 0, cached: t.cached ?? 0, written: t.written ?? 0, output: t.output ?? 0 }) * 1e6) / 1e6,
           };
         })
         .sort((a, b) => b.costUsd - a.costUsd),
       note:
         "Billing is on, so there is NO daily cap, NO percentage used and nothing to run out of. Never invent a limit and never say chat is about to stop working. " +
-        "Every figure here is real, computed from real token counts, so quote them directly. Asked what you cost, do NOT stop at the total: give the per-model rows, since one model is usually most of the bill and that is the interesting part. Say which model cost most and why (more requests, or a dearer rate, or fewer cached tokens). Never work a price out yourself and never price a single message that isn't in these numbers. " +
+        "Every figure here is real, computed from real token counts, so quote them directly. Output tokens include your own thinking, which bills at the output rate. Cache reads cost a small fraction of fresh prompt tokens, and cache writes a quarter more. Asked what you cost, do NOT stop at the total: give the per-model rows, since one model is usually most of the bill and that is the interesting part. Say which model cost most and why (more requests, or a dearer rate, or fewer cached tokens). Never work a price out yourself and never price a single message that isn't in these numbers. " +
         "All of it is a FLOOR, it only covers requests this counter has seen." +
         (cost.unpriced.length ? ` Cost is missing rates for ${cost.unpriced.join(", ")}, so it understates the real total; say so if you quote it.` : ""),
     };
@@ -1500,7 +1490,7 @@ const recallTurn = (messageId) => turnMemory.get(messageId) ?? null;
 // arithmetic the daily figure uses.
 function formatTurnUsage(record) {
   const t = record.usage;
-  const fresh = Math.max(0, t.prompt - t.cached);
+  const fresh = Math.max(0, t.prompt - t.cached - t.written);
   const pct = t.prompt ? Math.round((t.cached / t.prompt) * 100) : 0;
   const tools = record.tools.length ? record.tools.join(", ") : "none";
 
@@ -1511,15 +1501,15 @@ function formatTurnUsage(record) {
     .sort((a, b) => b.usd - a.usd)
     .map(
       ({ model, m, usd }) =>
-        ` ${model.replace(/^gemini-/, "")} — ${m.requests} req, ${m.prompt.toLocaleString()} in / ${(m.output + m.thinking).toLocaleString()} out, **$${usd.toFixed(6)}**`
+        ` ${model.replace(/^claude-/, "")} — ${m.requests} req, ${m.prompt.toLocaleString()} in / ${m.output.toLocaleString()} out, **$${usd.toFixed(6)}**`
     )
     .join("\n");
 
   return (
     `Requests: **${t.requests}**${t.rounds ? ` (${t.rounds} tool round${t.rounds === 1 ? "" : "s"})` : ""}\n` +
     `Tools: **${tools}**\n` +
-    `Prompt tokens: **${t.prompt.toLocaleString()}** (${t.cached.toLocaleString()} cached, ${pct}%, ${fresh.toLocaleString()} fresh)\n` +
-    `Reply tokens: **${t.output.toLocaleString()}**${t.thinking ? ` (+${t.thinking.toLocaleString()} thinking)` : ""}\n` +
+    `Prompt tokens: **${t.prompt.toLocaleString()}** (${t.cached.toLocaleString()} cached, ${pct}%, ${t.written.toLocaleString()} written to cache, ${fresh.toLocaleString()} fresh)\n` +
+    `Reply tokens: **${t.output.toLocaleString()}** (thinking included)\n` +
     `Cost: **$${turnCost(t).toFixed(6)}**\n${perModel}\n` +
     `Took: **${(record.ms / 1000).toFixed(1)}s**`
   );
@@ -1544,14 +1534,10 @@ async function explainTurn(record) {
   for (const modelId of availableModels()) {
     try {
       countRequest(modelId);
-      const thinking = thinkingFor(modelId);
-      const result = await ai.models.generateContent({
-        model: modelId,
-        contents: prompt,
-        config: { temperature: 0.3, maxOutputTokens: 700, ...(thinking ? { thinkingConfig: thinking } : {}) },
-      });
-      countTokens(modelId, result.usageMetadata);
-      const text = result.text?.trim();
+      const result = await createMessage({ model: modelId, messages: [{ role: "user", content: prompt }] });
+      countTokens(servedBy(result, modelId), result.usage);
+      if (result.stop_reason === "refusal") return null;
+      const text = textOf(result);
       if (text) return text.slice(0, 1800);
     } catch (err) {
       if (!isTransient(err)) break;
@@ -1562,13 +1548,27 @@ async function explainTurn(record) {
 
 // ⎯⎯ Memory ⎯⎯ //
 
+// Turns saved before the move to Claude carry role "model", so the role is mapped on the way out
+// rather than rewritten in Mongo. History has to open on a user turn, and a turn whose partner never
+// got saved is merged into its neighbour so the roles keep alternating.
+function toMessages(stored) {
+  const messages = [];
+  for (const m of stored) {
+    const role = m.role === "user" ? "user" : "assistant";
+    if (!m.text || (!messages.length && role !== "user")) continue;
+    const prev = messages[messages.length - 1];
+    if (prev?.role === role) prev.content += `\n\n${m.text}`;
+    else messages.push({ role, content: m.text });
+  }
+  return messages;
+}
+
 async function loadHistory(userId) {
   const doc = await chatSchema.findById(userId).lean();
   // Sliced here, not just at write time: the document is allowed to hold a batch of un-folded overflow
   // past the window, and sending that too would trade the summariser's saving straight back for prompt
   // tokens on every turn.
-  const history = (doc?.messages ?? []).slice(-MAX_HISTORY).map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
-  while (history.length && history[0].role !== "user") history.shift(); // Gemini history must start on a user turn
+  const history = toMessages((doc?.messages ?? []).slice(-MAX_HISTORY));
   return { history, summary: doc?.summary ?? "", facts: doc?.facts ?? [] };
 }
 
@@ -1599,14 +1599,15 @@ async function summarize(previous, dropped, sink = null) {
   for (const modelId of availableModels()) {
     try {
       countRequest(modelId);
-      const thinking = thinkingFor(modelId);
-      const result = await ai.models.generateContent({ model: modelId, contents: prompt, config: { temperature: 0.2, maxOutputTokens: 400, ...(thinking ? { thinkingConfig: thinking } : {}) } });
-      countTokens(modelId, result.usageMetadata);
+      const result = await createMessage({ model: modelId, messages: [{ role: "user", content: prompt }] });
+      const served = servedBy(result, modelId);
+      countTokens(served, result.usage);
       // Billed to the turn that triggered it. The record handed to onTurn holds this same object, so
       // a 💳 reaction minutes later reads the updated figure rather than the one the reply was sent
       // with: this request happens after the reply, but the turn is what paid for it.
-      countTurn(sink, modelId, result.usageMetadata);
-      const text = result.text?.trim();
+      countTurn(sink, served, result.usage);
+      if (result.stop_reason === "refusal") break;
+      const text = textOf(result);
       if (text) return text.replace(/\s+/g, " ").slice(0, SUMMARY_CAP);
     } catch (err) {
       if (!isTransient(err)) break;
@@ -1621,7 +1622,7 @@ async function summarize(previous, dropped, sink = null) {
 async function saveTurn(userId, userText, modelText, turnFacts = [], sink = null) {
   const doc = await chatSchema.findById(userId).lean();
   let messages = doc?.messages ?? [];
-  messages.push({ role: "user", text: userText }, { role: "model", text: modelText });
+  messages.push({ role: "user", text: userText }, { role: "assistant", text: modelText });
 
   // Only fold once a batch has built up. The overflow sits in the document meanwhile, so nothing is
   // lost while it waits, and loadHistory only ever hands the model the last MAX_HISTORY of it.
@@ -1695,7 +1696,8 @@ async function recentChannelContext(channel, { before, replyTo } = {}) {
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const MAX_IMAGES = 3;
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+// The API caps an image at 5MB as base64, which is about 3.75MB of raw bytes.
+const MAX_IMAGE_BYTES = 3.75 * 1024 * 1024;
 
 // Discord attachments come back as URLs, and the model needs bytes, so pull the ones it can read.
 async function collectImages(attachments) {
@@ -2251,67 +2253,59 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   // the words the gate looks for, so the tail of the conversation rides along: once a thread is about
   // the roster it stays about the roster. Resolved @mentions are appended because `spoken` has already
   // swapped the raw <@id> for a display name that may match nothing.
-  const gateText = [outgoing, ...history.slice(-2).map((h) => h.parts?.[0]?.text ?? ""), ...people.map((p) => p.name)].join(" ");
+  const gateText = [outgoing, ...history.slice(-2).map((h) => h.content), ...people.map((p) => p.name)].join(" ");
 
   const fightBlock = FIGHT_ASK.test(gateText) ? `\n\n${FIGHT_RULES}` : "";
 
-  // Volatile context stays inside systemInstruction. Moving it into the turn was tried and measured:
-  // the cached share was 74% before and 74% after, because implicit caching matches a prefix inside
-  // the instruction rather than the whole field, so the static head was already being cached in full.
-  // It bought nothing and it would have put identity next to the person's own words, so it stays put.
+  // Volatile context stays in the system prompt rather than the turn, so identity never sits next to
+  // the person's own words. It goes in a second block AFTER the cache breakpoint, though: caching is a
+  // prefix match, and the moment the clock in `caller` appears every token after it is billed fresh,
+  // so everything that does not change (persona, rules, stable server context) goes first and is the
+  // part that caches. Tools render ahead of all of it and cache with that first block.
   //
   // instructionHead is also what the fabrication guard treats as evidence, so the channel log is
   // built on top of it rather than into it: numbers members claim in chat must not be able to verify
   // a reply, while the log's speaker names still count for the name guard further down.
-  const instructionHead =
-    `${buildSystem({ bee, priv: isPrivate, userId })}${server.stable}` +
-    `\n\n${caller}${server.volatile}${fightBlock}${mentionBlock}${imageBlock(images)}`;
-  const config = {
-    // Order is deliberate and load bearing. Everything that does not change goes first, because
-    // implicit caching only ever matches a prefix: the moment the clock in `caller` appears, every
-    // token after it is billed fresh for the rest of the request. Stable server context used to sit
-    // behind it and was paying full rate on every single turn.
-    systemInstruction: `${instructionHead}${channelBlock}`,
-    tools: [{ functionDeclarations: buildTools(bee, isPrivate, gateText) }],
-    temperature: 0.6,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-  };
+  const stableSystem = `${buildSystem({ bee, priv: isPrivate, userId })}${server.stable}`;
+  const volatileSystem = `${caller}${server.volatile}${fightBlock}${mentionBlock}${imageBlock(images)}`;
+  const instructionHead = `${stableSystem}\n\n${volatileSystem}`;
+  const system = [
+    { type: "text", text: stableSystem, cache_control: { type: "ephemeral" } },
+    { type: "text", text: `${volatileSystem}${channelBlock}` },
+  ];
+  const tools = buildTools(bee, isPrivate, gateText);
   const ctx = makeContext(userId, beeTools, guild, weeks, mineDoc?.characters ?? []);
   const startedAt = Date.now();
   const toolsUsed = [];
-  const turn = { requests: 0, prompt: 0, output: 0, thinking: 0, cached: 0, rounds: 0, byModel: {} };
+  const turn = { requests: 0, prompt: 0, output: 0, cached: 0, written: 0, rounds: 0, byModel: {} };
   const toolData = []; // what the tools actually returned, kept so the reply can explain itself later
   let turnFacts = []; // numbers this turn's tool results produced, carried forward for later turns
-  const firstTurn = images.length ? [{ text: outgoing }, ...images.map((img) => ({ inlineData: img }))] : outgoing;
+  const firstTurn = images.length
+    ? [{ type: "text", text: outgoing }, ...images.map((img) => ({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.data } }))]
+    : outgoing;
 
-  // One full turn against a model, retried once bare if the model refuses its thinking knob.
-  async function attempt(modelId) {
-    try {
-      return await run(modelId);
-    } catch (err) {
-      if (!isThinkingRejected(err) || THINKING_UNSUPPORTED.has(modelId)) throw err;
-      THINKING_UNSUPPORTED.add(modelId);
-      console.warn(`Saku chat: ${modelId} rejected its thinking setting, retrying without it`);
-      return run(modelId);
-    }
-  }
-
-  // One full turn (chat + tool loop) against a given model id.
+  // One full turn (first request + tool loop) against a given model id.
   async function run(modelId) {
-    const thinkingConfig = thinkingFor(modelId);
-    const chat = ai.chats.create({
-      model: modelId,
-      config: thinkingConfig ? { ...config, thinkingConfig } : config,
-      history,
-    });
-    // Every send is a separate billed request, so count them all, not just one per turn.
-    const send = async (message) => {
+    const messages = [...history, { role: "user", content: firstTurn }];
+    // Every send is a separate billed request, so count them all, not just one per turn. The
+    // automatic cache breakpoint rides the end of the conversation, so each tool round reads the
+    // rounds before it from cache instead of paying for them again.
+    const send = async ({ last = false } = {}) => {
       countRequest(modelId);
-      const result = await chat.sendMessage({ message });
-      countTokens(modelId, result.usageMetadata);
-      countTurn(turn, modelId, result.usageMetadata);
+      const result = await createMessage({
+        model: modelId,
+        system,
+        tools,
+        ...(last ? { tool_choice: { type: "none" } } : {}),
+        messages,
+        cache_control: { type: "ephemeral" },
+      });
+      const served = servedBy(result, modelId);
+      countTokens(served, result.usage);
+      countTurn(turn, served, result.usage);
       return result;
     };
+    const callsOf = (result) => result.content.filter((b) => b.type === "tool_use");
     // Evidence is what Saku is entitled to state: this person's own message, what the prompt taught
     // it, and tool results as they come back. The channel log verifies NAMES only: the people talking
     // in it are real, but a score someone claims in chat must not launder into a number Saku states
@@ -2325,48 +2319,59 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     const fresh = [];
     let evidence = `${outgoing}\n${instructionHead}\n${facts.join(" ")}`;
     let nameEvidence = `${evidence}${channelBlock}`;
-    let result = await send(firstTurn);
-    let calls = result.functionCalls;
+    let result = await send();
+    let calls = callsOf(result);
     let rounds = 0;
 
-    while (calls?.length && rounds < MAX_TOOL_ROUNDS) {
+    while (result.stop_reason !== "refusal" && calls.length && rounds < MAX_TOOL_ROUNDS) {
       rounds++;
       turn.rounds = rounds;
-      const responses = [];
+      const results = [];
       for (const call of calls) {
-        if (process.env.SAKU_CHAT_DEBUG) console.log(`  [tool] ${call.name} ${JSON.stringify(call.args ?? {})}`);
+        const args = call.input ?? {};
+        if (process.env.SAKU_CHAT_DEBUG) console.log(`  [tool] ${call.name} ${JSON.stringify(args)}`);
         toolsUsed.push(call.name);
         let data;
+        let failed = false;
         try {
-          data = await runTool(call.name, call.args ?? {}, ctx);
+          data = await runTool(call.name, args, ctx);
         } catch (err) {
           console.error(`Error - Saku tool ${call.name} failed:`, err);
           data = { error: "That lookup failed." };
+          failed = true;
         }
         const json = JSON.stringify(data);
-        toolData.push({ tool: call.name, args: call.args ?? {}, result: json.slice(0, 1200) });
+        toolData.push({ tool: call.name, args, result: json.slice(0, 1200) });
         evidence += `\n${json}`;
         nameEvidence += `\n${json}`;
         fresh.push(...numberTokens(json));
         if (process.env.SAKU_CHAT_DEBUG) console.log(`  [result] ${json.slice(0, 400)}`);
-        responses.push({ functionResponse: { name: call.name, response: data } });
+        results.push({ type: "tool_result", tool_use_id: call.id, content: json, ...(failed ? { is_error: true } : {}) });
       }
-      // On the final permitted round, the answer-now instruction rides along with the tool results
-      // instead of costing its own request.
-      if (rounds === MAX_TOOL_ROUNDS) responses.push({ text: "That was the last lookup available this turn. Answer now with what you have, and say plainly if something is missing." });
-      result = await send(responses);
-      calls = result.functionCalls;
+      // On the final permitted round, tools are switched off and the answer-now instruction rides
+      // along with the tool results instead of costing its own request.
+      const last = rounds === MAX_TOOL_ROUNDS;
+      if (last) results.push({ type: "text", text: "That was the last lookup available this turn. Answer now with what you have, and say plainly if something is missing." });
+      messages.push({ role: "assistant", content: echoContent(result.content) }, { role: "user", content: results });
+      result = await send({ last });
+      calls = callsOf(result);
     }
 
-    // Out of tool rounds with calls still pending: close them out so the model has to answer.
-    if (calls?.length) {
-      result = await send(calls.map((call) => ({ functionResponse: { name: call.name, response: { error: "No more lookups available. Answer with what you already have." } } })));
+    // A decline that survived the server-side fallback. It is a policy answer, not an outage, so it
+    // goes out as a short reply in Saku's voice instead of walking the model chain.
+    if (result.stop_reason === "refusal") {
+      console.warn(`Saku chat: ${modelId} declined (${result.stop_details?.category ?? "no category"}) for ${username}`);
+      turnFacts = fresh;
+      return REFUSAL_REPLY;
     }
 
-    let text = result.text?.trim();
+    let text = textOf(result);
     if (!text) {
-      result = await send("Give the user your answer now, in plain text, using what you already have.");
-      text = result.text?.trim();
+      const said = echoContent(result.content);
+      if (said.length) messages.push({ role: "assistant", content: said });
+      messages.push({ role: "user", content: "Give the user your answer now, in plain text, using what you already have." });
+      result = await send({ last: true });
+      text = result.stop_reason === "refusal" ? REFUSAL_REPLY : textOf(result);
     }
 
     // The guards detect but no longer buy a corrective round, which used to be a second model call on
@@ -2397,7 +2402,7 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     const leaked = [...new Set(text?.match(INTERNALS_RE) ?? [])];
     if (leaked.length) text = cutSentencesNaming(text, leaked, "internals guard");
 
-    if (text && result.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+    if (text && result.stop_reason === "max_tokens") {
       console.warn(`Saku chat: ${modelId} hit the ${MAX_OUTPUT_TOKENS} token output cap, trimming to the last clean boundary`);
       text = trimToBoundary(text);
     }
@@ -2410,13 +2415,13 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   let usedModel = null;
   for (const modelId of availableModels()) {
     try {
-      reply = await attempt(modelId);
+      reply = await run(modelId);
       usedModel = modelId;
       modelCooldowns.delete(modelId);
       break;
     } catch (err) {
       // A typo in MODEL_CHAIN shouldn't take chat down, so skip the bad id and say so loudly.
-      if (Number(err?.status) === 404 || /not found for API version|unknown model/i.test(err?.message ?? "")) {
+      if (isMissingModel(err)) {
         console.error(`Error - Saku chat: model "${modelId}" does not exist. Fix MODEL_CHAIN; skipping it for now.`);
         modelCooldowns.set(modelId, Date.now() + MODEL_COOLDOWN_MS);
         continue;

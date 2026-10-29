@@ -14,7 +14,7 @@ const chatSchema = new Schema(
     messages: [
       {
         _id: false,
-        role: { type: String }, // "user" | "model"
+        role: { type: String }, // "user" | "assistant" (older turns say "model")
         text: { type: String },
       },
     ],

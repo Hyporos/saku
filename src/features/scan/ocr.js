@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Anthropic = require("@anthropic-ai/sdk");
 const { isTransient } = require("../../lib/transient.js");
 require("dotenv").config();
 
@@ -10,13 +10,16 @@ require("dotenv").config();
 // shape: a 429 is a per-minute burst that clears in seconds, not a spent daily cap. So the primary is
 // retried before anything descends, because descending is a quality downgrade on the one operation
 // where being wrong is invisible. A misread name writes a wrong score or quietly drops a member, and
-// nobody finds out until they check their own graph. That's also why the chain is three capable models
-// and no lite tier: if all of them are down, an error the bee can retry beats a bad read nobody
+// nobody finds out until they check their own graph. That's also why the chain is two capable models
+// and no cheap tier: if all of them are down, an error the bee can retry beats a bad read nobody
 // questions. Scanning happens right after Thursday reset, when getting it right matters most.
 
-// 3.5-flash leads because it reads a guild list as accurately as 3.6-flash in about half the time,
-// and a scan is a burst of images where that difference is felt. 3.6-flash sits right behind it.
-const MODEL_CHAIN = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-2.5-flash"];
+// Opus leads because accuracy is the whole job here; Sonnet is the outage fallback, not a cost tier.
+const MODEL_CHAIN = ["claude-opus-5-5", "claude-sonnet-5-5"];
+// Thinking can't be switched off, so effort sets how long a read takes. Medium is the API default and
+// errs towards accuracy; a scan is a burst of images, so drop it to low if scans feel slow.
+const EFFORT = "medium";
+const MAX_TOKENS = 8000; // thinking counts against it, and a truncated list silently drops members
 const PRIMARY_ATTEMPTS = 3; // only the primary is worth waiting on; below it, one try each
 const RETRY_DELAY_MS = 1500;
 const COOLDOWN_MS = 60 * 1000; // a per-minute limit clears on its own, so don't bench for long
@@ -24,7 +27,8 @@ const BUSY_MESSAGE = "Error - Every image model is busy or down right now. Give 
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const cooldowns = new Map();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// The retry loop below owns retries, so the SDK's own are off. The key comes from ANTHROPIC_API_KEY.
+const client = new Anthropic({ timeout: 60000, maxRetries: 0 });
 
 // The prompt lives with the reader because /scan and the webapp scan route must parse a screenshot
 // the same way. They each had their own byte-identical copy, so a tuning fix (a new ellipsis rule, a
@@ -91,10 +95,9 @@ async function fetchAttachment(attachment) {
  * @param {string} options.prompt - The extraction instructions.
  * @param {string} options.data - Base64 image data.
  * @param {string} [options.mimeType] - Image mime type, defaults to image/png.
- * @param {number} [options.temperature] - Sampling temperature, omit for the model default.
  * @returns {Promise<string>} The model's raw text response.
  */
-async function readImage({ prompt, data, mimeType = "image/png", temperature }) {
+async function readImage({ prompt, data, mimeType = "image/png" }) {
   const ready = MODEL_CHAIN.filter((m) => Date.now() > (cooldowns.get(m) ?? 0));
   const chain = ready.length ? ready : MODEL_CHAIN; // all benched, so try anyway
 
@@ -103,13 +106,28 @@ async function readImage({ prompt, data, mimeType = "image/png", temperature }) 
     const attempts = index === 0 ? PRIMARY_ATTEMPTS : 1;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelId, ...(temperature === undefined ? {} : { generationConfig: { temperature } }) });
-        const result = await model.generateContent([{ inlineData: { data, mimeType } }, prompt]);
-        const text = (await result.response).text();
-        // A vision model can burn its whole budget on thinking and answer with nothing. That's worth
-        // another go rather than failing the scan, so it takes the retry path with the rate limits.
-        if (!text?.trim()) {
-          const empty = new Error("Empty response from the image model");
+        const result = await client.beta.messages.create({
+          model: modelId,
+          max_tokens: MAX_TOKENS,
+          output_config: { effort: EFFORT },
+          betas: ["server-side-fallback-2026-07-01"],
+          fallbacks: "default",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image", source: { type: "base64", media_type: mimeType, data } },
+                { type: "text", text: prompt },
+              ],
+            },
+          ],
+        });
+        // A cut-off list would silently drop the members past the cut, and a decline or an answer
+        // that spent its whole budget thinking has nothing to parse. All three are worth another go
+        // rather than failing the scan, so they take the retry path with the rate limits.
+        const text = result.stop_reason === "refusal" ? "" : result.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+        if (!text.trim() || result.stop_reason === "max_tokens") {
+          const empty = new Error(`Unusable response from the image model (${result.stop_reason})`);
           empty.retryable = true;
           throw empty;
         }

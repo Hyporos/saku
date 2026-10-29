@@ -73,8 +73,8 @@ module.exports = {
 
       await updateProgress(70, "Submitting scores...");
     } catch (error) {
-      console.error("Gemini API Error:", error);
-      return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image with Gemini API.");
+      console.error("Error - OCR failed:", error);
+      return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to analyze the image.");
     }
 
     await updateProgress(80, "Submitting scores...");

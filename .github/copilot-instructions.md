@@ -22,8 +22,7 @@ A Discord bot for the MapleStory guild *Saku*. It manages culvert score tracking
 | `undici` | HTTP requests inside canvas/image utilities |
 | `axios` | HTTP requests in commands and routes |
 | `express` | REST API served on port 25637. No `cors` — nothing in a browser calls this API |
-| `@google/genai` | Gemini for Saku's chat (`features/chat/model.js`) |
-| `@google/generative-ai` | Gemini for screenshot OCR (`features/scan/ocr.js`) |
+| `@anthropic-ai/sdk` | Claude for Saku's chat (`features/chat/model.js`) and screenshot OCR (`features/scan/ocr.js`) |
 | `dotenv` | Load `.env` — call `require("dotenv").config()` at entry points only |
 | `timezone-support` | Timezone list for the birthday command |
 | `acorn` (dev) | Scope analysis behind `pnpm test-symbols` |
