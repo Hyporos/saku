@@ -23,7 +23,7 @@ scores from a screenshot, and view the data members don't see.
 
 ```
 pnpm bot               # start the bot
-pnpm deploy-commands   # register slash commands with Discord (needed after any name or option change)
+pnpm deploy-commands   # register slash commands with Discord (the bot also does this on every start)
 ```
 
 ## Tests

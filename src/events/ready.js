@@ -28,9 +28,13 @@ module.exports = {
     const [members, emojis, commands] = await Promise.all([
       guild.members.fetch(),
       guild.emojis.fetch(),
-      // Commands are registered globally, so their ids live on the application. Only needed so a
-      // slash command can be written as a clickable </chat:id> link instead of plain text.
-      client.application.commands.fetch().catch(() => null),
+      // Registered on every start, so the host never needs a deploy-commands run. The </chat:id> link needs the ids.
+      client.application.commands
+        .set(client.commands.map((command) => command.data.toJSON()))
+        .catch((error) => {
+          console.error("Error - Could not register slash commands:", error);
+          return client.application.commands.fetch().catch(() => null);
+        }),
     ]);
     setChatCommandId(commands?.find((c) => c.name === "chat")?.id);
 
