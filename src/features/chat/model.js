@@ -1,4 +1,6 @@
 const Anthropic = require("@anthropic-ai/sdk");
+const { isOutOfCredits, geminiFallbackReady, creditsOut, benchCredits } = require("../../lib/transient.js");
+const { geminiMessage } = require("./gemini.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Which models to try, in what order, at what effort, and the client that calls them.
@@ -35,15 +37,19 @@ if (process.env.SAKU_THINKING_LEVEL && EFFORT !== process.env.SAKU_THINKING_LEVE
 }
 
 // A safety-classifier decline is retried server side on the fallback model Anthropic picks for that
-// category, so a false positive costs a slower reply instead of no reply.
-const createMessage = (params) =>
-  client.beta.messages.create({
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    max_tokens: MAX_OUTPUT_TOKENS,
-    output_config: { effort: EFFORT },
-    ...params,
-  });
+// category, so a false positive costs a slower reply instead of no reply. An empty credit balance
+// hands the same body to Gemini instead, which answers in Claude's shape.
+async function createMessage(params) {
+  const body = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", max_tokens: MAX_OUTPUT_TOKENS, output_config: { effort: EFFORT }, ...params };
+  if (creditsOut()) return geminiMessage(body);
+  try {
+    return await client.beta.messages.create(body);
+  } catch (err) {
+    if (!isOutOfCredits(err) || !geminiFallbackReady()) throw err;
+    benchCredits();
+    return geminiMessage(body);
+  }
+}
 
 const textOf = (response) =>
   response.content
@@ -52,8 +58,10 @@ const textOf = (response) =>
     .join("")
     .trim();
 
-// The model that actually produced the reply, which is the one whose rates apply to its tokens.
-const servedBy = (response, modelId) => ((response.usage?.iterations ?? []).some((i) => i.type === "fallback_message") ? response.model : modelId);
+// The model that actually produced the reply, which is the one whose rates apply to its tokens: a
+// refusal fallback, or Gemini when the credits are out.
+const servedBy = (response, modelId) =>
+  response.model?.startsWith("gemini-") || (response.usage?.iterations ?? []).some((i) => i.type === "fallback_message") ? response.model : modelId;
 
 // What goes back into the next request as the assistant turn. After a fallback, everything ahead of
 // the last switch point except plain text belongs to the model that declined and must not be echoed.

@@ -1,5 +1,6 @@
 const Anthropic = require("@anthropic-ai/sdk");
-const { isTransient } = require("../../lib/transient.js");
+const { GoogleGenAI } = require("@google/genai");
+const { isTransient, isOutOfCredits, geminiFallbackReady, creditsOut, benchCredits } = require("../../lib/transient.js");
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -29,6 +30,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const cooldowns = new Map();
 // The retry loop below owns retries, so the SDK's own are off. The key comes from ANTHROPIC_API_KEY.
 const client = new Anthropic({ timeout: 60000, maxRetries: 0 });
+
+// Only used when the Anthropic balance is empty: the reader this replaced, at the same settings.
+const GEMINI_CHAIN = ["gemini-3.5-flash", "gemini-3.6-flash"];
+let gemini = null;
 
 // The prompt lives with the reader because /scan and the webapp scan route must parse a screenshot
 // the same way. They each had their own byte-identical copy, so a tuning fix (a new ellipsis rule, a
@@ -89,7 +94,7 @@ async function fetchAttachment(attachment) {
 }
 
 /**
- * Reads an image with the first model that answers.
+ * Reads an image with the first model that answers, on Gemini while the Anthropic credits are out.
  *
  * @param {Object} options
  * @param {string} options.prompt - The extraction instructions.
@@ -97,7 +102,18 @@ async function fetchAttachment(attachment) {
  * @param {string} [options.mimeType] - Image mime type, defaults to image/png.
  * @returns {Promise<string>} The model's raw text response.
  */
-async function readImage({ prompt, data, mimeType = "image/png" }) {
+async function readImage(options) {
+  if (creditsOut()) return readWithGemini(options);
+  try {
+    return await readWithClaude(options);
+  } catch (err) {
+    if (!isOutOfCredits(err) || !geminiFallbackReady()) throw err;
+    benchCredits();
+    return readWithGemini(options);
+  }
+}
+
+async function readWithClaude({ prompt, data, mimeType = "image/png" }) {
   const ready = MODEL_CHAIN.filter((m) => Date.now() > (cooldowns.get(m) ?? 0));
   const chain = ready.length ? ready : MODEL_CHAIN; // all benched, so try anyway
 
@@ -147,10 +163,35 @@ async function readImage({ prompt, data, mimeType = "image/png" }) {
     }
   }
 
+  throw busyError(lastError);
+}
+
+async function readWithGemini({ prompt, data, mimeType = "image/png" }) {
+  gemini ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: 60000 } });
+  let lastError = null;
+  for (const modelId of GEMINI_CHAIN) {
+    try {
+      const result = await gemini.models.generateContent({
+        model: modelId,
+        contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: prompt }] }],
+        config: { temperature: 0 },
+      });
+      if (result.text?.trim()) return result.text;
+      lastError = new Error(`Empty response from ${modelId}`);
+    } catch (err) {
+      if (!isTransient(err)) throw err;
+      lastError = err;
+    }
+    console.warn(`Error - OCR model ${modelId} unavailable on the Gemini fallback, trying the next one (${(lastError?.message ?? "").replace(/\s+/g, " ").slice(0, 60)})`);
+  }
+  throw busyError(lastError);
+}
+
+function busyError(cause) {
   const busy = new Error(BUSY_MESSAGE);
   busy.quotaExhausted = true; // the flag /scan, /culvertping and the scan route check to show this text as-is
-  busy.cause = lastError;
-  throw busy;
+  busy.cause = cause;
+  return busy;
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
