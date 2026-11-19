@@ -51,7 +51,9 @@ function luckyChannel(message, userId, date) {
     .split(/\s+/)
     .filter((w) => w && !ROLL_FILLER.has(w));
   const topic = words.slice(0, 4).join(" ") || null;
-  const key = `${date}|${userId}|${topic ?? ""}`;
+  // Each word's letters sorted, so a swapped-letter typo ("baldirx") lands on the same channel.
+  const spelling = (topic ?? "").split(" ").map((w) => [...w].sort().join("")).join(" ");
+  const key = `${date}|${userId}|${spelling}`;
   let hash = 2166136261;
   for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
   return { channel: 1 + ((hash >>> 0) % 40), topic };
