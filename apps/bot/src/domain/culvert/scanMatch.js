@@ -103,13 +103,32 @@ function pickCandidate(parsed, candidates) {
 }
 
 /**
- * Resolve a name read off a screenshot to a linked character name.
+ * Split a guild list name cell into its two names.
  *
- * @param {string} scannedName - One name as read off the screenshot.
- * @param {string[]} linkedNames - Lowercased names of every linked character.
- * @returns {{name: string|null, candidates: string[], truncated: boolean}}
+ * Since the 2026-11 guild list layout, a member who is logged in shows as "LoggedIn(Main)": the
+ * character they are on, then their main in brackets, and the column truncates the whole cell, so
+ * "Caycia(Cay.." and "Beezle(Bee" (dots lost) are normal reads. The main is the guild member, so it
+ * is the name that is linked; the part before the bracket is only the fallback.
+ *
+ * @param {string} scannedName - One name cell as read off the screenshot.
+ * @returns {{outer: string, inner: string|null}} - inner is null when there is no bracket. An inner
+ *   name whose closing bracket is missing is cut off, so it comes back ending in ".." to say so.
  */
-function matchScannedName(scannedName, linkedNames) {
+function splitScannedName(scannedName) {
+  const raw = String(scannedName ?? "").replace(/\s+/g, "");
+  const open = raw.indexOf("(");
+  if (open === -1) return { outer: raw, inner: null };
+
+  const outer = raw.slice(0, open);
+  const rest = raw.slice(open + 1);
+  const close = rest.indexOf(")");
+  let inner = close === -1 ? rest : rest.slice(0, close);
+  if (close === -1 && !/\.{1,3}$/.test(inner)) inner += "..";
+  return { outer, inner: inner.replace(/^\.+$/, "") || null };
+}
+
+// One name, no brackets: the matching this module has always done.
+function matchPlainName(scannedName, linkedNames) {
   const parsed = parseScannedName(scannedName);
 
   // An exception has already rewritten the name to exactly what is in the database, so an exact hit
@@ -136,6 +155,43 @@ function matchScannedName(scannedName, linkedNames) {
   }
 
   return { name: pickCandidate(parsed, candidates), candidates, truncated: parsed.truncated };
+}
+
+/**
+ * Resolve a name read off a screenshot to a linked character name.
+ *
+ * @param {string} scannedName - One name cell as read off the screenshot.
+ * @param {string[]} linkedNames - Lowercased names of every linked character.
+ * @param {(name: string) => string} [applyException] - The misread table, applied to each half of a
+ *   bracketed cell as well as the whole, since exceptions are stored per character name.
+ * @returns {{name: string|null, candidates: string[], truncated: boolean}}
+ */
+function matchScannedName(scannedName, linkedNames, applyException = (n) => n) {
+  const whole = applyException(String(scannedName ?? "").trim());
+  const { outer, inner } = splitScannedName(whole);
+  if (inner === null) return matchPlainName(whole, linkedNames);
+
+  // The main first. A short truncated main ("Cay..") can fit several people, and the logged-in name
+  // beside it is usually the same character, so it settles the tie when it can.
+  const main = matchPlainName(applyException(inner), linkedNames);
+  if (main.candidates.length > 1 && outer) {
+    const hint = fold(outer);
+    const better = main.candidates.find((c) => fold(c) === hint) ?? main.candidates.find((c) => fold(c).startsWith(hint) || hint.startsWith(fold(c)));
+    if (better) main.name = better;
+  }
+  if (main.name) return main;
+
+  return outer ? matchPlainName(applyException(outer), linkedNames) : main;
+}
+
+/**
+ * The name to show a bee when nothing matched: both halves of a bracketed cell, readable.
+ *
+ * @param {string} scannedName
+ */
+function displayScannedName(scannedName) {
+  const { outer, inner } = splitScannedName(scannedName);
+  return inner === null ? outer : `${outer} (${inner})`;
 }
 
 /**
@@ -193,8 +249,9 @@ function parseScanEntries(lines, applyException) {
   const zeroed = [];
 
   for (const line of lines) {
-    const parts = String(line).split(" ");
-    const name = parts[0];
+    const parts = String(line).trim().split(/\s+/);
+    // "Katie (bloom) 1234" keeps its bracket with the name; anything else after the name is ignored.
+    const name = parts[1]?.startsWith("(") && parts.length > 2 ? parts[0] + parts[1] : parts[0];
     if (!name) continue;
 
     const score = Number(parts.pop());
@@ -210,6 +267,8 @@ function parseScanEntries(lines, applyException) {
 
 module.exports = {
   matchScannedName,
+  splitScannedName,
+  displayScannedName,
   parseScannedName,
   candidatesFor,
   pickCandidate,

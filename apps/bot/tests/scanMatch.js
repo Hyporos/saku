@@ -3,6 +3,9 @@ const {
   parseScannedName,
   candidatesFor,
   pickCandidate,
+  exceptionMapper,
+  parseScanEntries,
+  displayScannedName,
 } = require("../src/domain/culvert/scanMatch.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -93,6 +96,27 @@ eq("empty roster", matchScannedName("adeldruu", []).name, null);
 // "druu" is four letters, so its beginning and ending are the whole name, and it appears inside
 // "adeldruu". The exact-match fast path is what keeps it landing on itself.
 eq("short name prefers its exact match", matchScannedName("druu", ROSTER).name, "druu");
+
+// ⎯⎯ The guild list layout from 2026-11: "LoggedIn(Main)", truncated anywhere ⎯⎯ //
+// The main in brackets is the guild member, so it wins; the name before the bracket is the fallback
+// and the tie-breaker.
+{
+  const R = ["beezlebub", "caycia", "cayro", "wrignt", "bloom", "yong"];
+  eq("bracketed main", matchScannedName("Katie(bloom)", R).name, "bloom");
+  eq("main cut off with dots", matchScannedName("wrignt(wrig..", R).name, "wrignt");
+  eq("main cut off with the dots lost", matchScannedName("Beezle(Bee", R).name, "beezlebub");
+  eq("short main settled by the name before it", matchScannedName("Caycia(Cay..", R).name, "caycia");
+  eq("same character twice", matchScannedName("Yong(Yong)", R).name, "yong");
+  eq("unlinked main falls back to the logged-in name", matchScannedName("bloom(Nobody)", R).name, "bloom");
+  eq("space before the bracket", matchScannedName("Katie (bloom)", R).name, "bloom");
+  eq("exception on the main half", matchScannedName("Alt(Beez1e)", R, exceptionMapper([{ exception: "beez1e", name: "beezlebub" }])).name, "beezlebub");
+  eq("exception on the whole cell", matchScannedName("X(Y..", R, exceptionMapper([{ exception: "x(y..", name: "yong" }])).name, "yong");
+  eq("bare bracket matches nothing", matchScannedName("(", R).name, null);
+  eq("shown readably when unmatched", displayScannedName("Beezle(Bee"), "Beezle (Bee..)");
+  const { scores } = parseScanEntries(["Katie (bloom) 1234", "Caycia(Cay.. 197190"], (n) => n);
+  eq("scan line keeps the bracket", scores[0].name, "Katie(bloom)");
+  eq("scan line keeps its score", scores[1].score, 197190);
+}
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures ? 1 : 0);
