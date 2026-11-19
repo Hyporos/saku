@@ -97,20 +97,23 @@ eq("empty roster", matchScannedName("adeldruu", []).name, null);
 // "adeldruu". The exact-match fast path is what keeps it landing on itself.
 eq("short name prefers its exact match", matchScannedName("druu", ROSTER).name, "druu");
 
-// ⎯⎯ The guild list layout from 2026-11: "LoggedIn(Main)", truncated anywhere ⎯⎯ //
-// The main in brackets is the guild member, so it wins; the name before the bracket is the fallback
-// and the tie-breaker.
+// ⎯⎯ The guild list layout from 2026-11: "Character(Main)", truncated anywhere ⎯⎯ //
+// The row's own character wins, since the score is its; the main in brackets breaks ties, and only
+// /culvertping falls back to it.
 {
-  const R = ["beezlebub", "caycia", "cayro", "wrignt", "bloom", "yong"];
-  eq("bracketed main", matchScannedName("Katie(bloom)", R).name, "bloom");
+  const R = ["beezlebub", "caycia", "cayro", "wrignt", "bloom", "yong", "katie", "katiemule"];
+  const ping = { fallbackToMain: true };
+  eq("row's own character", matchScannedName("Katie(bloom)", R).name, "katie");
+  eq("mule row stays on the mule", matchScannedName("katiemule(Katie)", R).name, "katiemule");
   eq("main cut off with dots", matchScannedName("wrignt(wrig..", R).name, "wrignt");
-  eq("main cut off with the dots lost", matchScannedName("Beezle(Bee", R).name, "beezlebub");
-  eq("short main settled by the name before it", matchScannedName("Caycia(Cay..", R).name, "caycia");
   eq("same character twice", matchScannedName("Yong(Yong)", R).name, "yong");
-  eq("unlinked main falls back to the logged-in name", matchScannedName("bloom(Nobody)", R).name, "bloom");
-  eq("space before the bracket", matchScannedName("Katie (bloom)", R).name, "bloom");
-  eq("exception on the main half", matchScannedName("Alt(Beez1e)", R, exceptionMapper([{ exception: "beez1e", name: "beezlebub" }])).name, "beezlebub");
+  eq("space before the bracket", matchScannedName("Katie (bloom)", R).name, "katie");
+  eq("unlinked character is not scored on the main", matchScannedName("Zorbo(Bee", R).name, null);
+  eq("culvertping falls back to the main", matchScannedName("Zorbo(Bee", R, undefined, ping).name, "beezlebub");
+  eq("culvertping fallback with a full main", matchScannedName("Alt(bloom)", R, undefined, ping).name, "bloom");
+  eq("exception on the character half", matchScannedName("Beez1e(X)", R, exceptionMapper([{ exception: "beez1e", name: "beezlebub" }])).name, "beezlebub");
   eq("exception on the whole cell", matchScannedName("X(Y..", R, exceptionMapper([{ exception: "x(y..", name: "yong" }])).name, "yong");
+  eq("truncated whole cell still matches", matchScannedName("Cayci..", R).name, "caycia");
   eq("bare bracket matches nothing", matchScannedName("(", R).name, null);
   eq("shown readably when unmatched", displayScannedName("Beezle(Bee"), "Beezle (Bee..)");
   const { scores } = parseScanEntries(["Katie (bloom) 1234", "Caycia(Cay.. 197190"], (n) => n);
