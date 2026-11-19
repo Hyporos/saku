@@ -15,7 +15,9 @@ const weekSchema = require("../../schemas/weekSchema.js");
 const userSchema = require("../../schemas/userSchema.js");
 const starboardSchema = require("../../schemas/starboardSchema.js");
 const { nameMatch, getResetDates, RANKINGS_URL } = require("../../domain/culvert/utils.js");
-const { CHANNELS } = require("../../config/ids.js");
+const { planGroup } = require("../../domain/culvert/scanMatch.js");
+const { CHANNELS, isBee } = require("../../config/ids.js");
+const { clearScanCache } = require("../../api/scanCache.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Every operation that edits the roster, in one place: they all resolve a character the same way, all
@@ -51,19 +53,21 @@ async function lookupOnRankings(name) {
 }
 
 // Resolve a name against the rankings, or explain why it could not be. Returns null once it has
-// already answered the interaction.
-async function resolveName(interaction, name, override, label) {
+// already answered the interaction. `canOverride` is false where the subcommand has no override.
+async function resolveName(interaction, name, override, label, canOverride = true) {
   if (override) return name;
   try {
     const found = await lookupOnRankings(name);
     if (found) return found;
     await interaction.editReply(
-      `Error - The character **${name}** could not be found on the rankings. Use \`override\` if the name is correct`
+      `Error - The character **${name}** could not be found on the rankings. ${
+        canOverride ? "Use `override` if the name is correct" : "Check the spelling"
+      }`
     );
   } catch (error) {
     console.error(`Error - /character ${label} could not reach the rankings:`, error?.message ?? error);
     await interaction.editReply(
-      "Error - The rankings could not be reached right now. Try again shortly, or use `override`"
+      `Error - The rankings could not be reached right now. Try again shortly${canOverride ? ", or use `override`" : ""}`
     );
   }
   return null;
@@ -467,10 +471,15 @@ async function rename(interaction) {
     { $set: { "characters.$.name": resolvedName } }
   );
 
-  // The scan exceptions and the finalized week snapshots both point at the old name, so they follow
-  // it. Without the snapshots, every week before the rename keeps the dead name and /scan reports the
+  // The scan exceptions, declared groups and finalized week snapshots all point at the old name, so
+  // they follow it. Without the snapshots, every week before the rename keeps the dead name and /scan reports the
   // character as renamed or unlinked against its own history.
   await exceptionSchema.updateMany({ name: nameMatch(oldName) }, { $set: { name: resolvedName } });
+  await Promise.all([
+    culvertSchema.updateMany({ "group.main": nameMatch(oldName) }, { $set: { "group.main": resolvedName } }),
+    culvertSchema.updateMany({ "group.scoresTo": nameMatch(oldName) }, { $set: { "group.scoresTo": resolvedName } }),
+    culvertSchema.updateMany({ "group.characters": nameMatch(oldName) }, { $set: { "group.characters.$": resolvedName } }),
+  ]);
   const weeksTouched = await renameInWeeks(oldName, resolvedName);
 
   await logAction({
@@ -689,12 +698,145 @@ async function correct(interaction) {
   );
 }
 
+// ⎯⎯ group ⎯⎯ //
+
+// An account group holds up to six characters: the main and five others.
+const ALT_OPTIONS = ["alt1", "alt2", "alt3", "alt4", "alt5"];
+
+const describeGroup = (saved) =>
+  `Main: **${saved.main}**\n` +
+  `Other characters: ${saved.characters?.length ? saved.characters.map((name) => `**${name}**`).join(", ") : "none"}\n` +
+  `Scores go to: **${saved.scoresTo}**`;
+
+// Members declare their own group; a bee can pass `user` to declare someone else's. Running it with a
+// main replaces the whole group, with nothing it shows the group, and with `clear` it removes it.
+async function group(interaction) {
+  const mainOption = interaction.options.getString("main");
+  const altOptions = ALT_OPTIONS.map((option) => interaction.options.getString(option)).filter(Boolean);
+  const scoresToOption = interaction.options.getString("scores_to");
+  const clear = interaction.options.getBoolean("clear") ?? false;
+  const userOption = interaction.options.getUser("user");
+  const quiet = { allowedMentions: { parse: [] } };
+
+  if (userOption && userOption.id !== interaction.user.id && !isBee(interaction.member, interaction.user.id)) {
+    return interaction.reply({
+      content: "Error - Only bees can set someone else's group. Leave `user` empty to set your own",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const target = userOption ?? interaction.user;
+  const own = target.id === interaction.user.id;
+  const whose = own ? "your" : `${target}'s`;
+
+  if (clear && (mainOption || altOptions.length || scoresToOption)) {
+    return interaction.reply("Error - Use `clear` on its own, without a main or other characters");
+  }
+  if (!mainOption && (altOptions.length || scoresToOption)) {
+    return interaction.reply("Error - Give the group's `main` too. Setting a group replaces the whole thing");
+  }
+
+  // ⎯⎯ View ⎯⎯ //
+  if (!mainOption && !clear) {
+    const doc = await culvertSchema.findById(target.id, { group: 1 }).lean();
+    if (!doc?.group) {
+      return interaction.reply({
+        content: `${own ? "You have" : `${target} has`} no group set. Set one with \`/character group\` and a \`main\``,
+        ...quiet,
+      });
+    }
+    return interaction.reply({ content: `Here is ${whose} group:\n${describeGroup(doc.group)}`, ...quiet });
+  }
+
+  // ⎯⎯ Clear ⎯⎯ //
+  if (clear) {
+    const doc = await culvertSchema.findById(target.id, { group: 1 }).lean();
+    if (!doc?.group) {
+      return interaction.reply({ content: `${own ? "You have" : `${target} has`} no group to clear`, ...quiet });
+    }
+    const proceed = await confirm(interaction, `Clear ${whose} group?\n${describeGroup(doc.group)}`, "Clear");
+    if (!proceed) return;
+
+    await culvertSchema.updateOne({ _id: target.id }, { $unset: { group: 1 } });
+    clearScanCache();
+    await logAction({
+      action: "Clear Group",
+      target: String(doc.group.main),
+      details: `Cleared the group of ${target.username} | Main: ${doc.group.main} | Characters: ${
+        (doc.group.characters ?? []).join(", ") || "none"
+      } | Scores to: ${doc.group.scoresTo}`,
+      category: "delete",
+      actorId: String(interaction.user.id),
+    });
+    return interaction.editReply({ content: `Cleared ${whose} group`, components: [], ...quiet });
+  }
+
+  // ⎯⎯ Set ⎯⎯ //
+  const typed = [mainOption, ...altOptions];
+  const invalid = typed.find((name) => !VALID_NAME.test(name));
+  if (invalid) {
+    return interaction.reply(
+      `Error - **${invalid}** is not a valid character name. Names are 2-13 letters and numbers, nothing else`
+    );
+  }
+  const twice = typed.find((name, i) => typed.findIndex((other) => other.toLowerCase() === name.toLowerCase()) !== i);
+  if (twice) return interaction.reply(`Error - **${twice}** is in the group twice`);
+
+  await interaction.deferReply();
+
+  // Checked before the rankings, so someone with nothing linked isn't kept waiting for six lookups.
+  const roster = await culvertSchema.find({}, { "characters.name": 1, group: 1 }).lean();
+  const linked = roster.find((user) => String(user._id) === target.id)?.characters ?? [];
+  if (linked.length === 0) {
+    const { error } = planGroup({ discordId: target.id, main: mainOption, roster });
+    return interaction.editReply({ content: `Error - ${error}`, ...quiet });
+  }
+
+  // One at a time: resolveName answers the interaction itself on a miss, and two misses must not race.
+  const resolved = [];
+  for (const name of typed) {
+    const found = await resolveName(interaction, name, false, "group", false);
+    if (!found) return;
+    resolved.push(found);
+  }
+
+  const plan = planGroup({
+    discordId: target.id,
+    main: resolved[0],
+    alts: resolved.slice(1),
+    scoresTo: scoresToOption,
+    roster,
+  });
+  if (plan.error) return interaction.editReply({ content: `Error - ${plan.error}`, ...quiet });
+
+  const previous = roster.find((user) => String(user._id) === target.id)?.group ?? null;
+  await culvertSchema.updateOne({ _id: target.id }, { $set: { group: { ...plan.group, updatedAt: new Date() } } });
+  clearScanCache(); // the webapp scanner holds its own copy of the roster
+
+  await logAction({
+    action: previous ? "Change Group" : "Set Group",
+    target: String(plan.group.main),
+    details: `Group of ${target.username} | Main: ${plan.group.main} | Characters: ${
+      plan.group.characters.join(", ") || "none"
+    } | Scores to: ${plan.group.scoresTo}${previous ? ` | Replaced main: ${previous.main}` : ""}`,
+    category: previous ? "edit" : "create",
+    actorId: String(interaction.user.id),
+  });
+
+  await interaction.editReply({
+    content: `Saved ${whose} group. Scans now send any row with these names to **${plan.group.scoresTo}**\n${describeGroup(plan.group)}`,
+    ...quiet,
+  });
+}
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-const SUBCOMMANDS = { link, unlink, restore, rename, changeid, correct };
+const SUBCOMMANDS = { link, unlink, restore, rename, changeid, correct, group };
 
 module.exports = {
   tier: "bee",
+  // Members set their own group; setting someone else's is checked inside, against isBee.
+  tiers: { group: "public" },
   culvert: true,
   data: new SlashCommandBuilder()
     .setName("character")
@@ -803,17 +945,44 @@ module.exports = {
         .addStringOption((option) =>
           option.setName("date").setDescription("An exact week instead (YYYY-MM-DD, must be a Wednesday)")
         )
-    ),
+    )
+    .addSubcommand((sub) => {
+      sub
+        .setName("group")
+        .setDescription("Set, view or clear your account group, so scans find you on any of its characters")
+        .addStringOption((option) =>
+          option.setName("main").setDescription("The group's main, the name in brackets on the guild list. Leave empty to view")
+        );
+      for (const name of ALT_OPTIONS) {
+        sub.addStringOption((option) => option.setName(name).setDescription("Another character in the group"));
+      }
+      return sub
+        .addStringOption((option) =>
+          option
+            .setName("scores_to")
+            .setDescription("Which linked character gets the group's scores (default: the main, if linked)")
+            .setAutocomplete(true)
+        )
+        .addBooleanOption((option) => option.setName("clear").setDescription("Remove the group"))
+        .addUserOption((option) => option.setName("user").setDescription("Bees only: set someone else's group"));
+    }),
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
   // Every subcommand that names an existing character offers them, so nobody types one from memory.
-  // Restore reads the unlink log instead, since by then the character is gone from the roster.
+  // Restore reads the unlink log instead, since by then the character is gone from the roster, and
+  // group offers only the characters linked to whoever the group is for.
   async autocomplete(interaction) {
-    const names =
-      interaction.options.getSubcommand() === "restore"
-        ? await restorableNames(interaction.options.getFocused())
-        : await linkedNames(interaction.options.getFocused());
+    const sub = interaction.options.getSubcommand();
+    const focused = interaction.options.getFocused();
+    let names;
+    if (sub === "restore") names = await restorableNames(focused);
+    else if (sub === "group") {
+      const picked = interaction.options.get("user")?.value;
+      const owner = picked && isBee(interaction.member, interaction.user.id) ? picked : interaction.user.id;
+      const doc = await culvertSchema.findById(owner, { "characters.name": 1 }).lean();
+      names = filterChoices((doc?.characters ?? []).map((character) => character.name), focused);
+    } else names = await linkedNames(focused);
     await interaction.respond(names.map((name) => ({ name, value: name }))).catch(() => {});
   },
 

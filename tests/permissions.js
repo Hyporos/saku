@@ -75,6 +75,13 @@ check("a member cannot use /character", !allowed(commands.get("character"), {}))
 check("a bee can", allowed(commands.get("character"), { bee: true }));
 check("the owner can", allowed(commands.get("character"), { owner: true }));
 
+// ⎯⎯ A public subcommand inside a bee command ⎯⎯ //
+const character = commands.get("character");
+check("/character group is public", tierOf(character, "group") === "public");
+check("...a member can use it", allowed(character, {}, "group"));
+check("...a friend still cannot (culvert)", !allowed(character, { friend: true }, "group"));
+check("...but a member still cannot use /character link", !allowed(character, {}, "link"));
+
 // ⎯⎯ Description tags agree with the gate ⎯⎯ //
 for (const [name, command] of commands) {
   const description = command.data.toJSON().description;
@@ -82,6 +89,17 @@ for (const [name, command] of commands) {
   const restricted = tierOf(command) !== "public";
   if (tagged !== restricted) {
     check(`/${name}: description tag matches its tier`, false, `tagged=${tagged} tier=${tierOf(command)}`);
+  }
+}
+// Subcommands too: Discord lists each one with its own description, without the parent's tag.
+for (const [name, command] of commands) {
+  for (const sub of command.data.toJSON().options ?? []) {
+    if (sub.type !== 1) continue;
+    const tagged = /\[(BEE|OWNER)\]/.test(sub.description);
+    const restricted = tierOf(command, sub.name) !== "public";
+    if (tagged !== restricted) {
+      check(`/${name} ${sub.name}: description tag matches its tier`, false, `tagged=${tagged} tier=${tierOf(command, sub.name)}`);
+    }
   }
 }
 check("every [BEE]/[OWNER] tag matches the enforced tier", true);

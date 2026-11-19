@@ -28,6 +28,9 @@ const escapeRegex = (value) => String(value).replace(REGEX_CHARS, "\\$&");
 // [A-Za-z0-9]), so the only accents in play are ones OCR invented.
 const fold = (value) => normalizeName(value);
 
+// A name read with trailing dots was cut off by the guild list.
+const isCut = (value) => /\.$/.test(value);
+
 /**
  * Split a scanned name into the pieces matching works on.
  *
@@ -172,9 +175,16 @@ function matchPlainName(scannedName, linkedNames) {
  * @param {string[]} linkedNames - Lowercased names of every linked character.
  * @param {(name: string) => string} [applyException] - The misread table, applied to each half of a
  *   bracketed cell as well as the whole, since exceptions are stored per character name.
+ * @param {Map} [groups] - From groupIndex. A declared group decides the row before anything else.
  * @returns {{name: string|null, candidates: string[], truncated: boolean}}
  */
-function matchScannedName(scannedName, linkedNames, applyException = (n) => n) {
+function matchScannedName(scannedName, linkedNames, applyException = (n) => n, groups = null) {
+  const declared = groups?.size ? groupMatch(String(scannedName ?? "").trim(), groups, applyException) : null;
+  if (declared) {
+    const name = declared.scoresTo.toLowerCase();
+    return { name, candidates: [name], truncated: false };
+  }
+
   const whole = applyException(String(scannedName ?? "").trim());
   const { outer, inner } = splitScannedName(whole);
   if (inner === null) return matchPlainName(whole, linkedNames);
@@ -221,6 +231,148 @@ function exceptionMapper(exceptions) {
   return (scannedName) => byMisread.get(toKey(scannedName)) ?? scannedName;
 }
 
+// A cut name shorter than this is too little to pick a group by.
+const GROUP_PREFIX = 3;
+
+/**
+ * Index the account groups members declared with /character group, by every name in them.
+ *
+ * Keys are folded like every other name comparison here. A name two people both declared (validation
+ * refuses that, but older or hand-edited data could have it) maps to null, so it decides nothing.
+ *
+ * @param {Array<{_id: string, characters?: Array<{name: string}>, group?: Object}>} roster
+ * @returns {Map<string, {discordId: string, scoresTo: string}|null>}
+ */
+function groupIndex(roster) {
+  const byName = new Map();
+  for (const user of roster ?? []) {
+    const group = user?.group;
+    const linked = (user?.characters ?? []).filter((c) => c?.name);
+    if (!group?.main || linked.length === 0) continue;
+    // scoresTo is checked when the group is saved; a character unlinked since falls back to the first.
+    const target = linked.find((c) => c.name.toLowerCase() === String(group.scoresTo ?? "").toLowerCase()) ?? linked[0];
+    const entry = { discordId: String(user._id), scoresTo: target.name };
+    for (const name of [group.main, ...(group.characters ?? [])]) {
+      const key = fold(toKey(name));
+      if (!key) continue;
+      const existing = byName.get(key);
+      byName.set(key, existing === undefined || existing?.discordId === entry.discordId ? entry : null);
+    }
+  }
+  return byName;
+}
+
+// One name against the declared groups: exact, or by prefix when it is cut and only one person fits.
+function groupFor(read, groups) {
+  if (!read) return null;
+  const key = fold(toKey(read));
+  if (!key) return null;
+  if (!isCut(read)) return groups.get(key) ? { ...groups.get(key), cut: false } : null;
+  if (key.length < GROUP_PREFIX) return null;
+
+  const owners = new Map();
+  for (const [name, entry] of groups) {
+    if (entry && name.startsWith(key)) owners.set(entry.discordId, entry);
+  }
+  return owners.size === 1 ? { ...[...owners.values()][0], cut: true } : null;
+}
+
+/**
+ * Decide a group someone is declaring, against everyone else's characters and groups. Names come in
+ * already checked against the rankings, in their real spelling.
+ *
+ * @param {Object} input
+ * @param {string} input.discordId - Whose group it is.
+ * @param {string} input.main - The bracketed representative.
+ * @param {string[]} [input.alts] - The other characters in the group.
+ * @param {string|null} [input.scoresTo] - The linked character scores go to, as typed.
+ * @param {Array<{_id: string, characters?: Array<{name: string}>, group?: Object}>} input.roster
+ * @returns {{group: {main: string, characters: string[], scoresTo: string}}|{error: string}}
+ */
+function planGroup({ discordId, main, alts = [], scoresTo = null, roster }) {
+  const owner = (roster ?? []).find((user) => String(user._id) === String(discordId));
+  const linked = (owner?.characters ?? []).map((c) => c?.name).filter(Boolean);
+  if (linked.length === 0) {
+    return { error: "No character is linked to this account yet, so there is nothing for the group's scores to go to. Ask a bee to link one with `/character link` first" };
+  }
+
+  const names = [main, ...alts].filter(Boolean);
+  const seen = new Set();
+  for (const name of names) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) return { error: `**${name}** is in the group twice` };
+    seen.add(key);
+  }
+
+  for (const user of roster ?? []) {
+    if (String(user._id) === String(discordId)) continue;
+    const theirs = new Set((user.characters ?? []).map((c) => c?.name?.toLowerCase()).filter(Boolean));
+    const grouped = new Set([user.group?.main, ...(user.group?.characters ?? [])].filter(Boolean).map((n) => n.toLowerCase()));
+    for (const name of names) {
+      if (theirs.has(name.toLowerCase())) return { error: `**${name}** is linked to someone else` };
+      if (grouped.has(name.toLowerCase())) return { error: `**${name}** is already in someone else's group` };
+    }
+  }
+
+  let target;
+  if (scoresTo) {
+    target = linked.find((name) => name.toLowerCase() === String(scoresTo).toLowerCase());
+    if (!target) return { error: `**${scoresTo}** is not one of the linked characters (${linked.join(", ")})` };
+  } else {
+    target = linked.find((name) => name.toLowerCase() === main.toLowerCase()) ?? linked[0];
+  }
+
+  return { group: { main, characters: alts.filter(Boolean), scoresTo: target } };
+}
+
+/**
+ * Resolve a cell through the declared groups alone. The bracketed main is checked first, then the
+ * character before it, each as read and through the misread table.
+ *
+ * @param {string} raw - The cell as read.
+ * @param {Map} groups - From groupIndex.
+ * @param {(name: string) => string} misread - The misread table.
+ * @param {(name: string) => string|null} [ownerOf] - Who a linked character belongs to. A cut main that
+ *   fits one group still loses to a character beside it that is plainly somebody else's.
+ * @returns {{discordId: string, scoresTo: string, cut: boolean}|null}
+ */
+function groupMatch(raw, groups, misread = (n) => n, ownerOf = () => null) {
+  if (!groups?.size) return null;
+  const plain = splitScannedName(raw);
+  const read = splitScannedName(misread(raw));
+  const reads = (...values) => [...new Set(values.filter(Boolean).flatMap((v) => [v, misread(v)]))];
+
+  // No bracket: the cell is one name.
+  if (plain.inner === null && read.inner === null) {
+    for (const value of reads(plain.outer, read.outer)) {
+      const hit = groupFor(value, groups);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  const outers = reads(plain.outer, read.outer);
+  let outerOwner = null;
+  for (const value of outers) {
+    const hit = !isCut(value) && groupFor(value, groups);
+    outerOwner = hit ? hit.discordId : ownerOf(value);
+    if (outerOwner) break;
+  }
+
+  for (const value of reads(plain.inner, read.inner)) {
+    const hit = groupFor(value, groups);
+    if (!hit) continue;
+    if (hit.cut && outerOwner && outerOwner !== hit.discordId) break;
+    return hit;
+  }
+
+  for (const value of outers) {
+    const hit = !isCut(value) && groupFor(value, groups);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // A whole scan, decided in one place: who each row is, what gets saved, what Saku learned, and what a
 // bee has to look at. /scan and the webapp's scanner route both call this and only do the writes.
@@ -252,8 +404,6 @@ function editDistance(a, b) {
 
 const isActive = (character, week) =>
   !character.memberSince || dayjs(character.memberSince).isBefore(dayjs(week).add(1, "week"));
-
-const isCut = (value) => /\.$/.test(value);
 
 /**
  * A character's past scores, without the week being scanned.
@@ -319,13 +469,14 @@ function likeliestRow(person, rows, week) {
 /**
  * Resolve every row of one screenshot against the roster.
  *
- * A row is one account group, read as "Character(Main)". The main is matched first, through a main
- * mapping or a linked name. When it is unknown but the character before it is exactly a linked
+ * A row is one account group, read as "Character(Main)". A group a member declared decides the row
+ * first (either name, bracket first). Otherwise the main is matched through a main mapping or a linked
+ * name. When it is unknown but the character before it is exactly a linked
  * character, Saku learns main → that character so next week matches whichever character they are on.
  *
  * @param {Object} input
  * @param {Array<{name: string, score: number}>} input.rows - From parseScanEntries, cells as read.
- * @param {Array<{_id: string, characters: Array}>} input.roster - culvertSchema documents.
+ * @param {Array<{_id: string, characters: Array, group?: Object}>} input.roster - culvertSchema documents.
  * @param {Array<{_id?: any, name: string, exception: string, kind?: string, source?: string}>} input.mappings
  *   - Every exception record, misreads and mains.
  * @param {string} input.week - The Wednesday being scanned, "YYYY-MM-DD".
@@ -358,6 +509,10 @@ function resolveScan({ rows, roster, mappings = [], week }) {
     mains.set(key, { ...entry, character });
     mainOf.set(character.discordId, entry);
   }
+
+  // Declared groups outrank everything below: learned mains, misreads and fuzzy names.
+  const groups = groupIndex(roster);
+  const ownerOf = (name) => characters.get(String(name).toLowerCase())?.discordId ?? null;
 
   // Linked names and mapped mains a truncated read could be.
   function byPrefix(read) {
@@ -395,6 +550,12 @@ function resolveScan({ rows, roster, mappings = [], week }) {
   }
 
   function resolveRow(raw) {
+    const declared = groupMatch(raw.trim(), groups, misread, ownerOf);
+    if (declared) {
+      const character = characters.get(declared.scoresTo.toLowerCase());
+      if (character) return { character, via: "group" };
+    }
+
     const cell = misread(raw.trim());
     const { outer, inner } = splitScannedName(cell);
     if (inner === null) return resolvePlain(cell);
@@ -425,7 +586,8 @@ function resolveScan({ rows, roster, mappings = [], week }) {
     if (near && (!outerExact || outerExact.discordId === near.discordId)) return { character: near, via: "main" };
 
     // Learning needs the whole main: a cut one could be the start of somebody else's.
-    if (outerExact) return { character: outerExact, via: "outer", learn: truncated || !key ? null : key };
+    // A name somebody declared in a group is theirs, never a main to learn for anyone else.
+    if (outerExact) return { character: outerExact, via: "outer", learn: truncated || !key || groups.has(fold(key)) ? null : key };
 
     const fallback = outerRead ? matchPlainName(outerRead, linkedNames).name : null;
     if (fallback) return { character: characters.get(fallback), via: "outer-fuzzy" };
@@ -563,16 +725,21 @@ async function loadExceptions() {
 }
 
 /**
- * Everything a scan needs before it can read a screenshot: the names to match against and the misread
- * table to apply. Both commands opened with this exact pair.
+ * Everything a scan needs before it can read a screenshot: the names to match against, the misread
+ * table to apply and the declared groups.
  *
- * @returns {Promise<{linkedNames: string[], applyException: (name: string) => string}>}
+ * @returns {Promise<{linkedNames: string[], applyException: (name: string) => string, groups: Map}>}
  */
 async function loadScanRoster() {
-  const [characters, applyException] = await Promise.all([getAllCharacters(), loadExceptions()]);
+  const [characters, applyException, grouped] = await Promise.all([
+    getAllCharacters(),
+    loadExceptions(),
+    culvertSchema.find({ group: { $exists: true } }, { characters: 1, group: 1 }).lean(),
+  ]);
   return {
     linkedNames: characters.filter((c) => c.name).map((c) => c.name.toLowerCase()),
     applyException,
+    groups: groupIndex(grouped),
   };
 }
 
@@ -722,6 +889,9 @@ module.exports = {
   candidatesFor,
   pickCandidate,
   exceptionMapper,
+  groupIndex,
+  groupMatch,
+  planGroup,
   toKey,
   loadScanRoster,
   parseScanEntries,

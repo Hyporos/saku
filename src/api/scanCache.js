@@ -22,7 +22,7 @@ function getScanBaseData() {
   }
   _scanDataCacheTime = now;
   _scanDataCache = Promise.all([
-      culvertSchema.find({}, { characters: 1, _id: 1 }).read("primary").lean(),
+      culvertSchema.find({}, { characters: 1, group: 1, _id: 1 }).read("primary").lean(),
       exceptionSchema.find({}).read("primary").lean(),
   ]);
   return _scanDataCache;

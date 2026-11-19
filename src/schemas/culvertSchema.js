@@ -38,6 +38,21 @@ const culvertSchema = new Schema(
         ],
       },
     ],
+    // The account group a member declared with /character group: the bracketed representative, the
+    // other characters in it, and the linked character its culvert scores go to. A scan row naming any
+    // of these resolves to scoresTo, ahead of learned and misread mappings.
+    group: {
+      type: new Schema(
+        {
+          main: { type: String, required: true },
+          characters: { type: [String], default: [] },
+          scoresTo: { type: String, required: true },
+          updatedAt: { type: Date },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
   },
   { versionKey: false }
 );

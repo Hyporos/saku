@@ -82,7 +82,7 @@ const COMMANDS = [
     name: "character rename",
     cat: "Culvert",
     bee: true,
-    desc: "Rename a character. All scores and character info are kept, and any /scan exceptions pointing at the old name follow it across. Like link, the new name is verified against the rankings and stored with its real capitalisation; use `override` if it isn't ranked yet.",
+    desc: "Rename a character. All scores and character info are kept, and any /scan exceptions or account groups naming the old name follow it across. Like link, the new name is verified against the rankings and stored with its real capitalisation; use `override` if it isn't ranked yet.",
     params:
       "`[old_name]` - The character to be renamed (pick from the list, it autocompletes)\n`[new_name]` - The new name to set for this character\n`[override]` - Force rename the character, even if not present on rankings",
   },
@@ -102,6 +102,13 @@ const COMMANDS = [
       "`[character]` - The character to be corrected (pick from the list, it autocompletes)\n`[score]` - The new score to submit\n`[week]` - This week or last week (use this or `date`)\n`[date]` - An exact week instead (YYYY-MM-DD, must be a Wednesday)",
   },
   {
+    name: "character group",
+    cat: "Culvert",
+    desc: "Tell Saku which characters are in your account group, so the weekly scan finds you whichever one you're logged in on. The guild list shows a row as Character(Main): give the name in brackets as `main` and up to five others. A scan row with any of those names, in the brackets or in front of them, saves your score on your `scores_to` character, ahead of anything Saku learned on its own. Each name is checked on the official rankings and saved with its real spelling; a name linked to someone else or in someone else's group is refused. Running it again replaces the whole group. Leave everything empty to see your group, or use `clear` to remove it (it asks first). You need a linked character first; ask a bee if you have none. Bees can set someone else's group with `user`.",
+    params:
+      "`[main]` - The group's main, the name in brackets (leave empty to view your group)\n`[alt1]` to `[alt5]` - The other characters in the group (optional)\n`[scores_to]` - Which of your linked characters gets the scores (optional; defaults to the main if it's linked, else your first linked character)\n`[clear]` - Remove the group\n`[user]` - Bees only: set someone else's group",
+  },
+  {
     name: "exception",
     cat: "Culvert",
     bee: true,
@@ -112,7 +119,7 @@ const COMMANDS = [
     name: "scan",
     cat: "Culvert",
     bee: true,
-    desc: "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert. Each row is one account group, read as Character(Main), and the score goes to whoever that main belongs to. When a main is new but the character beside it is exactly a linked character, Saku learns the main and lists it, with an Undo learned links button for 14 minutes; a changed main replaces the person's old one. Nothing is saved when two rows match the same person, when a cut-off main fits several people, or when a score is far outside that character's usual range (listed to check). Unmatched rows are listed with who they might be.",
+    desc: "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert. Each row is one account group, read as Character(Main), and the score goes to whoever that main belongs to. A group someone declared with /character group comes first: either name in a row decides it. When a main is new but the character beside it is exactly a linked character, Saku learns the main and lists it, with an Undo learned links button for 14 minutes; a changed main replaces the person's old one. Nothing is saved when two rows match the same person, when a cut-off main fits several people, or when a score is far outside that character's usual range (listed to check). Unmatched rows are listed with who they might be.",
     params: "`[attach]` - Screenshot of the culvert character name and score list \n`[week]` - Submit the scores for either the current or the last week",
   },
   {
