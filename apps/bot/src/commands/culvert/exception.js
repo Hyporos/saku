@@ -1,7 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
 const actionLogSchema = require("../../schemas/actionLogSchema.js");
-const { nameMatch } = require("../../domain/culvert/utils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -33,10 +32,10 @@ module.exports = {
     const nameOption = interaction.options.getString("name");
     const exceptionOption = interaction.options.getString("exception");
 
-    // Check if the exception has already been made
-    const exceptionExists = await exceptionSchema.exists({
-      exception: nameMatch(exceptionOption),
-    });
+    // Older records were stored as typed, so compare keys rather than query the raw text.
+    const key = exceptionSchema.toKey(exceptionOption);
+    const existing = await exceptionSchema.find({}, { exception: 1 }).lean();
+    const exceptionExists = existing.some((e) => exceptionSchema.toKey(e.exception) === key);
 
     if (exceptionExists) {
       return interaction.reply(
@@ -47,7 +46,7 @@ module.exports = {
     // Create an exception for the character
     await exceptionSchema.create({
       name: nameOption,
-      exception: exceptionOption,
+      exception: key,
     });
 
     // Log the exception

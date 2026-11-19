@@ -204,10 +204,55 @@ export type ScanResultEntry = {
   absent?: boolean;
 };
 
+// A main (the bracketed representative) Saku linked to a character during a scan.
+export type LearnedMain = {
+  id: string;
+  key: string;
+  name: string;
+  raw: string;
+  replaces: { key: string; name: string; source?: string } | null;
+};
+
+export type ScanConflict = {
+  discordId: string;
+  characters: string[];
+  rows: { raw: string; score: number }[];
+};
+
+export type ScanCheck = {
+  raw: string;
+  name: string;
+  discordId: string;
+  score: number;
+  main: string | null;
+  reason: "high" | "low";
+  best: number;
+  average: number;
+};
+
+export type ScanMissing = {
+  discordId: string;
+  characters: string[];
+  suggestion: {
+    raw: string;
+    display: string;
+    main: string;
+    character: string;
+    score: number;
+    by: "name" | "score";
+  } | null;
+};
+
+export type ScanNotFound = { name: string; previouslyScanned?: boolean; suggestions?: string[] };
+
 export type ScanImageResult = {
   week: string;
   success: ScanResultEntry[];
-  notFound: { name: string; previouslyScanned?: boolean }[];
+  notFound: ScanNotFound[];
+  learned?: LearnedMain[];
+  conflicts?: ScanConflict[];
+  checks?: ScanCheck[];
+  missing?: ScanMissing[];
   nanScores: { name: string }[];
   zeroScores: { name: string }[];
   absentScores: Array<{ name: string; score: number }>;

@@ -20,7 +20,7 @@ import DatePicker from "../../../components/DatePicker";
 import Divider from "../../../components/Divider";
 import { TableSortHead } from "../components/TableSortHead";
 import { Button } from "../../../components/Button";
-import type { ScanResultEntry, ScanImageResult, FinalizeResult } from "../types";
+import type { ScanResultEntry, ScanImageResult, FinalizeResult, LearnedMain, ScanConflict, ScanCheck, ScanMissing, ScanNotFound } from "../types";
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
@@ -39,9 +39,18 @@ type AnomalyEntry = {
   reason?: string;
 };
 
+// What one image's scan reported beyond its scores. Kept per image so a rescan replaces only its own.
+type ImageExtras = {
+  conflicts: ScanConflict[];
+  checks: ScanCheck[];
+  missing: ScanMissing[];
+};
+
 type AggregatedResult = {
   success: ScanResultEntry[];
-  notFound: { name: string; previouslyScanned?: boolean }[];
+  notFound: ScanNotFound[];
+  learned: (LearnedMain & { fingerprint: string })[];
+  perImage: Record<string, ImageExtras>;
   nanScores: { name: string }[];
   zeroScores: { name: string }[];
   absentScores: ScanResultEntry[];
@@ -61,6 +70,40 @@ type SavedScan = {
 };
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+const extrasOf = (data: ScanImageResult): ImageExtras => ({
+  conflicts: data.conflicts ?? [],
+  checks: data.checks ?? [],
+  missing: data.missing ?? [],
+});
+
+/**
+ * Combine every image's extras. Each image only shows part of the guild, so a person is missing only
+ * when no image has a row for them, and their likeliest row is taken from whichever image had one.
+ */
+function deriveExtras(perImage: Record<string, ImageExtras>) {
+  const entries = Object.entries(perImage);
+  const conflicts = entries.flatMap(([fingerprint, e]) => e.conflicts.map((c) => ({ ...c, fingerprint })));
+  const checks = entries.flatMap(([fingerprint, e]) => e.checks.map((c) => ({ ...c, fingerprint })));
+  let missing: Map<string, ScanMissing & { fingerprint?: string }> | null = null;
+  for (const [fingerprint, e] of entries) {
+    const here = new Map(e.missing.map((m) => [m.discordId, m]));
+    if (!missing) {
+      missing = new Map(e.missing.map((m) => [m.discordId, { ...m, fingerprint: m.suggestion ? fingerprint : undefined }]));
+      continue;
+    }
+    for (const [id, m] of missing) {
+      const other = here.get(id);
+      if (!other) missing.delete(id);
+      else if (other.suggestion && (!m.suggestion || (m.suggestion.by === "score" && other.suggestion.by === "name"))) {
+        missing.set(id, { ...other, fingerprint });
+      }
+    }
+  }
+  const missingList = missing ? [...missing.values()] : [];
+  missingList.sort((a, b) => Number(!a.suggestion) - Number(!b.suggestion) || a.characters[0].localeCompare(b.characters[0]));
+  return { conflicts, checks, missing: missingList };
+}
 
 /**
  * Compute a fast fingerprint from the first 2 KB of a file to detect duplicates.
@@ -164,6 +207,7 @@ export const ScannerTab = () => {
   const [exceptionModal, setExceptionModal] = useState<{ exception: string; fingerprint?: string } | null>(null);
   const [exceptionCharInput, setExceptionCharInput] = useState("");
   const [exceptionSaving, setExceptionSaving] = useState(false);
+  const [mainBusy, setMainBusy] = useState<Set<string>>(new Set());
   const [finalizeWarnModal, setFinalizeWarnModal] = useState<{ notFound: string[]; anomalies: string[]; missing: string[] } | null>(null);
   const [lightboxVisible, setLightboxVisible] = useState(false);
   const [lastScan, setLastScan] = useState<SavedScan | null>(null);
@@ -324,6 +368,8 @@ export const ScannerTab = () => {
       totalScanned: 0,
       week: "",
       anomalies: [],
+      learned: [],
+      perImage: {},
     };
     const failed: ImageFile[] = [];
     const notFoundFps = new Set<string>();
@@ -356,6 +402,8 @@ export const ScannerTab = () => {
         aggregated.week = data.week;
         aggregated.success.push(...data.success);
         aggregated.notFound.push(...data.notFound);
+        aggregated.learned.push(...(data.learned ?? []).map((l) => ({ ...l, fingerprint: img.fingerprint })));
+        aggregated.perImage[img.fingerprint] = extrasOf(data);
         if (data.notFound.length > 0) {
           notFoundFps.add(img.fingerprint);
           // Store OCR-read names so rescan can resolve them even when after an exception
@@ -565,10 +613,18 @@ export const ScannerTab = () => {
 
         // Recompute totals from the merged arrays rather than accumulating,
         // so rescanning an image never inflates the displayed counts.
+        // A link learned on the first pass is a mapping now, so a rescan won't report it again: keep it.
+        const mergedLearned = [...prev.learned];
+        for (const l of data.learned ?? []) {
+          if (!mergedLearned.some((x) => x.id === l.id)) mergedLearned.push({ ...l, fingerprint: img.fingerprint });
+        }
+
         return {
           ...prev,
           success: mergedSuccess,
           notFound: mergedNotFound,
+          learned: mergedLearned,
+          perImage: { ...prev.perImage, [img.fingerprint]: extrasOf(data) },
           nanScores: mergedNan,
           zeroScores: mergedZero,
           absentScores: mergedAbsent,
@@ -588,6 +644,54 @@ export const ScannerTab = () => {
       setRescanningSingle((prev) => { const n = new Set(prev); n.delete(img.fingerprint); return n; });
     }
   };
+
+  // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+  // Main mappings: link a row's bracketed name to a character, or undo one Saku learned
+
+  const withBusy = async (id: string, work: () => Promise<void>) => {
+    setMainBusy((prev) => new Set(prev).add(id));
+    try {
+      await work();
+    } finally {
+      setMainBusy((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  };
+
+  const linkMain = (main: string, character: string, fingerprint: string | undefined) =>
+    withBusy(`${main}:${character}`, async () => {
+      try {
+        await axios.post(
+          `${BOT_API}/bot/api/admin/exceptions`,
+          { kind: "main", name: character, exception: main },
+          { withCredentials: true }
+        );
+        notify("success", `Linked main "${main}" to ${character}`);
+        refreshActionLog();
+        const img = images.find((i) => i.fingerprint === fingerprint);
+        if (img) await rescanSingle(img);
+      } catch {
+        notify("error", `Failed to link "${main}" to ${character}`);
+      }
+    });
+
+  const undoLearned = (item: LearnedMain) =>
+    withBusy(item.id, async () => {
+      try {
+        await axios.delete(`${BOT_API}/bot/api/admin/exceptions/${item.id}`, { withCredentials: true });
+        if (item.replaces) {
+          await axios.post(
+            `${BOT_API}/bot/api/admin/exceptions`,
+            { kind: "main", name: item.replaces.name, exception: item.replaces.key },
+            { withCredentials: true }
+          );
+        }
+        setResults((prev) => (prev ? { ...prev, learned: prev.learned.filter((l) => l.id !== item.id) } : prev));
+        notify("success", `Undid "${item.key}" → ${item.name}. Its score this week stays.`);
+        refreshActionLog();
+      } catch {
+        notify("error", `Failed to undo "${item.key}"`);
+      }
+    });
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Create exception from Not Found entry
@@ -766,6 +870,8 @@ export const ScannerTab = () => {
         });
       })()
     : [];
+
+  const extras = deriveExtras(results?.perImage ?? {});
 
   // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
   // Render
@@ -1178,6 +1284,131 @@ export const ScannerTab = () => {
                   </div>
                 )}
 
+                {/* Learned main links */}
+                {results.learned.length > 0 && (
+                  <div className="bg-blue-900/10 border border-blue-800/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaCheck className="text-[#7FA3C8] flex-shrink-0" size={11} />
+                      <span className="text-xs font-medium text-[#7FA3C8] uppercase tracking-wider">
+                        Learned Mains ({results.learned.length})
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {results.learned.map((l) => (
+                        <div key={l.id} className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-[#7FA3C8]/80 flex-1 min-w-0">
+                            {l.replaces && <span className="text-[#C8A855]">Main changed: </span>}
+                            <span className="text-white/80">{l.key}</span>
+                            {" → "}
+                            <span className="text-white/80">{l.name}</span>
+                            <span className="text-tertiary/40"> from {l.raw}{l.replaces ? `, was ${l.replaces.key}` : ""}</span>
+                          </p>
+                          {!viewingLastScan && (
+                          <button
+                            disabled={mainBusy.has(l.id)}
+                            onClick={() => undoLearned(l)}
+                            className="flex-shrink-0 text-[10px] text-[#7FA3C8] hover:text-white border border-[#7FA3C8]/30 hover:border-white/20 rounded px-1.5 py-0.5 transition-colors disabled:opacity-40"
+                          >
+                            Undo
+                          </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Two rows for one person: neither saved */}
+                {extras.conflicts.length > 0 && (
+                  <div className="bg-red-900/10 border border-red-800/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaExclamationTriangle className="text-[#C87070] flex-shrink-0" size={11} />
+                      <span className="text-xs font-medium text-[#C87070] uppercase tracking-wider">
+                        Same Person Twice, Not Saved ({extras.conflicts.length})
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {extras.conflicts.map((c, i) => (
+                        <p key={i} className="text-xs text-[#C87070]/80">
+                          <span className="text-white/80">{c.characters.join(" / ")}</span>
+                          {": "}
+                          {c.rows.map((r) => `${r.raw} (${r.score.toLocaleString()})`).join(" and ")}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Score outside the character's range: not saved */}
+                {extras.checks.length > 0 && (
+                  <div className="bg-orange-900/10 border border-orange-800/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaExclamationTriangle className="text-[#D4915E] flex-shrink-0" size={11} />
+                      <span className="text-xs font-medium text-[#D4915E] uppercase tracking-wider">
+                        Check, Not Saved ({extras.checks.length})
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {extras.checks.map((c, i) => (
+                        <div key={i} className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-[#D4915E]/80 flex-1 min-w-0">
+                            <span className="text-white/80">{c.raw}</span>
+                            {" → "}
+                            <span className="text-white/80">{c.name}</span>
+                            {c.reason === "high"
+                              ? <>: {c.score.toLocaleString()} &mdash; far above their best of {c.best.toLocaleString()}</>
+                              : <>: {c.score.toLocaleString()} &mdash; far below their average of {c.average.toLocaleString()}</>}
+                          </p>
+                          {!viewingLastScan && c.main && (
+                          <button
+                            disabled={mainBusy.has(`${c.main}:${c.name}`)}
+                            onClick={() => linkMain(c.main!, c.name, c.fingerprint)}
+                            className="flex-shrink-0 text-[10px] text-[#D4915E] hover:text-white border border-[#D4915E]/30 hover:border-white/20 rounded px-1.5 py-0.5 transition-colors disabled:opacity-40"
+                          >
+                            Link and Save
+                          </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Linked members with no row */}
+                {extras.missing.length > 0 && (
+                  <div className="bg-red-900/10 border border-red-800/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaExclamationTriangle className="text-[#C87070] flex-shrink-0" size={11} />
+                      <span className="text-xs font-medium text-[#C87070] uppercase tracking-wider">
+                        No Row Found ({extras.missing.length})
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                      {extras.missing.map((m) => (
+                        <div key={m.discordId} className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-[#C87070]/80 flex-1 min-w-0">
+                            <span className="text-white/80">{m.characters.join(" / ")}</span>
+                            {m.suggestion && (
+                              <span className="text-tertiary/50">
+                                {" "}&mdash; maybe {m.suggestion.display} ({m.suggestion.score.toLocaleString()}, by {m.suggestion.by})
+                              </span>
+                            )}
+                          </p>
+                          {!viewingLastScan && m.suggestion && (
+                          <button
+                            disabled={mainBusy.has(`${m.suggestion.main}:${m.suggestion.character}`)}
+                            onClick={() => linkMain(m.suggestion!.main, m.suggestion!.character, m.fingerprint)}
+                            className="flex-shrink-0 text-[10px] text-accent hover:text-white border border-accent/30 hover:border-white/20 rounded px-1.5 py-0.5 transition-colors disabled:opacity-40"
+                          >
+                            Link {m.suggestion.main} → {m.suggestion.character}
+                          </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Not found */}
                 {results.notFound.length > 0 && (
                   <div className="bg-red-900/10 border border-red-800/30 rounded-lg p-3">
@@ -1195,6 +1426,9 @@ export const ScannerTab = () => {
                             {nf.previouslyScanned && (
                               <span className="ml-1.5 text-tertiary/40">(renamed or unlinked)</span>
                             )}
+                            {nf.suggestions && (
+                              <span className="ml-1.5 text-tertiary/40">(could be {nf.suggestions.join(", ")})</span>
+                            )}
                           </span>
                           {!viewingLastScan && (
                           <button
@@ -1211,7 +1445,7 @@ export const ScannerTab = () => {
                 )}
 
                 {/* No-alerts empty state */}
-                {results.anomalies.length === 0 && results.success.filter(e => e.sandbag).length === 0 && results.notFound.length === 0 && (
+                {results.anomalies.length === 0 && results.success.filter(e => e.sandbag).length === 0 && results.notFound.length === 0 && results.learned.length === 0 && extras.conflicts.length === 0 && extras.checks.length === 0 && extras.missing.length === 0 && (
                   <div className="flex flex-col items-center justify-center flex-1 h-full gap-3 text-tertiary/40 py-8">
                     <p className="text-sm mb-4">No issues — scanned successfully!</p>
                   </div>

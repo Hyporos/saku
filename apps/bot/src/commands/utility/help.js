@@ -112,7 +112,7 @@ const COMMANDS = [
     name: "scan",
     cat: "Culvert",
     bee: true,
-    desc: "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert.",
+    desc: "Submit bulk culvert data from a screenshot. The screenshot must be from the Member Participation Status tab in the guild menu, and only contain the columns from Name to Culvert. Each row is one account group, read as Character(Main), and the score goes to whoever that main belongs to. When a main is new but the character beside it is exactly a linked character, Saku learns the main and lists it, with an Undo learned links button for 14 minutes; a changed main replaces the person's old one. Nothing is saved when two rows match the same person, when a cut-off main fits several people, or when a score is far outside that character's usual range (listed to check). Unmatched rows are listed with who they might be.",
     params: "`[attach]` - Screenshot of the culvert character name and score list \n`[week]` - Submit the scores for either the current or the last week",
   },
   {
