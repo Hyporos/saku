@@ -754,7 +754,7 @@ async function group(interaction) {
     if (!doc?.group) {
       return interaction.reply({ content: `${own ? "You have" : `${target} has`} no group to clear`, ...quiet });
     }
-    const proceed = await confirm(interaction, `Clear ${whose} group?\n${describeGroup(doc.group)}`, "Clear");
+    const proceed = await confirm(interaction, `Clear ${own ? "your" : `${target.username}'s`} group?\n${describeGroup(doc.group)}`, "Clear");
     if (!proceed) return;
 
     await culvertSchema.updateOne({ _id: target.id }, { $unset: { group: 1 } });
