@@ -16,7 +16,6 @@ const ROLES = {
   BEE: "720001044746076181", // guild admins
   MEMBER: "750000646345719899",
   FRIEND: "720006084252663868", // no access to culvert commands
-  URSUS: "835222431396397058", // opt-in ping for the 2x Ursus windows
   MONSTER_PARK: "962201169588019221", // opt-in ping for the Sunday box reminder
 };
 
