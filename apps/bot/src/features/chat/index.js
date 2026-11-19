@@ -2377,9 +2377,11 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     }
 
     // A decline that survived the server-side fallback. It is a policy answer, not an outage, so it
-    // goes out as a short reply in Saku's voice instead of walking the model chain.
+    // goes out as a short reply in Saku's voice instead of walking the model chain. Haiku is the
+    // exception: it has no server-side fallback, so its declines (banter included) walk the chain.
     if (result.stop_reason === "refusal") {
       console.warn(`Saku chat: ${modelId} declined (${result.stop_details?.category ?? "no category"}) for ${username}`);
+      if (/haiku/i.test(modelId)) throw Object.assign(new Error(`${modelId} declined`), { declined: true });
       turnFacts = fresh;
       return REFUSAL_REPLY;
     }
@@ -2432,6 +2434,7 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   // Walk down the chain on quota and outage errors only; a real error is a bug and should surface.
   let reply = null;
   let usedModel = null;
+  let declined = false;
   for (const modelId of availableModels()) {
     try {
       reply = await run(modelId);
@@ -2439,6 +2442,11 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
       modelCooldowns.delete(modelId);
       break;
     } catch (err) {
+      // Not an outage, so nothing is benched: the next model just gets its turn.
+      if (err?.declined) {
+        declined = true;
+        continue;
+      }
       // A typo in MODEL_CHAIN shouldn't take chat down, so skip the bad id and say so loudly.
       if (isMissingModel(err)) {
         console.error(`Error - Saku chat: model "${modelId}" does not exist. Fix MODEL_CHAIN; skipping it for now.`);
@@ -2451,7 +2459,7 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     }
   }
 
-  if (reply === null) return RATE_NOTICE; // every model unreachable; don't save a failed turn
+  if (reply === null) return declined ? REFUSAL_REPLY : RATE_NOTICE; // don't save a failed turn
 
   reply = reply.replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, ", "); // the persona bans em dashes; enforce it
 
