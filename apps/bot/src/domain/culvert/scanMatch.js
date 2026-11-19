@@ -105,10 +105,9 @@ function pickCandidate(parsed, candidates) {
 /**
  * Split a guild list name cell into its two names.
  *
- * Since the 2026-11 guild list layout, a member who is logged in shows as "LoggedIn(Main)": the
- * character they are on, then their main in brackets, and the column truncates the whole cell, so
- * "Caycia(Cay.." and "Beezle(Bee" (dots lost) are normal reads. The main is the guild member, so it
- * is the name that is linked; the part before the bracket is only the fallback.
+ * Since the 2026-11 guild list layout, a cell reads "Character(Main)": the row's own character, then
+ * the account's representative (its main) in brackets. One-character accounts read "wrignt(wrignt)".
+ * The column truncates the whole cell, so "Caycia(Cay.." and "Beezle(Bee" (dots lost) are normal reads.
  *
  * @param {string} scannedName - One name cell as read off the screenshot.
  * @returns {{outer: string, inner: string|null}} - inner is null when there is no bracket. An inner
@@ -160,28 +159,32 @@ function matchPlainName(scannedName, linkedNames) {
 /**
  * Resolve a name read off a screenshot to a linked character name.
  *
+ * The row's own character comes first, because the score on the row is that character's: an account
+ * with two characters in the guild shows "Mule(Main)" and "Main(Main)", and matching on the bracket
+ * would write both rows to Main. The main only settles a tie, unless fallbackToMain is set, which
+ * /culvertping uses because there the answer is a person to ping, not a character to score.
+ *
  * @param {string} scannedName - One name cell as read off the screenshot.
  * @param {string[]} linkedNames - Lowercased names of every linked character.
  * @param {(name: string) => string} [applyException] - The misread table, applied to each half of a
  *   bracketed cell as well as the whole, since exceptions are stored per character name.
+ * @param {{fallbackToMain?: boolean}} [options]
  * @returns {{name: string|null, candidates: string[], truncated: boolean}}
  */
-function matchScannedName(scannedName, linkedNames, applyException = (n) => n) {
+function matchScannedName(scannedName, linkedNames, applyException = (n) => n, { fallbackToMain = false } = {}) {
   const whole = applyException(String(scannedName ?? "").trim());
   const { outer, inner } = splitScannedName(whole);
   if (inner === null) return matchPlainName(whole, linkedNames);
 
-  // The main first. A short truncated main ("Cay..") can fit several people, and the logged-in name
-  // beside it is usually the same character, so it settles the tie when it can.
-  const main = matchPlainName(applyException(inner), linkedNames);
-  if (main.candidates.length > 1 && outer) {
-    const hint = fold(outer);
-    const better = main.candidates.find((c) => fold(c) === hint) ?? main.candidates.find((c) => fold(c).startsWith(hint) || hint.startsWith(fold(c)));
-    if (better) main.name = better;
+  const own = outer ? matchPlainName(applyException(outer), linkedNames) : { name: null, candidates: [], truncated: false };
+  if (own.candidates.length > 1) {
+    const hint = fold(inner.replace(/\.+$/, ""));
+    const better = own.candidates.find((c) => fold(c) === fold(outer)) ?? own.candidates.find((c) => hint && fold(c).startsWith(hint));
+    if (better) own.name = better;
   }
-  if (main.name) return main;
+  if (own.name || !fallbackToMain) return own;
 
-  return outer ? matchPlainName(applyException(outer), linkedNames) : main;
+  return matchPlainName(applyException(inner), linkedNames);
 }
 
 /**
