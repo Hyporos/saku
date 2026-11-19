@@ -98,20 +98,18 @@ eq("empty roster", matchScannedName("adeldruu", []).name, null);
 eq("short name prefers its exact match", matchScannedName("druu", ROSTER).name, "druu");
 
 // ⎯⎯ The guild list layout from 2026-11: "Character(Main)", truncated anywhere ⎯⎯ //
-// The row's own character wins, since the score is its; the main in brackets breaks ties, and only
-// /culvertping falls back to it.
+// Membership is per account group and the character before the bracket changes freely, so the main
+// wins; the character settles ties and is the fallback when the main isn't linked.
 {
-  const R = ["beezlebub", "caycia", "cayro", "wrignt", "bloom", "yong", "katie", "katiemule"];
-  const ping = { fallbackToMain: true };
-  eq("row's own character", matchScannedName("Katie(bloom)", R).name, "katie");
-  eq("mule row stays on the mule", matchScannedName("katiemule(Katie)", R).name, "katiemule");
+  const R = ["beezlebub", "caycia", "cayro", "wrignt", "bloom", "yong", "katie"];
+  eq("bracketed main", matchScannedName("Katie(bloom)", R).name, "bloom");
   eq("main cut off with dots", matchScannedName("wrignt(wrig..", R).name, "wrignt");
+  eq("main cut off with the dots lost", matchScannedName("Zorbo(Bee", R).name, "beezlebub");
+  eq("short main settled by the character", matchScannedName("Caycia(Cay..", R).name, "caycia");
   eq("same character twice", matchScannedName("Yong(Yong)", R).name, "yong");
-  eq("space before the bracket", matchScannedName("Katie (bloom)", R).name, "katie");
-  eq("unlinked character is not scored on the main", matchScannedName("Zorbo(Bee", R).name, null);
-  eq("culvertping falls back to the main", matchScannedName("Zorbo(Bee", R, undefined, ping).name, "beezlebub");
-  eq("culvertping fallback with a full main", matchScannedName("Alt(bloom)", R, undefined, ping).name, "bloom");
-  eq("exception on the character half", matchScannedName("Beez1e(X)", R, exceptionMapper([{ exception: "beez1e", name: "beezlebub" }])).name, "beezlebub");
+  eq("unlinked main falls back to the character", matchScannedName("katie(Nobody)", R).name, "katie");
+  eq("space before the bracket", matchScannedName("Katie (bloom)", R).name, "bloom");
+  eq("exception on the main half", matchScannedName("Alt(Beez1e)", R, exceptionMapper([{ exception: "beez1e", name: "beezlebub" }])).name, "beezlebub");
   eq("exception on the whole cell", matchScannedName("X(Y..", R, exceptionMapper([{ exception: "x(y..", name: "yong" }])).name, "yong");
   eq("truncated whole cell still matches", matchScannedName("Cayci..", R).name, "caycia");
   eq("bare bracket matches nothing", matchScannedName("(", R).name, null);
