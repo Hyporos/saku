@@ -6,6 +6,8 @@ const {
   exceptionMapper,
   parseScanEntries,
   displayScannedName,
+  resolveScan,
+  toKey,
 } = require("../src/domain/culvert/scanMatch.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -117,6 +119,96 @@ eq("short name prefers its exact match", matchScannedName("druu", ROSTER).name, 
   const { scores } = parseScanEntries(["Katie (bloom) 1234", "Caycia(Cay.. 197190"], (n) => n);
   eq("scan line keeps the bracket", scores[0].name, "Katie(bloom)");
   eq("scan line keeps its score", scores[1].score, 197190);
+}
+
+// ⎯⎯ resolveScan: one screenshot, decided whole ⎯⎯ //
+// Mains are stable and the character before the bracket isn't, so Saku learns main → linked
+// character from exact matches only, and every rule below decides what a row may save or teach.
+{
+  const WEEK = "2026-11-11";
+  const past = (...scores) => scores.map((score, i) => ({ date: `2026-10-${String(7 + i * 7).padStart(2, "0")}`, score }));
+  const ROSTER = [
+    { _id: "111", characters: [{ name: "Katie", memberSince: "Jan 01, 2025", scores: past(100000, 110000, 105000) }] },
+    { _id: "222", characters: [{ name: "Bloom", scores: [...past(200000, 190000, 195000), { date: WEEK, score: 1 }] }] },
+    { _id: "333", characters: [{ name: "Caycia", scores: past(60000) }] },
+    { _id: "444", characters: [{ name: "Cayro", scores: past(60000) }] },
+    { _id: "555", characters: [{ name: "Newbie", memberSince: "Dec 01, 2026", scores: [] }] },
+    { _id: "666", characters: [{ name: "Wrignt", scores: past(150000, 150000, 150000) }] },
+    { _id: "777", characters: [{ name: "Zed", scores: past(90000, 90000, 90000) }] },
+    { _id: "888", characters: [{ name: "Abcdefgh", scores: [] }] },
+  ];
+  const MAPS = [{ _id: "m1", kind: "main", source: "auto", exception: "GhostRep..", name: "zed" }];
+  const run = (rows, mappings = MAPS) =>
+    resolveScan({ rows: rows.map(([name, score]) => ({ name, score })), roster: ROSTER, mappings, week: WEEK });
+  const row = (result, raw) => result.rows.find((r) => r.raw === raw);
+
+  // Key normalizing, on both sides
+  eq("key drops case, spaces and trailing dots", toKey(" Bee Zle.. "), "beezle");
+  eq("misread found with dots on either side", exceptionMapper([{ exception: "Boompa..", name: "boompala" }])("boompa"), "boompala");
+
+  // A known main
+  let r = run([["Alt(Bloom)", 150000]]);
+  eq("linked main matches", row(r, "Alt(Bloom)").name, "Bloom");
+  eq("linked main teaches nothing", r.learned.length, 0);
+  check("sandbag flag kept", row(r, "Alt(Bloom)").sandbag === true && row(r, "Alt(Bloom)").personalBest === 200000);
+  check("an existing score is replaced, not added", r.saves[0].replace === true);
+  eq("mapped main matches", run([["Whoever(GhostRep)", 90000]]).rows[0].name, "Zed");
+  eq("mapped main matches when cut", run([["X(Ghost..", 90000]]).rows[0].name, "Zed");
+  eq("misread on the main half", run([["Alt(B1oom)", 200000]], [{ exception: "b1oom", name: "Bloom" }]).rows[0].name, "Bloom");
+
+  // Rule 2: learn only from an exact match, and say so
+  r = run([["Katie(Ranger)", 106000]]);
+  eq("unknown main falls to the exact character", row(r, "Katie(Ranger)").status, "saved");
+  eq("main is learned", r.learned.length, 1);
+  check("learned item names the key, character and person",
+    r.learned[0]?.key === "ranger" && r.learned[0]?.name === "Katie" && r.learned[0]?.discordId === "111" && r.learned[0]?.replaces === null);
+  eq("cut main is never learned", run([["Katie(Rang..", 106000]]).learned.length, 0);
+  eq("fuzzy character is never learned", run([["Katle(Qwerty)", 106000]]).learned.length, 0);
+  eq("fuzzy character still saves", run([["Katle(Qwerty)", 106000]]).rows[0].status, "saved");
+
+  // Rule 3: one row, one person
+  r = run([["Katie(Ranger)", 106000], ["Kat(Katie)", 104000]]);
+  check("two rows for one person both conflict", r.rows.every((x) => x.status === "conflict"));
+  eq("a conflict saves nothing", r.saves.length, 0);
+  eq("a conflict learns nothing", r.learned.length, 0);
+  check("the conflict carries both raw cells", r.conflicts[0]?.rows.map((x) => x.raw).join("|") === "Katie(Ranger)|Kat(Katie)");
+
+  // Rule 4: a changed main replaces the person's old mapping
+  r = run([["Katie(NewRep)", 106000]], [...MAPS, { _id: "m2", kind: "main", exception: "oldrep", name: "Katie" }]);
+  check("main change replaces the old one", r.learned[0]?.key === "newrep" && r.learned[0]?.replaces?.key === "oldrep" && r.learned[0]?.replaces?.id === "m2");
+  eq("old main still matches until replaced", run([["Alt(OldRep)", 106000]], [{ kind: "main", exception: "oldrep", name: "Katie" }]).rows[0].name, "Katie");
+
+  // Rule 5: coverage
+  r = run([["Alt(Bloom)", 195000], ["Xbcdefgx(Qwerty)", 1], ["Foo(Bar)", 148000]]);
+  const missingOf = (id) => r.missing.find((m) => m.discordId === id);
+  check("unrowed active people are missing", ["111", "333", "444", "666", "777", "888"].every((id) => missingOf(id)));
+  check("someone not in the guild yet is not missing", !missingOf("555"));
+  check("someone with a row is not missing", !missingOf("222"));
+  check("paired by name", missingOf("888")?.suggestion?.raw === "Xbcdefgx(Qwerty)" && missingOf("888")?.suggestion?.by === "name");
+  check("paired by score when names share nothing", missingOf("666")?.suggestion?.raw === "Foo(Bar)" && missingOf("666")?.suggestion?.by === "score");
+  eq("suggestion keys on the bracketed name", missingOf("666")?.suggestion?.main, "bar");
+  eq("no pairing without a likely row", missingOf("333")?.suggestion ?? null, null);
+
+  // Rule 6: a cut main that fits several people is never guessed
+  r = run([["Zorbo(Cay..", 120000]]);
+  eq("ambiguous cut main is unmatched", r.rows[0].status, "ambiguous");
+  check("candidates come back as suggestions", r.rows[0].suggestions?.join(",") === "Caycia,Cayro");
+  eq("the character settles it", run([["Caycia(Cay..", 120000]]).rows[0].name, "Caycia");
+  eq("a cut main with one owner is fine", run([["Q(Wrig..", 150000]]).rows[0].name, "Wrignt");
+
+  // Rule 7: score sanity on a row matched without its main
+  r = run([["Katie(Ranger)", 400000]]);
+  eq("far above PB is a check", r.rows[0].status, "check");
+  check("a check saves and learns nothing", r.saves.length === 0 && r.learned.length === 0);
+  check("the check says why", r.checks[0]?.reason === "high" && r.checks[0]?.main === "ranger");
+  eq("far below average is a check", run([["Katie(Ranger)", 30000]]).rows[0].status, "check");
+  eq("a known main is never checked", run([["Alt(Bloom)", 900000]]).rows[0].status, "saved");
+  eq("too little history is never checked", run([["Caycia(NewMain)", 900000]]).rows[0].status, "saved");
+
+  // Absent and not found
+  eq("joined after the week is absent", run([["Newbie(Newbie)", 5]]).rows[0].status, "absent");
+  eq("nobody is notFound", run([["Nobody(Noone)", 5]]).rows[0].status, "notFound");
+  eq("a NaN score saves as 0", run([["Alt(Bloom)", NaN]]).saves[0].score, 0);
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");

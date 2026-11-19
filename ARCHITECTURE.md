@@ -179,11 +179,15 @@ match them against linked characters. That logic existed **three times** and the
 | re-read the exception table per name | yes | yes | no |
 
 Whichever one you were reading, the other two were quietly worse at the same job. It is now one
-module, and the three callers keep only what genuinely differs: how they turn a matched name into a
-character (a `findOne` for the commands, an in-memory map for the route) and how they report results.
+module. `/scan` and the scanner route hand a whole screenshot to `resolveScan`, which decides every
+row (who it is, what is saved, what was learned, what a bee must check) without touching the database,
+and then do only the writes and the reporting. `/culvertping` only needs names, so it uses
+`matchScannedName` and never learns anything.
 
-Nothing in `scanMatch.js` touches Discord, and only `loadScanRoster`/`loadExceptions` touch the
-database, so the matching is testable directly — which is the point. `tests/scanMatch.js` covers it.
+Nothing in `scanMatch.js` touches Discord. The pure part (`resolveScan`, `matchScannedName` and their
+helpers) is tested directly in `tests/scanMatch.js`; the small database helpers below it
+(`loadScanRoster`, `saveScanScores`, `saveMainMapping`, `saveLearned`, `undoMainMappings`) only read
+and write what the pure part decided.
 
 **Three bugs the unification fixed**, all confirmed against the real 202-character roster:
 
@@ -198,15 +202,42 @@ A differential run over the real roster (994 realistic OCR inputs: clean reads, 
 o/0 swaps, case drift, junk) matched the old behaviour on 991 and differed only on those three, in
 each case by correctly returning "no match" where the old code invented one.
 
-**Bracketed names (guild list layout from 2026-11).** Guild membership belongs to an account group,
-and a cell reads `Character(Main)`: whichever character the member is on (it changes freely within the
-group), then the group's representative, their main, in brackets; `wrignt(wrignt)` for a one-character
-account. It truncates anywhere (`Caycia(Cay..`, or `Beezle(Bee` when OCR drops the dots). Both scan
-prompts copy the whole cell, brackets and dots included. `matchScannedName` splits it
-(`splitScannedName`) and matches the main first, so a week's score lands on the main whichever
-character the member was on. The character before the bracket breaks ties between short-prefix
-matches and is the fallback when the main isn't linked. Exceptions apply to the whole cell and to
-each half. `/culvertping` lists an unmatched cell as `Beezle (Bee..)`.
+**Bracketed names and main mappings (guild list layout from 2026-11).** Guild membership belongs to
+an account group of up to six characters, and a row reads `Character(Main)`: whichever character the
+member is on (it changes freely), then the group's representative, their main, in brackets;
+`wrignt(wrignt)` for a one-character account. One row is one group, and culvert counts once per group.
+The cell truncates anywhere (`Caycia(Cay..`, or `Beezle(Bee` when OCR drops the dots), and both scan
+prompts copy the whole cell. Misread exceptions apply to the whole cell and to each half. An unmatched
+cell is shown as `Beezle (Bee..)`.
+
+The main is the stable name, but it is often not the character a member linked. So the exception
+table also holds **main mappings** (`kind: "main"`): representative → linked character, at most one
+per person, `source` `auto` or `manual`. Every exception key is lowercase with whitespace and trailing
+dots removed (`exceptionSchema.toKey`), on save and on lookup, so older records still match.
+
+`resolveScan` applies these rules, each covered in `tests/scanMatch.js`:
+
+- **Main first.** A main mapping or a linked name decides the row. A cut-off main is matched by
+  prefix against both; if it fits several people and the character beside it doesn't settle which,
+  the row stays unmatched with the candidates as suggestions. It is never guessed.
+- **Learn only from exact matches, visibly.** When the main is unknown but the character before it
+  is exactly a linked character, the row saves on that character and Saku learns main → character.
+  Only a whole main is learned, never a cut one. Each learned link is reported, written to the action
+  log, and can be undone: one button per link in the webapp, one "Undo learned links" on the `/scan`
+  reply (deleting the link and restoring any it replaced).
+- **A changed main replaces the old one.** Learning a main for someone who already has a different
+  one replaces it and is reported as a main change.
+- **One row, one person.** If two rows of one scan resolve to the same person, neither is saved and
+  both raw cells are reported as a conflict. The webapp scans each image separately, so this holds
+  per image.
+- **Score sanity.** A row matched without its main (by the character beside it) whose score is far
+  outside that character's range (at least 3 past scores; above 1.5x their best or below half their
+  recent average) is not saved and teaches nothing; it is reported to check. The sandbag flag is
+  separate and unchanged.
+- **Coverage.** Linked members active that week with no row are reported, each paired with the most
+  likely unmatched row (by name, or by score when the names share nothing). In the webapp one tap
+  makes a manual main mapping keyed on that row's bracketed name and rescans the image; `/scan` lists
+  the pairing as text.
 
 ---
 
@@ -232,7 +263,7 @@ copy it; that duplication is what caused the bug.
 | `pnpm test-symbols` | **Every identifier is declared, imported, or a real global** |
 | `pnpm test-api` | All 35 API routes still mounted, secret gate applied once |
 | `pnpm test-permissions` | Every command's tier, and tags matching enforcement |
-| `pnpm test-scan-match` | Screenshot name matching: truncation, confusables, junk input |
+| `pnpm test-scan-match` | Screenshot matching: truncation, confusables, junk input, main mappings and every scan rule |
 | `pnpm test-chat-modules` | Chat exports exist, no import cycles, public surface intact |
 | `pnpm test-chat` | Live model behaviour: fabrication guards, tone, tool use |
 | `pnpm test-canvas` | Level card + leaderboard rendering, stall handling |

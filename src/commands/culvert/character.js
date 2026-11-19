@@ -396,13 +396,9 @@ async function restore(interaction) {
   );
 
   // The exceptions went with the character, so they come back with it.
-  for (const exception of exceptions) {
+  for (const { _id, ...exception } of exceptions) {
     await exceptionSchema
-      .findOneAndUpdate(
-        { name: exception.name, exception: exception.exception },
-        { name: exception.name, exception: exception.exception },
-        { upsert: true }
-      )
+      .findOneAndUpdate({ name: exception.name, exception: exception.exception }, exception, { upsert: true })
       .catch(() => {});
   }
 

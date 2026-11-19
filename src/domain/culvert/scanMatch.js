@@ -1,5 +1,7 @@
+const dayjs = require("dayjs");
+const culvertSchema = require("../../schemas/culvertSchema.js");
 const exceptionSchema = require("../../schemas/exceptionSchema.js");
-const { normalizeName, getAllCharacters } = require("./utils.js");
+const { normalizeName, nameMatch, getAllCharacters } = require("./utils.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Turning a name read off a screenshot into a name that is actually linked.
@@ -198,15 +200,353 @@ function displayScannedName(scannedName) {
   return inner === null ? outer : `${outer} (${inner})`;
 }
 
+// Lowercase, no whitespace, no trailing dots: the one key every exception is stored and looked up by.
+const toKey = exceptionSchema.toKey;
+
 /**
  * Build the misread→real name lookup from exception records already in hand.
+ *
+ * Main mappings come along too: applied to the bracketed half they turn a representative into the
+ * linked character, which is all /culvertping needs from them.
  *
  * @param {Array<{exception: string, name: string}>} exceptions
  * @returns {(name: string) => string} - Maps a misread name to its real one, or returns it unchanged.
  */
 function exceptionMapper(exceptions) {
-  const byMisread = new Map((exceptions ?? []).map((e) => [String(e.exception).toLowerCase(), e.name]));
-  return (scannedName) => byMisread.get(String(scannedName ?? "").toLowerCase()) ?? scannedName;
+  const byMisread = new Map();
+  for (const e of exceptions ?? []) {
+    const key = toKey(e.exception);
+    if (key) byMisread.set(key, e.name);
+  }
+  return (scannedName) => byMisread.get(toKey(scannedName)) ?? scannedName;
+}
+
+// ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+// A whole scan, decided in one place: who each row is, what gets saved, what Saku learned, and what a
+// bee has to look at. /scan and the webapp's scanner route both call this and only do the writes.
+
+const SANDBAG = 0.85;
+// A score this far outside a character's own range is more likely the wrong person than a good week.
+const SANITY_HISTORY = 3;
+const SANITY_HIGH = 1.5;
+const SANITY_LOW = 0.5;
+const RECENT_WEEKS = 5;
+// Pairing a missing person with an unmatched row: at most one edit per three letters, or a score
+// within 30% of their recent average when the names have nothing in common.
+const NAME_CLOSE = 0.34;
+const SCORE_CLOSE = 0.3;
+
+function editDistance(a, b) {
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let corner = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const next = Math.min(prev[j] + 1, prev[j - 1] + 1, corner + (a[i - 1] === b[j - 1] ? 0 : 1));
+      corner = prev[j];
+      prev[j] = next;
+    }
+  }
+  return prev[b.length];
+}
+
+const isActive = (character, week) =>
+  !character.memberSince || dayjs(character.memberSince).isBefore(dayjs(week).add(1, "week"));
+
+const isCut = (value) => /\.$/.test(value);
+
+/**
+ * A character's past scores, without the week being scanned.
+ *
+ * @returns {{count: number, best: number, average: number}}
+ */
+function scoreHistory(scores, week) {
+  const past = (scores ?? [])
+    .filter((s) => String(s.date) !== String(week) && Number(s.score) > 0)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const best = past.reduce((max, s) => Math.max(max, s.score), 0);
+  const recent = past.slice(0, RECENT_WEEKS);
+  const average = recent.length ? recent.reduce((sum, s) => sum + s.score, 0) / recent.length : 0;
+  return { count: past.length, best, average };
+}
+
+function sanityProblem(character, score, week) {
+  if (!(score > 0)) return null;
+  const { count, best, average } = scoreHistory(character.scores, week);
+  if (count < SANITY_HISTORY) return null;
+  if (score > best * SANITY_HIGH) return { reason: "high", best, average: Math.round(average) };
+  if (score < average * SANITY_LOW) return { reason: "low", best, average: Math.round(average) };
+  return null;
+}
+
+// The unmatched row most likely to be this person: by name first, then by score.
+function likeliestRow(person, rows, week) {
+  const names = person.characters.map((c) => c.name);
+  let best = null;
+  for (const row of rows) {
+    const { outer, inner } = splitScannedName(row.raw);
+    for (const piece of [inner, outer]) {
+      const read = fold(toKey(piece));
+      if (read.length < 3) continue;
+      for (const name of names) {
+        const target = fold(name);
+        const distance = editDistance(read, isCut(piece ?? "") ? target.slice(0, read.length) : target) / read.length;
+        if (!best || distance < best.distance) best = { row, character: name, distance, by: "name" };
+      }
+    }
+  }
+  if (best && best.distance <= NAME_CLOSE) return best;
+
+  // Only one character per group is scored a week, so the person's week is their best across them.
+  const byWeek = new Map();
+  for (const c of person.characters) {
+    for (const s of c.scores ?? []) byWeek.set(s.date, Math.max(byWeek.get(s.date) ?? 0, Number(s.score) || 0));
+  }
+  const { average } = scoreHistory([...byWeek].map(([date, score]) => ({ date, score })), week);
+  if (!(average > 0)) return null;
+
+  let closest = null;
+  for (const row of rows) {
+    if (!(row.score > 0)) continue;
+    const off = Math.abs(row.score / average - 1);
+    if (off <= SCORE_CLOSE && (!closest || off < closest.distance)) {
+      closest = { row, character: person.characters.find((c) => isActive(c, week))?.name ?? names[0], distance: off, by: "score" };
+    }
+  }
+  return closest;
+}
+
+/**
+ * Resolve every row of one screenshot against the roster.
+ *
+ * A row is one account group, read as "Character(Main)". The main is matched first, through a main
+ * mapping or a linked name. When it is unknown but the character before it is exactly a linked
+ * character, Saku learns main → that character so next week matches whichever character they are on.
+ *
+ * @param {Object} input
+ * @param {Array<{name: string, score: number}>} input.rows - From parseScanEntries, cells as read.
+ * @param {Array<{_id: string, characters: Array}>} input.roster - culvertSchema documents.
+ * @param {Array<{_id?: any, name: string, exception: string, kind?: string, source?: string}>} input.mappings
+ *   - Every exception record, misreads and mains.
+ * @param {string} input.week - The Wednesday being scanned, "YYYY-MM-DD".
+ */
+function resolveScan({ rows, roster, mappings = [], week }) {
+  const characters = new Map();
+  const people = new Map();
+  for (const user of roster ?? []) {
+    const discordId = String(user._id);
+    const person = { discordId, characters: [] };
+    for (const character of user.characters ?? []) {
+      if (!character?.name) continue;
+      const entry = { ...character, discordId };
+      characters.set(character.name.toLowerCase(), entry);
+      person.characters.push(entry);
+    }
+    if (person.characters.length > 0) people.set(discordId, person);
+  }
+  const linkedNames = [...characters.keys()];
+
+  const misread = exceptionMapper((mappings ?? []).filter((m) => m.kind !== "main"));
+  const mains = new Map();
+  const mainOf = new Map();
+  for (const mapping of mappings ?? []) {
+    if (mapping.kind !== "main") continue;
+    const key = toKey(mapping.exception);
+    const character = characters.get(String(mapping.name).toLowerCase());
+    if (!key || !character) continue;
+    const entry = { id: mapping._id ? String(mapping._id) : null, key, name: character.name, source: mapping.source ?? "manual" };
+    mains.set(key, { ...entry, character });
+    mainOf.set(character.discordId, entry);
+  }
+
+  // Linked names and mapped mains a truncated read could be.
+  function byPrefix(read) {
+    const prefix = fold(toKey(read));
+    const found = new Map();
+    if (!prefix) return [];
+    for (const name of linkedNames) if (fold(name).startsWith(prefix)) found.set(name, characters.get(name));
+    for (const [key, main] of mains) if (fold(key).startsWith(prefix)) found.set(main.character.name.toLowerCase(), main.character);
+    return [...found.values()];
+  }
+
+  // One person among the candidates, or null when the character beside them doesn't settle it.
+  function settle(candidates, outerExact, outerRead) {
+    const owners = new Set(candidates.map((c) => c.discordId));
+    const sameName = candidates.find((c) => outerRead && fold(c.name) === fold(outerRead));
+    if (owners.size === 1) return sameName ?? candidates[0];
+    if (outerExact && owners.has(outerExact.discordId)) {
+      return candidates.find((c) => c.name === outerExact.name) ?? candidates.find((c) => c.discordId === outerExact.discordId);
+    }
+    return sameName ?? null;
+  }
+
+  function resolvePlain(cell) {
+    const parsed = parseScannedName(cell);
+    if (parsed.truncated) {
+      const candidates = byPrefix(parsed.stem);
+      if (candidates.length === 0) return { character: null };
+      const chosen = settle(candidates, null, null);
+      return chosen ? { character: chosen, via: "name" } : { character: null, suggestions: candidates.map((c) => c.name) };
+    }
+    const mapped = mains.get(toKey(cell));
+    if (mapped) return { character: mapped.character, via: "mapping" };
+    const { name } = matchPlainName(cell, linkedNames);
+    return { character: name ? characters.get(name) : null, via: "name" };
+  }
+
+  function resolveRow(raw) {
+    const cell = misread(raw.trim());
+    const { outer, inner } = splitScannedName(cell);
+    if (inner === null) return resolvePlain(cell);
+
+    const outerRead = outer ? misread(outer) : "";
+    const outerExact = outerRead && !isCut(outerRead) ? characters.get(outerRead.toLowerCase()) ?? null : null;
+    const innerRead = misread(inner);
+    const truncated = isCut(innerRead);
+    const key = toKey(innerRead);
+
+    if (truncated) {
+      const candidates = byPrefix(innerRead);
+      if (candidates.length > 0) {
+        const chosen = settle(candidates, outerExact, outerRead);
+        if (chosen) return { character: chosen, via: "main" };
+        return { character: null, suggestions: candidates.map((c) => c.name) };
+      }
+    } else {
+      const mapped = mains.get(key);
+      if (mapped) return { character: mapped.character, via: "mapping" };
+      const linked = characters.get(key);
+      if (linked) return { character: linked, via: "main" };
+    }
+
+    // The main is unknown. A near miss on a linked name still counts when nothing contradicts it.
+    const fuzzy = truncated ? null : matchPlainName(innerRead, linkedNames).name;
+    const near = fuzzy ? characters.get(fuzzy) : null;
+    if (near && (!outerExact || outerExact.discordId === near.discordId)) return { character: near, via: "main" };
+
+    // Learning needs the whole main: a cut one could be the start of somebody else's.
+    if (outerExact) return { character: outerExact, via: "outer", learn: truncated || !key ? null : key };
+
+    const fallback = outerRead ? matchPlainName(outerRead, linkedNames).name : null;
+    if (fallback) return { character: characters.get(fallback), via: "outer-fuzzy" };
+    return { character: null };
+  }
+
+  const resolved = (rows ?? []).map((row) => {
+    const raw = String(row.name ?? "");
+    const score = Number(row.score);
+    return { raw, score, isNaN: Number.isNaN(score), ...resolveRow(raw) };
+  });
+
+  // ⎯⎯ One row, one person ⎯⎯ //
+  const byPerson = new Map();
+  for (const row of resolved) {
+    if (!row.character) {
+      row.status = row.suggestions?.length ? "ambiguous" : "notFound";
+    } else if (!isActive(row.character, week)) {
+      row.status = "absent";
+    } else {
+      const list = byPerson.get(row.character.discordId) ?? [];
+      list.push(row);
+      byPerson.set(row.character.discordId, list);
+    }
+  }
+
+  const conflicts = [];
+  for (const [discordId, list] of byPerson) {
+    if (list.length < 2) continue;
+    for (const row of list) row.status = "conflict";
+    conflicts.push({
+      discordId,
+      characters: [...new Set(list.map((r) => r.character.name))],
+      rows: list.map((r) => ({ raw: r.raw, score: r.score })),
+    });
+  }
+
+  // ⎯⎯ Saves, learning and the score check ⎯⎯ //
+  const saves = [];
+  const learned = [];
+  const checks = [];
+  for (const row of resolved) {
+    if (row.status) continue;
+    const character = row.character;
+
+    // Only a row matched without its main is checked; a known main is already proof of who it is.
+    const problem = row.via === "outer" || row.via === "outer-fuzzy" ? sanityProblem(character, row.score, week) : null;
+    if (problem) {
+      row.status = "check";
+      checks.push({ raw: row.raw, name: character.name, discordId: character.discordId, score: row.score, main: row.learn ?? null, ...problem });
+      continue;
+    }
+
+    row.status = "saved";
+    const best = [...(character.scores ?? [])].reduce((max, s) => Math.max(max, Number(s.score) || 0), 0);
+    if (!row.isNaN && row.score !== 0 && row.score < best * SANDBAG) {
+      row.sandbag = true;
+      row.personalBest = best;
+    }
+    saves.push({
+      name: character.name,
+      discordId: character.discordId,
+      score: row.isNaN ? 0 : row.score,
+      replace: (character.scores ?? []).some((s) => String(s.date) === String(week)),
+    });
+
+    if (row.learn) {
+      const previous = mainOf.get(character.discordId);
+      learned.push({
+        key: row.learn,
+        name: character.name,
+        discordId: character.discordId,
+        raw: row.raw,
+        score: row.score,
+        replaces: previous && previous.key !== row.learn ? { id: previous.id, key: previous.key, name: previous.name, source: previous.source } : null,
+      });
+    }
+  }
+
+  // ⎯⎯ Coverage ⎯⎯ //
+  const seen = new Set(resolved.filter((r) => r.character).map((r) => r.character.discordId));
+  const unmatched = resolved.filter((r) => r.status === "notFound" || r.status === "ambiguous");
+  const missing = [];
+  for (const person of people.values()) {
+    if (seen.has(person.discordId) || !person.characters.some((c) => isActive(c, week))) continue;
+    const pair = unmatched.length ? likeliestRow(person, unmatched, week) : null;
+    missing.push({
+      discordId: person.discordId,
+      characters: person.characters.map((c) => c.name),
+      suggestion: pair
+        ? {
+            raw: pair.row.raw,
+            display: displayScannedName(pair.row.raw),
+            main: toKey(splitScannedName(pair.row.raw).inner ?? pair.row.raw),
+            character: pair.character,
+            score: pair.row.score,
+            by: pair.by,
+          }
+        : null,
+    });
+  }
+
+  return {
+    rows: resolved.map((row) => ({
+      raw: row.raw,
+      name: row.character?.name ?? row.raw,
+      score: row.score,
+      isNaN: row.isNaN,
+      status: row.status,
+      via: row.via ?? null,
+      discordId: row.character?.discordId ?? null,
+      sandbag: Boolean(row.sandbag),
+      ...(row.personalBest ? { personalBest: row.personalBest } : {}),
+      ...(row.suggestions?.length ? { suggestions: row.suggestions } : {}),
+    })),
+    saves,
+    learned,
+    conflicts,
+    checks,
+    missing,
+  };
 }
 
 /**
@@ -237,17 +577,117 @@ async function loadScanRoster() {
 }
 
 /**
+ * Point a representative at a linked character, keeping one main mapping per person: any other main
+ * mapping on that person's characters is removed and handed back, so an undo can put it back.
+ *
+ * @param {{key: string, name: string, source: "auto"|"manual"}} mapping
+ * @returns {Promise<{saved: Object, replaced: Object[]}|null>} - null when the character isn't linked.
+ */
+async function saveMainMapping({ key, name, source }) {
+  const exception = toKey(key);
+  const owner = await culvertSchema.findOne({ "characters.name": nameMatch(name) }, { characters: 1 }).lean();
+  const character = owner?.characters.find((c) => c.name.toLowerCase() === String(name).toLowerCase());
+  if (!exception || !character) return null;
+
+  const discordId = String(owner._id);
+  const replaced = await exceptionSchema
+    .find({
+      kind: "main",
+      exception: { $ne: exception },
+      name: { $in: owner.characters.map((c) => c.name) },
+    })
+    .lean();
+  if (replaced.length > 0) await exceptionSchema.deleteMany({ _id: { $in: replaced.map((r) => r._id) } });
+
+  const saved = await exceptionSchema
+    .findOneAndUpdate(
+      { kind: "main", exception },
+      { $set: { name: character.name, exception, kind: "main", source, discordId, updatedAt: new Date() } },
+      { upsert: true, new: true }
+    )
+    .lean();
+  return { saved, replaced };
+}
+
+/**
+ * Take learned mappings back: delete each, and restore whatever it replaced.
+ *
+ * @param {Array<{id: string, replaces?: {key: string, name: string, source?: string}|null}>} learned
+ * @returns {Promise<number>} - How many were removed.
+ */
+async function undoMainMappings(learned) {
+  let removed = 0;
+  for (const item of learned ?? []) {
+    if (item.id && (await exceptionSchema.findByIdAndDelete(item.id))) removed++;
+    if (item.replaces) await saveMainMapping({ key: item.replaces.key, name: item.replaces.name, source: item.replaces.source ?? "manual" });
+  }
+  return removed;
+}
+
+/**
+ * Save what Saku learned from a scan, logging each one, and hand back what an undo needs.
+ *
+ * @param {Array} learned - resolveScan's learned list.
+ * @param {(entry: {action: string, target: string, details: string, category: string}) => Promise} log
+ * @returns {Promise<Array>} - The learned items with the saved mapping's id, and what each replaced.
+ */
+async function saveLearned(learned, log) {
+  const saved = [];
+  for (const item of learned ?? []) {
+    const result = await saveMainMapping({ key: item.key, name: item.name, source: "auto" });
+    if (!result) continue;
+    const previous = result.replaced[0];
+    const replaces = previous ? { key: previous.exception, name: previous.name, source: previous.source } : null;
+    saved.push({ ...item, id: String(result.saved._id), replaces });
+    await log({
+      action: replaces ? "Change Main" : "Learn Main",
+      target: item.name,
+      details: `Main ${item.key} → ${item.name} | Row: ${item.raw}${replaces ? ` | Replaced: ${replaces.key}` : ""}`,
+      category: replaces ? "edit" : "create",
+    });
+  }
+  return saved;
+}
+
+/**
+ * Write a scan's scores in one batch.
+ *
+ * @param {Array<{name: string, score: number, replace: boolean}>} saves - resolveScan's saves.
+ * @param {string} week
+ */
+async function saveScanScores(saves, week) {
+  const ops = (saves ?? []).map(({ name, score, replace }) =>
+    replace
+      ? {
+          updateOne: {
+            filter: { "characters.name": name, "characters.scores.date": week },
+            update: { $set: { "characters.$[nameElem].scores.$[dateElem].score": score } },
+            arrayFilters: [{ "nameElem.name": name }, { "dateElem.date": week }],
+          },
+        }
+      : {
+          updateOne: {
+            filter: { "characters.name": name },
+            update: { $addToSet: { "characters.$[nameElem].scores": { score, date: week } } },
+            arrayFilters: [{ "nameElem.name": name }],
+          },
+        }
+  );
+  if (ops.length > 0) await culvertSchema.bulkWrite(ops, { ordered: false });
+}
+
+/**
  * Turn the model's raw output into scored entries.
  *
  * Each line is "CharacterName Score". The name is the first token and the score the last, which is
  * what keeps a class name in between from breaking the read.
  *
  * @param {string[]} lines - The model's response, split by newline.
- * @param {(name: string) => string} applyException - From loadExceptions.
+ * @param {(name: string) => string} [applyException] - From loadExceptions; resolveScan applies its own.
  * @returns {{scores: Array, unreadable: Array, zeroed: Array}} - unreadable and zeroed hold the same
  *   objects that are in scores, so renaming one to its matched character updates all three.
  */
-function parseScanEntries(lines, applyException) {
+function parseScanEntries(lines, applyException = (n) => n) {
   const scores = [];
   const unreadable = [];
   const zeroed = [];
@@ -271,12 +711,18 @@ function parseScanEntries(lines, applyException) {
 
 module.exports = {
   matchScannedName,
+  resolveScan,
+  saveMainMapping,
+  undoMainMappings,
+  saveLearned,
+  saveScanScores,
   splitScannedName,
   displayScannedName,
   parseScannedName,
   candidatesFor,
   pickCandidate,
   exceptionMapper,
+  toKey,
   loadScanRoster,
   parseScanEntries,
 };

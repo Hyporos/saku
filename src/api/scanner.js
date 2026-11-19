@@ -6,9 +6,15 @@ const culvertSchema = require("../schemas/culvertSchema.js");
 const weekSchema = require("../schemas/weekSchema.js");
 const { readImage, CULVERT_SCAN_PROMPT } = require("../features/scan/ocr.js");
 const { getResetDates } = require("../domain/culvert/utils.js");
-const { matchScannedName, parseScanEntries, exceptionMapper } = require("../domain/culvert/scanMatch.js");
+const {
+  resolveScan,
+  parseScanEntries,
+  splitScannedName,
+  saveScanScores,
+  saveLearned,
+} = require("../domain/culvert/scanMatch.js");
 const { BACKUPS_DIR, writeActionLog, fail } = require("./shared.js");
-const { getScanBaseData } = require("./scanCache.js");
+const { getScanBaseData, clearScanCache } = require("./scanCache.js");
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 // Bulk score entry from screenshots: OCR, matching, logging and finalizing.
@@ -37,25 +43,6 @@ router.post("/admin/scanner/scan", async (req, res) => {
       historicalWeeks.flatMap((w) => (w.scores ?? []).map((s) => s.name.toLowerCase()))
     );
 
-    // Lowercased names, which is what the matcher works on.
-    const linkedNames = [];
-    // name(lower) → { char fields + discordId } — used instead of per-char findOne()
-    const charDetailMap = new Map();
-    // names that already have a score this week — replaces per-char isScoreSubmitted()
-    const hasScoreThisWeek = new Set();
-
-    for (const user of allUsers) {
-      for (const char of user.characters ?? []) {
-        if (!char.name) continue;
-        const key = char.name.toLowerCase();
-        linkedNames.push(key);
-        charDetailMap.set(key, { ...char, discordId: user._id });
-        if (char.scores?.some((s) => String(s.date) === String(selectedWeek))) {
-          hasScoreThisWeek.add(key);
-        }
-      }
-    }
-
     let entryArray;
     try {
       const text = await readImage({ prompt: CULVERT_SCAN_PROMPT, data: image.data, mimeType: image.mimeType || "image/png" });
@@ -65,107 +52,48 @@ router.post("/admin/scanner/scan", async (req, res) => {
       return res.status(502).json({ error: error.quotaExhausted ? error.message : "Failed to analyze the image" });
     }
 
-    // Parse entries. Shared with /scan so both read a screenshot the same way; NaNScores and
-    // zeroScores hold the same objects as validScores, so renaming one renames all three.
-    const applyException = exceptionMapper(exceptions);
-    const { scores: validScores, unreadable: NaNScores, zeroed: zeroScores } =
-      parseScanEntries(entryArray, applyException);
+    // Matching, learning and every rule about what may be saved live in domain/culvert/scanMatch.js,
+    // shared with /scan, so a screenshot resolves the same way whichever one reads it.
+    const { scores: rows } = parseScanEntries(entryArray);
+    const result = resolveScan({ rows, roster: allUsers, mappings: exceptions, week: selectedWeek });
 
-    const notFoundChars = [];
-    const absentChars = [];
-    let totalSuccess = 0;
-    let totalFailure = 0;
-    let totalScanned = 0;
+    await saveScanScores(result.saves, selectedWeek);
+    const learned = await saveLearned(result.learned, (entry) => writeActionLog(req, entry));
+    if (learned.length > 0) clearScanCache();
 
-    // Bulk write operations — collected below, executed in a single batched call
-    const bulkOps = [];
+    // A cell names two characters; either one appearing in a past week means this row was once active.
+    const wasScanned = (raw) => {
+      const { outer, inner } = splitScannedName(raw);
+      return [outer, inner].some((n) => n && historicalNames.has(n.toLowerCase()));
+    };
 
-    // Match against DB characters. The matching itself lives in domain/culvert/scanMatch.js so the
-    // /scan command and /culvertping resolve a screenshot name exactly the same way this does.
-    for (const validCharacter of validScores) {
-      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames, applyException);
-
-      // Resolve from the in-memory map rather than a findOne per character.
-      const character = matchedName ? charDetailMap.get(matchedName) : undefined;
-      const userDiscordId = character?.discordId;
-
-      if (character && (!character.memberSince || dayjs(character.memberSince).isBefore(dayjs(selectedWeek).add(1, "week")))) {
-        totalScanned++;
-        totalSuccess++;
-        // Shared object, so the NaN and zero lists pick this up too.
-        validCharacter.name = character.name;
-        validCharacter.discordId = userDiscordId;
-
-        const scoreValue = !isNaN(validCharacter.score) ? validCharacter.score : 0;
-        // hasScoreThisWeek replaces the per-character isScoreSubmitted() aggregation pipeline
-        const scoreExists = hasScoreThisWeek.has(character.name.toLowerCase());
-        if (!scoreExists) {
-          bulkOps.push({
-            updateOne: {
-              filter: { "characters.name": character.name },
-              update: { $addToSet: { "characters.$[nameElem].scores": { score: scoreValue, date: selectedWeek } } },
-              arrayFilters: [{ "nameElem.name": character.name }],
-            },
-          });
-        } else {
-          bulkOps.push({
-            updateOne: {
-              filter: { "characters.name": character.name, "characters.scores.date": selectedWeek },
-              update: { $set: { "characters.$[nameElem].scores.$[dateElem].score": scoreValue } },
-              arrayFilters: [{ "nameElem.name": character.name }, { "dateElem.date": selectedWeek }],
-            },
-          });
-        }
-
-        const sortedScores = [...character.scores].sort((a, b) => b.score - a.score);
-        const bestScore = sortedScores[0]?.score || 0;
-        if (validCharacter.score !== 0 && !isNaN(validCharacter.score) && validCharacter.score < bestScore * 0.85) {
-          validCharacter.sandbag = true;
-          validCharacter.personalBest = bestScore;
-        }
-      } else {
-        if (character) {
-          // Matched in DB but joined after the selected week — exclude from counts, surface as absent
-          const zeroIdx = zeroScores.findIndex((z) => z.name === validCharacter.name);
-          if (zeroIdx !== -1) zeroScores.splice(zeroIdx, 1);
-          absentChars.push({ name: character.name, score: validCharacter.score });
-        } else {
-          totalScanned++;
-          totalFailure++;
-          notFoundChars.push({ name: validCharacter.name, discordId: userDiscordId });
-        }
-      }
-    }
-
-    // Execute all score writes in a single batched operation
-    if (bulkOps.length > 0) {
-      await culvertSchema.bulkWrite(bulkOps, { ordered: false });
-    }
-
-    // Build result
-    const successEntries = validScores
-      .filter((v) => !notFoundChars.some((nf) => nf.name === v.name))
-      .map((v) => ({
-        name: v.name,
-        score: v.score,
-        sandbag: v.sandbag,
-        isNaN: NaNScores.some((n) => n.name === v.name),
-        ...(v.sandbag && v.personalBest ? { personalBest: v.personalBest } : {}),
-      }));
+    const saved = result.rows.filter((r) => r.status === "saved");
+    const unmatched = result.rows.filter((r) => r.status === "notFound" || r.status === "ambiguous");
 
     res.json({
       week: selectedWeek,
-      success: successEntries,
-      notFound: notFoundChars.map((nf) => ({
-        name: nf.name,
-        ...(historicalNames.has(nf.name.toLowerCase()) ? { previouslyScanned: true } : {}),
+      success: saved.map((r) => ({
+        name: r.name,
+        score: r.score,
+        sandbag: r.sandbag,
+        isNaN: r.isNaN,
+        ...(r.personalBest ? { personalBest: r.personalBest } : {}),
       })),
-      nanScores: NaNScores.map((n) => ({ name: n.name })),
-      zeroScores: zeroScores.map((z) => ({ name: z.name })),
-      absentScores: absentChars.map((a) => ({ name: a.name, score: a.score })),
-      totalSuccess,
-      totalFailure,
-      totalScanned,
+      notFound: unmatched.map((r) => ({
+        name: r.raw,
+        ...(wasScanned(r.raw) ? { previouslyScanned: true } : {}),
+        ...(r.suggestions ? { suggestions: r.suggestions } : {}),
+      })),
+      nanScores: saved.filter((r) => r.isNaN).map((r) => ({ name: r.name })),
+      zeroScores: saved.filter((r) => !r.isNaN && r.score === 0).map((r) => ({ name: r.name })),
+      absentScores: result.rows.filter((r) => r.status === "absent").map((r) => ({ name: r.name, score: r.score })),
+      learned: learned.map((l) => ({ id: l.id, key: l.key, name: l.name, raw: l.raw, replaces: l.replaces })),
+      conflicts: result.conflicts,
+      checks: result.checks,
+      missing: result.missing,
+      totalSuccess: saved.length,
+      totalFailure: unmatched.length,
+      totalScanned: saved.length + unmatched.length,
     });
   } catch (error) {
     console.error("Scanner error:", error);
