@@ -61,7 +61,7 @@ module.exports = {
       // Matching lives in domain/culvert/scanMatch.js, shared with /scan and the webapp's scanner
       // route. This command used to have its own copy that skipped the confusable-letter folding, so
       // a name /scan matched happily came back "could not be found" here.
-      const { name: matchedName } = matchScannedName(checkedName, linkedNames, applyException, { fallbackToMain: true });
+      const { name: matchedName } = matchScannedName(checkedName, linkedNames, applyException);
 
       const user = matchedName
         ? await culvertSchema.findOne(
