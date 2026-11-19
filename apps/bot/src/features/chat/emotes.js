@@ -34,16 +34,27 @@ function asksForChannel(message) {
   return CHANNEL_ASK.test(text) || /\b(for|to|on)\b/i.test(text) || text.trim().split(/\s+/).length <= 3;
 }
 
-// Today's lucky channel for one thing. The same thing gets the same channel all day, so asking twice
-// can't catch Saku contradicting itself, which is what made it start calling its own rolls made up.
-// The thing is whatever follows "for" ("ch for et" -> "et"), else the asker.
-function luckyChannel(message, fallbackKey, date) {
-  const topic = String(message ?? "").match(/\bfor\s+(?:my\s+|a\s+|an\s+|the\s+)?([^?.!,]{1,30})/i)?.[1]?.replace(/["`\n]/g, "").trim().toLowerCase();
-  // Keyed on the first word, so "ch for et" and "ch for et pls" agree.
-  const key = `${date}|${topic?.split(/\s+/)[0] || fallbackKey}`;
+// Today's lucky channel for one person and one thing. The same ask gets the same channel all day, so
+// asking twice can't catch Saku contradicting itself; a different boss or item, or a different
+// person, gets its own. The thing is what's left once the channel and request words are gone, so
+// "ch for et", "baldrix ch" and "what channel should i use for et" all key on the boss.
+const ROLL_FILLER = new Set(
+  ("ch chs channel channels for to on in at the a an my me i we u you ur your pls plz please what whats which " +
+    "give gimme get got tell pick roll rolled lucky luck best good use using should would could can will do does " +
+    "go going try today todays rn now any another other different next real drop drops dropping hit tap need want").split(" ")
+);
+function luckyChannel(message, userId, date) {
+  const words = String(message ?? "")
+    .toLowerCase()
+    .replace(/<[@#][!&]?\d+>/g, " ")
+    .replace(/[^a-z0-9' ]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !ROLL_FILLER.has(w));
+  const topic = words.slice(0, 4).join(" ") || null;
+  const key = `${date}|${userId}|${topic ?? ""}`;
   let hash = 2166136261;
   for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
-  return { channel: 1 + ((hash >>> 0) % 40), topic: topic || null };
+  return { channel: 1 + ((hash >>> 0) % 40), topic };
 }
 
 // Discord renders a custom emote ONLY as <:name:id>. The model writes two near misses: the bare
