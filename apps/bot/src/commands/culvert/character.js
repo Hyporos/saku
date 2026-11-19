@@ -756,7 +756,7 @@ async function groupFromScreenshot(interaction, { screenshot, typed, mainOption,
     read = parseGroupList(await readImage({ prompt: GROUP_LIST_PROMPT, ...image }));
   } catch (error) {
     console.error("Error - /character group could not read the screenshot:", error);
-    return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to read the screenshot.");
+    return interaction.editReply(error.quotaExhausted ? "Error - The image reader is busy right now. Give it a minute and try again." : "Error - Failed to read the screenshot.");
   }
 
   const seen = new Set(typed.map((name) => name.toLowerCase()));
