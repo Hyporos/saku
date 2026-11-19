@@ -27,7 +27,7 @@ src/
 
   features/           self-contained features that own their whole pipeline
     chat/             Saku's AI (see "The chat feature" below)
-    scan/ocr.js       Claude OCR (Gemini when credits are out): the reader, both prompts, attachment fetching
+    scan/ocr.js       Claude OCR (Gemini when credits are out): the reader, the scan and group prompts, attachment fetching
 
   scheduling/         registry.js (cron jobs + DST), jobs.js, health.js
   api/                the Express API the webapp consumes (see "The API" below)
@@ -219,7 +219,15 @@ dots removed (`exceptionSchema.toKey`), on save and on lookup, so older records 
 `group: { main, characters, scoresTo, updatedAt }` on their culvert document (the bracketed main,
 up to five other characters, and the linked character the scores go to; bees can set anyone's).
 Every name is checked on the rankings and stored in its real spelling, and a name linked to someone
-else or in someone else's group is refused (`planGroup`). `groupIndex` keys every group name the
+else or in someone else's group is refused (`planGroup`). Instead of typing names, a member can attach
+a screenshot of the in-game Group List window (Name / Job / Level, up to six rows):
+`GROUP_LIST_PROMPT` in `features/scan/ocr.js` reads the Name column through `readImage`, and
+`parseGroupList` (pure, in `scanMatch.js`, tested) drops headers, bullets, stray columns and repeats
+and keeps six. Typed names come first and the screenshot fills the rest; names the rankings don't
+know are left out and listed. The window doesn't mark the main, so an ephemeral reply asks with a
+select menu (default: one of the member's linked characters, else the first row) and Save runs the
+same `planGroup` and save as the typed path, against a freshly read roster. Only the invoker can use
+the menu; it closes after three minutes without saving. `groupIndex` keys every group name the
 same folded way as the rest of matching; a name two people somehow both hold decides nothing.
 `/scan`, the scanner route and `/culvertping` all read it (`loadScanRoster` returns it for
 `matchScannedName`). Saving or clearing a group clears the scanner cache, and `/character rename`

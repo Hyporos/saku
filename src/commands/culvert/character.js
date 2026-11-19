@@ -3,6 +3,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   ComponentType,
   MessageFlags,
 } = require("discord.js");
@@ -15,7 +16,8 @@ const weekSchema = require("../../schemas/weekSchema.js");
 const userSchema = require("../../schemas/userSchema.js");
 const starboardSchema = require("../../schemas/starboardSchema.js");
 const { nameMatch, getResetDates, RANKINGS_URL } = require("../../domain/culvert/utils.js");
-const { planGroup } = require("../../domain/culvert/scanMatch.js");
+const { planGroup, parseGroupList, GROUP_SIZE } = require("../../domain/culvert/scanMatch.js");
+const { readImage, fetchAttachment, GROUP_LIST_PROMPT } = require("../../features/scan/ocr.js");
 const { CHANNELS, isBee } = require("../../config/ids.js");
 const { clearScanCache } = require("../../api/scanCache.js");
 
@@ -708,12 +710,164 @@ const describeGroup = (saved) =>
   `Other characters: ${saved.characters?.length ? saved.characters.map((name) => `**${name}**`).join(", ") : "none"}\n` +
   `Scores go to: **${saved.scoresTo}**`;
 
+// Writes a planned group, logs it and says so. The typed and the screenshot paths both end here.
+async function saveGroup(interaction, { target, plan, previous, whose, quiet }) {
+  await culvertSchema.updateOne({ _id: target.id }, { $set: { group: { ...plan.group, updatedAt: new Date() } } });
+  clearScanCache(); // the webapp scanner holds its own copy of the roster
+
+  await logAction({
+    action: previous ? "Change Group" : "Set Group",
+    target: String(plan.group.main),
+    details: `Group of ${target.username} | Main: ${plan.group.main} | Characters: ${
+      plan.group.characters.join(", ") || "none"
+    } | Scores to: ${plan.group.scoresTo}${previous ? ` | Replaced main: ${previous.main}` : ""}`,
+    category: previous ? "edit" : "create",
+    actorId: String(interaction.user.id),
+  });
+
+  await interaction.editReply({
+    content: `Saved ${whose} group. Scans now send any row with these names to **${plan.group.scoresTo}**\n${describeGroup(plan.group)}`,
+    components: [],
+    ...quiet,
+  });
+}
+
+// Long enough to open the guild list and check which name is in brackets.
+const GROUP_PICK_MS = 3 * 60 * 1000;
+
+// Reads the Group List window, keeps the names the rankings know, and asks which one is the main,
+// since the window doesn't say. Typed names come first and the screenshot fills the rest.
+async function groupFromScreenshot(interaction, { screenshot, typed, mainOption, scoresToOption, target, whose, quiet }) {
+  if (screenshot.contentType && !screenshot.contentType.startsWith("image/")) {
+    return interaction.reply({ content: "Error - `screenshot` must be an image", flags: MessageFlags.Ephemeral });
+  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const roster = await culvertSchema.find({}, { "characters.name": 1, group: 1 }).lean();
+  const linked = (roster.find((user) => String(user._id) === target.id)?.characters ?? []).map((c) => c.name);
+  if (linked.length === 0) {
+    const { error } = planGroup({ discordId: target.id, main: "", roster });
+    return interaction.editReply({ content: `Error - ${error}`, ...quiet });
+  }
+
+  let read;
+  try {
+    const image = await fetchAttachment(screenshot);
+    read = parseGroupList(await readImage({ prompt: GROUP_LIST_PROMPT, ...image }));
+  } catch (error) {
+    console.error("Error - /character group could not read the screenshot:", error);
+    return interaction.editReply(error.quotaExhausted ? error.message : "Error - Failed to read the screenshot.");
+  }
+
+  const seen = new Set(typed.map((name) => name.toLowerCase()));
+  const candidates = [...typed, ...read.filter((name) => !seen.has(name.toLowerCase()))];
+  const dropped = candidates.slice(GROUP_SIZE).map((name) => `**${name}** (a group holds six)`);
+
+  const names = [];
+  for (const name of candidates.slice(0, GROUP_SIZE)) {
+    if (!VALID_NAME.test(name)) {
+      dropped.push(`**${name}** (not a valid name)`);
+      continue;
+    }
+    let found;
+    try {
+      found = await lookupOnRankings(name);
+    } catch (error) {
+      console.error("Error - /character group could not reach the rankings:", error?.message ?? error);
+      return interaction.editReply("Error - The rankings could not be reached right now. Try again shortly");
+    }
+    if (!found) dropped.push(`**${name}** (not on the rankings)`);
+    else if (!names.some((other) => other.toLowerCase() === found.toLowerCase())) names.push(found);
+  }
+  const droppedLine = dropped.length ? `\nLeft out: ${dropped.join(", ")}` : "";
+
+  if (names.length === 0) {
+    return interaction.editReply({
+      content: `Error - No name in the screenshot was found on the rankings. Attach the Group List window, or type the names instead${droppedLine}`,
+      ...quiet,
+    });
+  }
+
+  // Checked now, so a name that belongs to someone else is reported before anyone picks a main.
+  const check = planGroup({ discordId: target.id, main: names[0], alts: names.slice(1), scoresTo: scoresToOption, roster });
+  if (check.error) return interaction.editReply({ content: `Error - ${check.error}${droppedLine}`, ...quiet });
+
+  const same = (a) => (b) => a.toLowerCase() === b.toLowerCase();
+  let main =
+    (mainOption && names.find(same(mainOption))) ?? names.find((name) => linked.some(same(name))) ?? names[0];
+
+  const components = () => [
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId("char_group_main")
+        .setPlaceholder("Which one is your main?")
+        .addOptions(names.map((name) => ({ label: name, value: name, default: name === main })))
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("char_group_save").setLabel("Save").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("char_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+    ),
+  ];
+
+  const message = await interaction.editReply({
+    content:
+      `Found in ${whose} screenshot: ${names.map((name) => `**${name}**`).join(", ")}${droppedLine}\n` +
+      "Which one is your main? (the name in brackets in the guild list)",
+    components: components(),
+    ...quiet,
+  });
+
+  const collector = message.createMessageComponentCollector({
+    filter: (i) => i.user.id === interaction.user.id,
+    time: GROUP_PICK_MS,
+  });
+
+  collector.on("collect", async (press) => {
+    try {
+      if (press.customId === "char_group_main") {
+        main = press.values[0];
+        return await press.update({ components: components() });
+      }
+      if (press.customId === "char_cancel") {
+        collector.stop("cancelled");
+        return await press.update({ content: "Cancelled, nothing was changed.", components: [] });
+      }
+      collector.stop("saved");
+      await press.deferUpdate();
+
+      // Read again: someone may have claimed one of these names while the menu was open.
+      const fresh = await culvertSchema.find({}, { "characters.name": 1, group: 1 }).lean();
+      const plan = planGroup({
+        discordId: target.id,
+        main,
+        alts: names.filter((name) => name !== main),
+        scoresTo: scoresToOption,
+        roster: fresh,
+      });
+      if (plan.error) return await interaction.editReply({ content: `Error - ${plan.error}`, components: [], ...quiet });
+
+      const previous = fresh.find((user) => String(user._id) === target.id)?.group ?? null;
+      await saveGroup(interaction, { target, plan, previous, whose, quiet });
+    } catch (error) {
+      console.error("Error - /character group could not save from the screenshot:", error);
+      await interaction.editReply({ content: "Error - Could not save the group", components: [] }).catch(() => {});
+    }
+  });
+
+  collector.on("end", async (_, reason) => {
+    if (reason !== "time") return;
+    await interaction.editReply({ content: "Timed out, nothing was changed.", components: [] }).catch(() => {});
+  });
+}
+
 // Members declare their own group; a bee can pass `user` to declare someone else's. Running it with a
-// main replaces the whole group, with nothing it shows the group, and with `clear` it removes it.
+// main or a screenshot replaces the whole group, with nothing it shows the group, and with `clear` it
+// removes it.
 async function group(interaction) {
   const mainOption = interaction.options.getString("main");
   const altOptions = ALT_OPTIONS.map((option) => interaction.options.getString(option)).filter(Boolean);
   const scoresToOption = interaction.options.getString("scores_to");
+  const screenshot = interaction.options.getAttachment("screenshot");
   const clear = interaction.options.getBoolean("clear") ?? false;
   const userOption = interaction.options.getUser("user");
   const quiet = { allowedMentions: { parse: [] } };
@@ -729,19 +883,19 @@ async function group(interaction) {
   const own = target.id === interaction.user.id;
   const whose = own ? "your" : `${target}'s`;
 
-  if (clear && (mainOption || altOptions.length || scoresToOption)) {
-    return interaction.reply("Error - Use `clear` on its own, without a main or other characters");
+  if (clear && (mainOption || altOptions.length || scoresToOption || screenshot)) {
+    return interaction.reply("Error - Use `clear` on its own, without a main, other characters or a screenshot");
   }
-  if (!mainOption && (altOptions.length || scoresToOption)) {
-    return interaction.reply("Error - Give the group's `main` too. Setting a group replaces the whole thing");
+  if (!mainOption && !screenshot && (altOptions.length || scoresToOption)) {
+    return interaction.reply("Error - Give the group's `main` or a `screenshot` too. Setting a group replaces the whole thing");
   }
 
   // ⎯⎯ View ⎯⎯ //
-  if (!mainOption && !clear) {
+  if (!mainOption && !screenshot && !clear) {
     const doc = await culvertSchema.findById(target.id, { group: 1 }).lean();
     if (!doc?.group) {
       return interaction.reply({
-        content: `${own ? "You have" : `${target} has`} no group set. Set one with \`/character group\` and a \`main\``,
+        content: `${own ? "You have" : `${target} has`} no group set. Set one with \`/character group\` and a \`screenshot\` or a \`main\``,
         ...quiet,
       });
     }
@@ -772,7 +926,7 @@ async function group(interaction) {
   }
 
   // ⎯⎯ Set ⎯⎯ //
-  const typed = [mainOption, ...altOptions];
+  const typed = [mainOption, ...altOptions].filter(Boolean);
   const invalid = typed.find((name) => !VALID_NAME.test(name));
   if (invalid) {
     return interaction.reply(
@@ -781,6 +935,10 @@ async function group(interaction) {
   }
   const twice = typed.find((name, i) => typed.findIndex((other) => other.toLowerCase() === name.toLowerCase()) !== i);
   if (twice) return interaction.reply(`Error - **${twice}** is in the group twice`);
+
+  if (screenshot) {
+    return groupFromScreenshot(interaction, { screenshot, typed, mainOption, scoresToOption, target, whose, quiet });
+  }
 
   await interaction.deferReply();
 
@@ -810,23 +968,7 @@ async function group(interaction) {
   if (plan.error) return interaction.editReply({ content: `Error - ${plan.error}`, ...quiet });
 
   const previous = roster.find((user) => String(user._id) === target.id)?.group ?? null;
-  await culvertSchema.updateOne({ _id: target.id }, { $set: { group: { ...plan.group, updatedAt: new Date() } } });
-  clearScanCache(); // the webapp scanner holds its own copy of the roster
-
-  await logAction({
-    action: previous ? "Change Group" : "Set Group",
-    target: String(plan.group.main),
-    details: `Group of ${target.username} | Main: ${plan.group.main} | Characters: ${
-      plan.group.characters.join(", ") || "none"
-    } | Scores to: ${plan.group.scoresTo}${previous ? ` | Replaced main: ${previous.main}` : ""}`,
-    category: previous ? "edit" : "create",
-    actorId: String(interaction.user.id),
-  });
-
-  await interaction.editReply({
-    content: `Saved ${whose} group. Scans now send any row with these names to **${plan.group.scoresTo}**\n${describeGroup(plan.group)}`,
-    ...quiet,
-  });
+  await saveGroup(interaction, { target, plan, previous, whose, quiet });
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -952,6 +1094,9 @@ module.exports = {
         .setDescription("Set, view or clear your account group, so scans find you on any of its characters")
         .addStringOption((option) =>
           option.setName("main").setDescription("The group's main, the name in brackets on the guild list. Leave empty to view")
+        )
+        .addAttachmentOption((option) =>
+          option.setName("screenshot").setDescription("A screenshot of your in-game Group List window, instead of typing names")
         );
       for (const name of ALT_OPTIONS) {
         sub.addStringOption((option) => option.setName(name).setDescription("Another character in the group"));
