@@ -13,6 +13,28 @@ const { loadDstOffset, saveDstState, JOB_DEFINITIONS, computeNextRun, startAllJo
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
+// Which code is running, first thing in the host console, so a restart that didn't pick up an update
+// shows at a glance. The commit when the host deploys from git; otherwise the newest file under src/,
+// which is when files were last uploaded.
+function codeVersion() {
+  try {
+    const out = require("node:child_process").execSync('git log -1 --format="%h %cs %s"', { cwd: __dirname, stdio: ["ignore", "pipe", "ignore"] });
+    return `commit ${String(out).trim()}`;
+  } catch {
+    let newest = 0;
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else newest = Math.max(newest, fs.statSync(full).mtimeMs);
+      }
+    };
+    walk(__dirname);
+    return `no git here; newest file in src/ is from ${new Date(newest).toISOString().replace("T", " ").slice(0, 16)} UTC`;
+  }
+}
+console.log(`Saku code version: ${codeVersion()} | chat model first: ${process.env.SAKU_CHAT_MODEL || "claude-opus-5-5 (default)"}`);
+
 const app = express();
 
 app.use(express.json({ limit: "50mb" }));
