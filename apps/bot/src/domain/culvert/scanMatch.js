@@ -306,11 +306,11 @@ function planGroup({ discordId, main, alts = [], scoresTo = null, roster }) {
 
   for (const user of roster ?? []) {
     if (String(user._id) === String(discordId)) continue;
-    const theirs = new Set((user.characters ?? []).map((c) => c?.name?.toLowerCase()).filter(Boolean));
-    const grouped = new Set([user.group?.main, ...(user.group?.characters ?? [])].filter(Boolean).map((n) => n.toLowerCase()));
+    const theirs = new Set((user.characters ?? []).map((c) => c?.name && fold(c.name)).filter(Boolean));
+    const grouped = new Set([user.group?.main, ...(user.group?.characters ?? [])].filter(Boolean).map((n) => fold(n)));
     for (const name of names) {
-      if (theirs.has(name.toLowerCase())) return { error: `**${name}** is linked to someone else` };
-      if (grouped.has(name.toLowerCase())) return { error: `**${name}** is already in someone else's group` };
+      if (theirs.has(fold(name))) return { error: `**${name}** is linked to someone else` };
+      if (grouped.has(fold(name))) return { error: `**${name}** is already in someone else's group` };
     }
   }
 
