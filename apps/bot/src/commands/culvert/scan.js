@@ -13,6 +13,7 @@ const {
 } = require("../../domain/culvert/scanMatch.js");
 const { readImage, fetchAttachment, CULVERT_SCAN_PROMPT } = require("../../features/scan/ocr.js");
 const { isBee } = require("../../config/ids.js");
+const { clearScanCache } = require("../../api/scanCache.js");
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
@@ -159,6 +160,7 @@ module.exports = {
     const learned = await saveLearned(result.learned, (entry) =>
       logAction({ ...entry, actorId: String(interaction.user.id) })
     );
+    if (learned.length > 0) clearScanCache(); // the webapp scanner caches mappings too
 
     await updateProgress(100, "Submitting scores...");
 
@@ -191,6 +193,7 @@ module.exports = {
     }
 
     const removed = await undoMainMappings(learned);
+    clearScanCache();
     await logAction({
       action: "Undo Learned Mains",
       target: learned.map((l) => l.name).join(", ").slice(0, 200),
