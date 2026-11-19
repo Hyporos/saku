@@ -9,6 +9,7 @@ const {
   resolveScan,
   groupIndex,
   planGroup,
+  parseGroupList,
   toKey,
 } = require("../src/domain/culvert/scanMatch.js");
 
@@ -283,6 +284,22 @@ eq("short name prefers its exact match", matchScannedName("druu", ROSTER).name, 
   check("a name in someone else's group is refused", /someone else's group/.test(plan({ main: "Sunbeam" }).error ?? ""));
   check("their own group's names are fine to reuse", Boolean(plan({ main: "Sunflower", alts: ["Moonbeam"] }).group));
   check("no linked character is refused", /Ask a bee/.test(planGroup({ discordId: "999", main: "X", roster: ROSTER }).error ?? ""));
+}
+
+// ⎯⎯ Reading a Group List screenshot ⎯⎯ //
+{
+  const list = (text) => parseGroupList(text).join(",");
+  eq("one name per line, in row order", list("Bellze\nBellzeBeast\nbelzadena"), "Bellze,BellzeBeast,belzadena");
+  eq("blank lines and headers are skipped", list("Name\n\nBellze\n  \nJob\nLevel:\nBelzaran\n"), "Bellze,Belzaran");
+  eq("the window title is skipped", list("Group List\nBellze"), "Bellze");
+  eq("a stray Job and Level column is cut off", list("Bellze Night Lord 295\nBellzren Ren 280"), "Bellze,Bellzren");
+  eq("bullets and numbering are removed", list("- Bellze\n2. Bellzren\n* `Belzaran`"), "Bellze,Bellzren,Belzaran");
+  eq("a name starting with a digit keeps it", list("1Bellze"), "1Bellze");
+  eq("a repeated row counts once, whatever its case", list("Bellze\nbellze\nBELLZE\nBellzren"), "Bellze,Bellzren");
+  eq("more than six rows keep the first six", list("a1\na2\na3\na4\na5\na6\na7\na8"), "a1,a2,a3,a4,a5,a6");
+  eq("special characters are kept", list("Bellzö"), "Bellzö");
+  eq("an empty answer reads nothing", list(""), "");
+  eq("a CRLF answer reads the same", list("Bellze\r\nBellzren\r\n"), "Bellze,Bellzren");
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");

@@ -325,6 +325,33 @@ function planGroup({ discordId, main, alts = [], scoresTo = null, roster }) {
   return { group: { main, characters: alts.filter(Boolean), scoresTo: target } };
 }
 
+// The in-game Group List window holds at most six characters.
+const GROUP_SIZE = 6;
+const GROUP_LIST_HEADERS = new Set(["name", "names", "job", "level", "group", "grouplist"]);
+
+/**
+ * Turn the model's read of a Group List screenshot into names. The prompt asks for one bare name per
+ * line, but a header, a bullet, a stray Job/Level column or a repeated row must not become a name.
+ *
+ * @param {string} text - The model's raw answer.
+ * @returns {string[]} Up to six names, in row order, each once (case-insensitive).
+ */
+function parseGroupList(text) {
+  const names = [];
+  const seen = new Set();
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    const cell = line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").trim();
+    const name = (cell.split(/\s+/)[0] ?? "").replace(/^[`*"'|]+|[`*"'|:]+$/g, "");
+    if (!name || GROUP_LIST_HEADERS.has(name.toLowerCase())) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+    if (names.length === GROUP_SIZE) break;
+  }
+  return names;
+}
+
 /**
  * Resolve a cell through the declared groups alone. The bracketed main is checked first, then the
  * character before it, each as read and through the misread table.
@@ -892,6 +919,8 @@ module.exports = {
   groupIndex,
   groupMatch,
   planGroup,
+  parseGroupList,
+  GROUP_SIZE,
   toKey,
   loadScanRoster,
   parseScanEntries,

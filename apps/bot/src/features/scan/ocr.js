@@ -4,7 +4,7 @@ const { isTransient, isOutOfCredits, geminiFallbackReady, creditsOut, benchCredi
 require("dotenv").config();
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
-// Shared screenshot reader for /scan, /culvertping and the webapp scan route.
+// Shared screenshot reader for /scan, /culvertping, /character group and the webapp scan route.
 //
 // These used to call one model with no retry, so a single rate limit failed the whole command. The
 // chain and the benching stay for a real outage, but with billing on the key the problem changed
@@ -76,6 +76,24 @@ Example output:
 PlayerName1
 AltName(MainName)
 LongPlayerNa..`;
+
+// /character group reads the in-game Group List window (Name / Job / Level, up to six rows) so a member
+// can set their group without typing names. Only the Name column matters, and a misspelt name is
+// caught by the rankings check afterwards rather than here.
+const GROUP_LIST_PROMPT = `Analyze this MapleStory Group List window screenshot.
+
+It is a table with the columns Name, Job and Level, and up to 6 rows. Empty slots show a maple leaf icon and no name.
+
+Rules:
+- Column Isolation: Read ONLY the Name column. Ignore the Job and Level columns and the window title.
+- Exact Spelling: Copy each name exactly as rendered, letter case included, with no spaces. Preserve all special characters (ö, á, etc.).
+- Empty Slots: Output nothing for an empty slot.
+- Formatting: Return ONLY the names, one per line, top to bottom. No headers, introductory text, numbering or blank lines.
+
+Example output:
+Bellze
+BellzeBeast
+belzadena`;
 
 /**
  * Fetch a Discord attachment and return it as base64, ready for readImage.
@@ -197,4 +215,4 @@ function busyError(cause) {
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
 
-module.exports = { readImage, fetchAttachment, CULVERT_SCAN_PROMPT, CULVERTPING_PROMPT };
+module.exports = { readImage, fetchAttachment, CULVERT_SCAN_PROMPT, CULVERTPING_PROMPT, GROUP_LIST_PROMPT };
