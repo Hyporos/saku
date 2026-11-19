@@ -128,7 +128,7 @@ module.exports = {
 
     // Read once: the whole scan is decided from this snapshot.
     const [roster, mappings] = await Promise.all([
-      culvertSchema.find({}, { characters: 1 }).lean(),
+      culvertSchema.find({}, { characters: 1, group: 1 }).lean(),
       exceptionSchema.find({}).lean(),
     ]);
 

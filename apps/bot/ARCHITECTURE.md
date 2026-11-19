@@ -215,8 +215,26 @@ table also holds **main mappings** (`kind: "main"`): representative → linked c
 per person, `source` `auto` or `manual`. Every exception key is lowercase with whitespace and trailing
 dots removed (`exceptionSchema.toKey`), on save and on lookup, so older records still match.
 
+**Declared groups.** Members can also say who they are: `/character group` stores
+`group: { main, characters, scoresTo, updatedAt }` on their culvert document (the bracketed main,
+up to five other characters, and the linked character the scores go to; bees can set anyone's).
+Every name is checked on the rankings and stored in its real spelling, and a name linked to someone
+else or in someone else's group is refused (`planGroup`). `groupIndex` keys every group name the
+same folded way as the rest of matching; a name two people somehow both hold decides nothing.
+`/scan`, the scanner route and `/culvertping` all read it (`loadScanRoster` returns it for
+`matchScannedName`). Saving or clearing a group clears the scanner cache, and `/character rename`
+renames the name inside groups too.
+
 `resolveScan` applies these rules, each covered in `tests/scanMatch.js`:
 
+- **A declared group decides first.** A row whose bracketed main or logged-in name is any name in
+  someone's group resolves to that person's `scoresTo` character, ahead of main mappings, misreads
+  and fuzzy names; the bracket is checked before the name in front of it. A cut-off name matches a
+  group by prefix (at least three letters) only when exactly one person's group fits and the
+  character beside it isn't plainly someone else's; otherwise the rules below take over. A row
+  matched by a group is not score-checked and teaches nothing, and Saku never learns a main mapping
+  for a name that is in a declared group. If `scoresTo` has since been unlinked, the person's first
+  linked character takes the score.
 - **Main first.** A main mapping or a linked name decides the row. A cut-off main is matched by
   prefix against both; if it fits several people and the character beside it doesn't settle which,
   the row stays unmatched with the candidates as suggestions. It is never guessed.
@@ -263,7 +281,7 @@ copy it; that duplication is what caused the bug.
 | `pnpm test-symbols` | **Every identifier is declared, imported, or a real global** |
 | `pnpm test-api` | All 35 API routes still mounted, secret gate applied once |
 | `pnpm test-permissions` | Every command's tier, and tags matching enforcement |
-| `pnpm test-scan-match` | Screenshot matching: truncation, confusables, junk input, main mappings and every scan rule |
+| `pnpm test-scan-match` | Screenshot matching: truncation, confusables, junk input, main mappings, declared groups and every scan rule |
 | `pnpm test-chat-modules` | Chat exports exist, no import cycles, public surface intact |
 | `pnpm test-chat` | Live model behaviour: fabrication guards, tone, tool use |
 | `pnpm test-canvas` | Level card + leaderboard rendering, stall handling |

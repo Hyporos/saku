@@ -7,6 +7,8 @@ const {
   parseScanEntries,
   displayScannedName,
   resolveScan,
+  groupIndex,
+  planGroup,
   toKey,
 } = require("../src/domain/culvert/scanMatch.js");
 
@@ -209,6 +211,78 @@ eq("short name prefers its exact match", matchScannedName("druu", ROSTER).name, 
   eq("joined after the week is absent", run([["Newbie(Newbie)", 5]]).rows[0].status, "absent");
   eq("nobody is notFound", run([["Nobody(Noone)", 5]]).rows[0].status, "notFound");
   eq("a NaN score saves as 0", run([["Alt(Bloom)", NaN]]).saves[0].score, 0);
+}
+
+// ⎯⎯ Declared groups: /character group outranks learned and misread mappings ⎯⎯ //
+{
+  const WEEK = "2026-11-11";
+  const past = (...scores) => scores.map((score, i) => ({ date: `2026-10-${String(7 + i * 7).padStart(2, "0")}`, score }));
+  const ROSTER = [
+    {
+      _id: "111",
+      characters: [{ name: "Katie", scores: past(100000, 110000, 105000) }, { name: "Kitty", scores: [] }],
+      group: { main: "Sunflower", characters: ["Moonbeam", "Katie"], scoresTo: "Katie" },
+    },
+    { _id: "222", characters: [{ name: "Bloom", scores: past(200000, 190000, 195000) }], group: { main: "Bloomrep", characters: ["Sunbeam"], scoresTo: "Bloom" } },
+    { _id: "333", characters: [{ name: "Rosa", scores: [] }], group: { main: "Moonlit", characters: [], scoresTo: "Gone" } },
+    { _id: "444", characters: [{ name: "Zed", scores: past(90000, 90000, 90000) }] },
+  ];
+  const run = (rows, mappings = []) =>
+    resolveScan({ rows: rows.map(([name, score]) => ({ name, score })), roster: ROSTER, mappings, week: WEEK });
+
+  let r = run([["Whoever(Sunflower)", 106000]]);
+  eq("group by bracketed main", r.rows[0].name, "Katie");
+  eq("...via the group", r.rows[0].via, "group");
+  eq("...teaches nothing", r.learned.length, 0);
+  eq("group by logged-in name", run([["Moonbeam(NewRep)", 106000]]).rows[0].name, "Katie");
+  eq("a logged-in group name learns no main", run([["Moonbeam(NewRep)", 106000]]).learned.length, 0);
+  eq("a group name with no bracket", run([["Sunbeam", 195000]]).rows[0].name, "Bloom");
+  eq("group name matched through confusables", run([["X(SunfIower)", 106000]]).rows[0].name, "Katie");
+  eq("bracket outranks the character beside it", run([["Sunbeam(Sunflower)", 106000]]).rows[0].name, "Katie");
+  eq("truncated main, one group fits", run([["Q(Sunf..", 106000]]).rows[0].name, "Katie");
+  r = run([["Q(Moon..", 106000]]);
+  check("truncated main, two groups fit: not guessed by group", r.rows[0].via !== "group", JSON.stringify(r.rows[0]));
+  eq("...the character beside it still settles it", run([["Moonbeam(Moon..", 106000]]).rows[0].name, "Katie");
+  eq("a cut main loses to a character plainly someone else's", run([["Zed(Sunf..", 90000]]).rows[0].name, "Zed");
+  eq("a group with a gone scoresTo falls back to their first character", run([["X(Moonlit)", 1000]]).rows[0].name, "Rosa");
+
+  // A group beats a learned main and a misread pointing elsewhere.
+  r = run([["Alt(Sunflower)", 106000]], [{ _id: "m1", kind: "main", source: "auto", exception: "sunflower", name: "Zed" }]);
+  eq("group beats a learned mapping", r.rows[0].name, "Katie");
+  r = run([["Alt(Bloomrep)", 195000]], [{ exception: "bloomrep", name: "Zed" }]);
+  eq("group beats a misread", r.rows[0].name, "Bloom");
+
+  // Learning never claims a group name, and the existing rules still hold.
+  r = run([["Zed(Moonbeam)", 90000]]);
+  eq("bracketed group name wins over the character beside it", r.rows[0].name, "Katie");
+  eq("...and is never learned", r.learned.length, 0);
+  r = run([["Moonbeam(Sunflower)", 106000], ["Katie(Katie)", 104000]]);
+  check("one row, one person still holds for groups", r.rows.every((x) => x.status === "conflict"));
+  r = run([["Alt(Sunflower)", 900000]]);
+  eq("a declared group is not score-checked", r.rows[0].status, "saved");
+  check("coverage counts a group row", !r.missing.some((m) => m.discordId === "111"));
+
+  // /culvertping matches through the same groups.
+  const groups = groupIndex(ROSTER);
+  const names = ["katie", "kitty", "bloom", "rosa", "zed"];
+  eq("culvertping: group by bracket", matchScannedName("Alt(Sunflower)", names, (n) => n, groups).name, "katie");
+  eq("culvertping: group by logged-in name", matchScannedName("Moonbeam(Unknown)", names, (n) => n, groups).name, "katie");
+  eq("culvertping: no groups, no change", matchScannedName("Alt(Bloom)", names).name, "bloom");
+  check("a name two people declared decides nothing", groupIndex([
+    { _id: "1", characters: [{ name: "A1" }], group: { main: "Same", scoresTo: "A1" } },
+    { _id: "2", characters: [{ name: "B1" }], group: { main: "Same", scoresTo: "B1" } },
+  ]).get("same") === null);
+  // Declaring a group: scoresTo default, and names that belong to somebody else.
+  const plan = (input) => planGroup({ discordId: "111", roster: ROSTER, ...input });
+  eq("scoresTo defaults to the main when it is linked", plan({ main: "Kitty", alts: ["Moonbeam"] }).group?.scoresTo, "Kitty");
+  eq("...else to their first linked character", plan({ main: "Sunflower" }).group?.scoresTo, "Katie");
+  eq("scoresTo given is kept in its real spelling", plan({ main: "Sunflower", scoresTo: "kitty" }).group?.scoresTo, "Kitty");
+  check("scoresTo must be their own linked character", Boolean(plan({ main: "Sunflower", scoresTo: "Zed" }).error));
+  check("a duplicate name is refused", Boolean(plan({ main: "Sunflower", alts: ["sunflower"] }).error));
+  check("a name linked to someone else is refused", /linked to someone else/.test(plan({ main: "Sunflower", alts: ["Zed"] }).error ?? ""));
+  check("a name in someone else's group is refused", /someone else's group/.test(plan({ main: "Sunbeam" }).error ?? ""));
+  check("their own group's names are fine to reuse", Boolean(plan({ main: "Sunflower", alts: ["Moonbeam"] }).group));
+  check("no linked character is refused", /Ask a bee/.test(planGroup({ discordId: "999", main: "X", roster: ROSTER }).error ?? ""));
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
