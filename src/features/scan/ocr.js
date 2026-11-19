@@ -49,14 +49,14 @@ Rules:
 - Data Integrity: If a score is missing or obscured, default to 0.
 - Character Encoding: Preserve all special characters and symbols (ö, á, etc.) exactly as rendered.
 - Formatting: Return ONLY 'CharacterName Score' (space-separated), one per line. No headers, no intro text.
-- Ellipsis Truncation: If a character name contains an ellipsis (..), treat the ellipsis as the end of the name.
-- Strict Column Separation: Do not include any text that follows an ellipsis (e.g., if you see heatherhah..Dawn, the name is just heatherhah).
+- Name Cell: Copy the whole name cell exactly as shown, with no spaces. A logged-in member shows as two names, the character they are on and their main in brackets, e.g. Katie(bloom) or Caycia(Cay.. — keep both and the bracket.
+- Ellipsis Truncation: If the name cell ends in dots (..), keep the dots: they mark where the name was cut off. Nothing after them belongs to the name (e.g., if you see heatherhah..Dawn, the name is heatherhah..).
 - Integer Only Scores: Output the culvert score as a raw integer with no commas or symbols (e.g., 216993 instead of 216,993).
 
 Example output:
 PlayerName1 63100
-PlayerName2 62918
-PlayerName3 0`;
+AltName(MainName) 62918
+LongPlayerNa.. 0`;
 
 // /culvertping reads the same screenshot for names alone, so its prompt lives beside the one above
 // rather than inline in the command — the two share the ellipsis and column rules, and those are
@@ -66,15 +66,16 @@ const CULVERTPING_PROMPT = `Analyze this MapleStory guild list screenshot for th
 Your goal is to extract character names with 100% accuracy, specifically handling truncated names and column overlaps.
 
 Rules:
-- Truncation Logic: If a character name contains an ellipsis (..), stop the extraction immediately at the first dot. Do not include the dots or any text following them (e.g., 'heatherhah..Dawn' becomes 'heatherhah').
+- Name Cell: Copy the whole name cell exactly as shown, with no spaces. A logged-in member shows as two names, the character they are on and their main in brackets, e.g. 'Katie(bloom)' or 'Caycia(Cay..' — keep both and the bracket.
+- Truncation Logic: If the name cell ends in dots (..), keep the dots, since they mark where the name was cut off, and stop there (e.g., 'heatherhah..Dawn' becomes 'heatherhah..').
 - Column Isolation: Extract ONLY the first vertical column. Strictly ignore the Class (Adele, Night Walker, etc.), Level, and Score columns.
 - Encoding: Preserve all special characters (ö, á, etc.) exactly as they appear.
 - Formatting: Return ONLY the character names, one per line. No headers, introductory text, or blank lines.
 
 Example output:
 PlayerName1
-PlayerName2
-PlayerName3`;
+AltName(MainName)
+LongPlayerNa..`;
 
 /**
  * Fetch a Discord attachment and return it as base64, ready for readImage.

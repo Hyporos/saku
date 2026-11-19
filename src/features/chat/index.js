@@ -6,7 +6,7 @@ const chatSchema = require("../../schemas/chatSchema.js");
 const characterMetaSchema = require("../../schemas/characterMetaSchema.js");
 const { getResetDates, normalizeName, RANKINGS_URL } = require("../../domain/culvert/utils.js");
 const { loadScoreIndex, computeStats } = require("../../domain/culvert/chart.js");
-const { isTransient } = require("../../lib/transient.js");
+const { isTransient, creditsOut } = require("../../lib/transient.js");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
@@ -2162,7 +2162,7 @@ function trimToBoundary(text) {
 
 // Emote rationing, the channel-request detector and the :name: repair pass all moved out together:
 // none of them referenced anything else in this file.
-const { EMOTE_RE, HAS_EMOTE, EMOTE_GAP, emoteCooldown, CHANNEL_WORD, CHANNEL_ASK, repairEmotes } = require("./emotes.js");
+const { EMOTE_RE, HAS_EMOTE, EMOTE_GAP, emoteCooldown, asksForChannel, luckyChannel, repairEmotes } = require("./emotes.js");
 const modelCooldowns = new Map();
 
 function availableModels() {
@@ -2171,6 +2171,22 @@ function availableModels() {
 }
 
 // ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ //
+
+// Asked what model it runs on, Saku had nothing to go on and guessed. "claude-sonnet-5-5" reads as
+// "Claude Sonnet 5.5". Both notes sit in the volatile part of the prompt, which is also what the
+// number guard accepts as evidence, so "5.5" in the answer isn't flagged as invented.
+const modelLabel = (id) =>
+  String(id)
+    .replace(/^claude-/, "Claude ")
+    .replace(/-(\d+)-(\d+)$/, " $1.$2")
+    .replace(/-(\d+)$/, " $1")
+    .replace(/\b([a-z])/g, (c) => c.toUpperCase());
+const modelNote = () =>
+  `\n\nYOUR MODEL: you run on Anthropic's Claude models, tried in this order: ${MODEL_CHAIN.map(modelLabel).join(", then ")}. A busy or failing model hands the reply to the next one, and if the Anthropic credits run out, Google's Gemini answers instead. Asked which model you are or what you run on, answer from the line below, plainly, and don't guess.`;
+const servingNote = (modelId) =>
+  creditsOut()
+    ? `\nThis reply is being written by Google Gemini, because the Anthropic credits are out right now.`
+    : `\nThis reply is being written by ${modelLabel(modelId)} (${modelId}).`;
 
 // Runs one turn of Saku with per-user memory + role-scoped culvert tools. Returns the reply string.
 // onTurn, when given, receives everything this turn was built from once the reply is ready. The
@@ -2183,7 +2199,8 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   // to use. Instructing it to "only mention this if asked" was not enough twice over: it offered a
   // channel to someone asking if they were lucky, and to someone who was just swearing at it. A
   // number it was never given is a number it cannot hand out.
-  const asksChannel = CHANNEL_WORD.test(message) && (CHANNEL_ASK.test(message) || message.includes("?"));
+  const asksChannel = asksForChannel(message);
+  const roll = asksChannel ? luckyChannel(message, userId, dayjs().utc().format("YYYY-MM-DD")) : null;
 
   // All four are independent, so they go out together rather than costing four round-trips of latency.
   const [{ history, summary, facts }, mineDoc, { text: spoken, people }] = await Promise.all([
@@ -2213,7 +2230,7 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     // The full channel-luck rules ride along with the roll itself, so the 97% of turns that never
     // ask for a channel don't carry them. MAPLE_KNOWLEDGE keeps the one-line "never kill the bit".
     (asksChannel
-      ? `They are asking which channel to use. CHANNEL LUCK is the guild superstition and you are fully in on it: today's rolled channel is ${1 + Math.floor(Math.random() * 40)}. Give that number like it's gospel, no tool call, and it holds no matter who it's for ("what channel will drop TC for james" gets the roll, named for him). NEVER answer by explaining that channels don't affect drop rates, that the fight is instanced, or that it's RNG: no disclaimers, no "but really". Roll, name the channel, wish them luck. `
+      ? `They are asking which channel to use. CHANNEL LUCK is the guild superstition and you are fully in on it: today's rolled channel${roll.topic ? ` for "${roll.topic}"` : ""} is ${roll.channel}. This roll is the guild's luck ritual and it is real: it is not a made up stat, so the rules about inventing numbers don't touch it, and it stays the same all day for the same thing. If earlier in this conversation you refused a channel, said you'd been making numbers up, or said you had no roll loaded, that was wrong; drop it and give this one. Give that number like it's gospel, no tool call, and it holds no matter who it's for ("what channel will drop TC for james" gets the roll, named for him). NEVER answer by explaining that channels don't affect drop rates, that the fight is instanced, or that it's RNG: no disclaimers, no "but really". Roll, name the channel, wish them luck. `
       : "") +
     `Anything in your saved memory from earlier conversations may be out of date; re-check numbers with a tool.` +
     (summary
@@ -2267,9 +2284,9 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
   // built on top of it rather than into it: numbers members claim in chat must not be able to verify
   // a reply, while the log's speaker names still count for the name guard further down.
   const stableSystem = `${buildSystem({ bee, priv: isPrivate, userId })}${server.stable}`;
-  const volatileSystem = `${caller}${server.volatile}${fightBlock}${mentionBlock}${imageBlock(images)}`;
+  const volatileSystem = `${caller}${modelNote()}${server.volatile}${fightBlock}${mentionBlock}${imageBlock(images)}`;
   const instructionHead = `${stableSystem}\n\n${volatileSystem}`;
-  const system = [
+  const systemBlocks = [
     { type: "text", text: stableSystem, cache_control: { type: "ephemeral" } },
     { type: "text", text: `${volatileSystem}${channelBlock}` },
   ];
@@ -2284,8 +2301,10 @@ async function askSaku({ userId, username, message, isBee: bee = false, isPrivat
     ? [{ type: "text", text: outgoing }, ...images.map((img) => ({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.data } }))]
     : outgoing;
 
-  // One full turn (first request + tool loop) against a given model id.
+  // One full turn (first request + tool loop) against a given model id. Which model is writing goes
+  // in the uncached block, so a fallback costs no cache and Saku can say truthfully what it's on.
   async function run(modelId) {
+    const system = [systemBlocks[0], { type: "text", text: `${systemBlocks[1].text}${servingNote(modelId)}` }];
     const messages = [...history, { role: "user", content: firstTurn }];
     // Every send is a separate billed request, so count them all, not just one per turn. The
     // automatic cache breakpoint rides the end of the conversation, so each tool round reads the

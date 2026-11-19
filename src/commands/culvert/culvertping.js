@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const culvertSchema = require("../../schemas/culvertSchema.js");
 const { nameMatch } = require("../../domain/culvert/utils.js");
-const { matchScannedName, loadScanRoster } = require("../../domain/culvert/scanMatch.js");
+const { matchScannedName, displayScannedName, loadScanRoster } = require("../../domain/culvert/scanMatch.js");
 const { readImage, fetchAttachment, CULVERTPING_PROMPT } = require("../../features/scan/ocr.js");
 require("dotenv").config();
 
@@ -61,7 +61,7 @@ module.exports = {
       // Matching lives in domain/culvert/scanMatch.js, shared with /scan and the webapp's scanner
       // route. This command used to have its own copy that skipped the confusable-letter folding, so
       // a name /scan matched happily came back "could not be found" here.
-      const { name: matchedName } = matchScannedName(checkedName, linkedNames);
+      const { name: matchedName } = matchScannedName(checkedName, linkedNames, applyException);
 
       const user = matchedName
         ? await culvertSchema.findOne(
@@ -83,7 +83,7 @@ module.exports = {
         }
       } else {
         // Character not found in database
-        notFoundNames.push(checkedName);
+        notFoundNames.push(displayScannedName(checkedName));
       }
     }
 

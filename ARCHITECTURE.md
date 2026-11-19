@@ -198,6 +198,15 @@ A differential run over the real roster (994 realistic OCR inputs: clean reads, 
 o/0 swaps, case drift, junk) matched the old behaviour on 991 and differed only on those three, in
 each case by correctly returning "no match" where the old code invented one.
 
+**Bracketed names (guild list layout from 2026-11).** A logged-in member's cell reads
+`LoggedIn(Main)`, truncated anywhere (`Caycia(Cay..`, or `Beezle(Bee` when OCR drops the dots). Both
+scan prompts copy the whole cell, brackets and dots included. `matchScannedName` splits it
+(`splitScannedName`), tries the main in brackets first (a missing `)` counts as truncated), uses the
+logged-in name to settle a tie between short-prefix candidates, and falls back to the logged-in name
+when the main matches nobody. Exceptions apply to the whole cell and to each half, so an exception
+stored for a plain character name still fires inside brackets. `/culvertping` lists an unmatched cell
+as `Beezle (Bee..)`.
+
 ---
 
 ## Name normalizing — one function, two callers

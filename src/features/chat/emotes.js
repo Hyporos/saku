@@ -22,6 +22,30 @@ const CHANNEL_WORD = /\bch(?:annel)?s?\b/i;
 const CHANNEL_ASK =
   /\b(what|whats|which|good|best|where|try|go|going|use|using|lucky|luck|recommend|suggest|should|give|gimme|can|could|would|tell|pick|roll|need|want|any|real|another|other|different|next)\b/i;
 
+// "ch for et" is the shape most requests actually take: no request word, no question mark. So "for",
+// "to" and "on" count, and so does any short message about a channel. A message that already names a
+// channel number ("got a drop on ch 12 for once") is a statement, unless it's a question.
+const NAMES_A_CHANNEL = /\bch(?:annel)?\.?\s*\d{1,2}\b/i;
+function asksForChannel(message) {
+  const text = String(message ?? "");
+  if (!CHANNEL_WORD.test(text)) return false;
+  if (text.includes("?")) return true;
+  if (NAMES_A_CHANNEL.test(text)) return false;
+  return CHANNEL_ASK.test(text) || /\b(for|to|on)\b/i.test(text) || text.trim().split(/\s+/).length <= 3;
+}
+
+// Today's lucky channel for one thing. The same thing gets the same channel all day, so asking twice
+// can't catch Saku contradicting itself, which is what made it start calling its own rolls made up.
+// The thing is whatever follows "for" ("ch for et" -> "et"), else the asker.
+function luckyChannel(message, fallbackKey, date) {
+  const topic = String(message ?? "").match(/\bfor\s+(?:my\s+|a\s+|an\s+|the\s+)?([^?.!,]{1,30})/i)?.[1]?.replace(/["`\n]/g, "").trim().toLowerCase();
+  // Keyed on the first word, so "ch for et" and "ch for et pls" agree.
+  const key = `${date}|${topic?.split(/\s+/)[0] || fallbackKey}`;
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
+  return { channel: 1 + ((hash >>> 0) % 40), topic: topic || null };
+}
+
 // Discord renders a custom emote ONLY as <:name:id>. The model writes two near misses: the bare
 // :name: that people type, and a half-formed <:name:> with the id dropped. Both ship as literal text.
 // Repair whichever resolve to a real guild emote and DELETE the ones that don't, including names the
@@ -98,5 +122,7 @@ module.exports = {
   emoteCooldown,
   CHANNEL_WORD,
   CHANNEL_ASK,
+  asksForChannel,
+  luckyChannel,
   repairEmotes,
 };

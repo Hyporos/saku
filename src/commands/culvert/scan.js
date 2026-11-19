@@ -93,7 +93,7 @@ module.exports = {
     for (const validCharacter of validScores) {
       // Matching lives in domain/culvert/scanMatch.js, shared with /culvertping and the webapp's
       // scanner route, so a screenshot name resolves to the same character whichever one reads it.
-      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames);
+      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames, applyException);
 
       const user = matchedName
         ? await culvertSchema.findOne(

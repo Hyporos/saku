@@ -67,8 +67,9 @@ router.post("/admin/scanner/scan", async (req, res) => {
 
     // Parse entries. Shared with /scan so both read a screenshot the same way; NaNScores and
     // zeroScores hold the same objects as validScores, so renaming one renames all three.
+    const applyException = exceptionMapper(exceptions);
     const { scores: validScores, unreadable: NaNScores, zeroed: zeroScores } =
-      parseScanEntries(entryArray, exceptionMapper(exceptions));
+      parseScanEntries(entryArray, applyException);
 
     const notFoundChars = [];
     const absentChars = [];
@@ -82,7 +83,7 @@ router.post("/admin/scanner/scan", async (req, res) => {
     // Match against DB characters. The matching itself lives in domain/culvert/scanMatch.js so the
     // /scan command and /culvertping resolve a screenshot name exactly the same way this does.
     for (const validCharacter of validScores) {
-      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames);
+      const { name: matchedName } = matchScannedName(validCharacter.name, linkedNames, applyException);
 
       // Resolve from the in-memory map rather than a findOne per character.
       const character = matchedName ? charDetailMap.get(matchedName) : undefined;

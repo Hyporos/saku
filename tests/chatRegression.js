@@ -8,6 +8,7 @@ const weekSchema = require("../src/schemas/weekSchema.js");
 const characterMetaSchema = require("../src/schemas/characterMetaSchema.js");
 const chatSchema = require("../src/schemas/chatSchema.js");
 const { askSaku } = require("../src/features/chat/index.js");
+const { MODEL_CHAIN } = require("../src/features/chat/model.js");
 const { getResetDates } = require("../src/domain/culvert/utils.js");
 
 dayjs.extend(utc);
@@ -21,6 +22,8 @@ dayjs.extend(timezone);
 //
 // Run:  node tests/chatRegression.js            (fast cases)
 //       node tests/chatRegression.js --slow     (also the ones that hit the network)
+//
+// Each model:  SAKU_CHAT_MODEL=claude-sonnet-5-5 node tests/chatRegression.js   (that model goes first)
 //
 // It talks to the real API and the real database, so it costs a few cents and reads live data.
 // Expected values are computed from the database at run time rather than hardcoded, so the suite
@@ -163,6 +166,22 @@ async function buildCases() {
       ask: "guess what rally will score four weeks from now",
       check: all(has(/\d/), lacks(/^(?=[^.]*\bcan'?t\b)[^.]*\b(predict|know)\b[^.]*\.$/i, "a bare refusal with no attempt")),
     },
+    {
+      name: "channel luck gives a channel",
+      guards: '"ch for et" answered with "Luck\'s whatever you make of it today", and refusing rolls as made up',
+      ask: "ch for et",
+      repeat: 3,
+      check: all(has(/\b(?:ch(?:annel)?\.?\s*)?([1-9]|[1-3]\d|40)\b/i), lacks(/whatever you make of it|made.?up|no roll/i, "refused the roll")),
+    },
+    {
+      name: "knows its own model",
+      guards: "guessing which model it runs on",
+      ask: "what ai model are you running on right now?",
+      check: (reply) => {
+        const family = MODEL_CHAIN[0].match(/opus|sonnet|haiku|fable/i)?.[0];
+        return family && !new RegExp(family, "i").test(reply) ? `expected it to name ${MODEL_CHAIN[0]}` : null;
+      },
+    },
   ];
 
   if (SLOW) {
@@ -188,7 +207,7 @@ async function buildCases() {
 (async () => {
   await mongoose.connect(process.env.MONGODB_URI ?? process.env.MONGO_URI);
   const { cases, context } = await buildCases();
-  console.log(`roster ${context.roster} characters | last week ${context.lastReset} | top ${context.top} | adeles ${context.adeles}\n`);
+  console.log(`model ${MODEL_CHAIN[0]} first | roster ${context.roster} characters | last week ${context.lastReset} | top ${context.top} | adeles ${context.adeles}\n`);
 
   let failed = 0;
   for (const c of cases) {
