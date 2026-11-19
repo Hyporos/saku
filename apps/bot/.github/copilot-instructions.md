@@ -140,7 +140,6 @@ These IDs are hardcoded and must remain consistent:
 |---|---|
 | Guest role | `720006084252663868` |
 | Bee (staff) role | `720001044746076181` |
-| Ursus ping role | `835222431396397058` |
 | Saku channel | `719788426022617142` |
 | Announcements channel | `720002714683179070` |
 | Reminders/scan channel | `1090002887410729090` |
@@ -148,7 +147,7 @@ These IDs are hardcoded and must remain consistent:
 ## Cron / Scheduling
 
 - Jobs are declared in the `JOB_DEFINITIONS` table in `scheduling/registry.js`, not created ad hoc.
-  Repeating times for the same job are built from a helper (see `ursusJob`, `culvertReminder`) rather
+  Repeating times for the same job are built from a helper (see `culvertReminder`) rather
   than written out per firing.
 - `createScheduledJob(client, channelId, cronExpression, messageFn)` lives in `scheduling/health.js`.
 - `cronExpression` uses standard cron syntax (5 fields).

@@ -56,7 +56,7 @@ type ScheduledTask = {
   id: string;
   name: string;
   channelName: string;
-  category: "ursus" | "reminder" | "mp";
+  category: "reminder" | "mp";
   description: string;
   baseHour: number;
   days: number[];

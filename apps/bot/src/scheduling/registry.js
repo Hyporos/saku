@@ -51,26 +51,9 @@ const announcementsChannel = CHANNELS.ANNOUNCEMENTS;
 
 // Structured job registry. baseHour is the intended EST hour during Standard Time;
 // days is an array of day-of-week integers (0 = Sun … 6 = Sat), empty = every day.
-// The 2x Ursus windows and the culvert reminders each ran to a full definition per firing time, six
-// blocks that differed only in an hour and a day. Built from a table instead, so a change to the
-// wording is one edit rather than four, and adding a time is one line.
-
-const URSUS_WINDOW_HOURS = 4;
-const ursusJob = (id, name, baseHour) => ({
-  id,
-  name,
-  channelId: sakuChannel,
-  channelName: "saku",
-  baseHour,
-  days: [], // every day
-  category: "ursus",
-  description: `Announces 2× Ursus is active for the next ${URSUS_WINDOW_HOURS} hours.`,
-  getMessage: (offset) => () => {
-    const now = dayjs().tz("America/New_York").hour(baseHour + offset).minute(0).second(0);
-    const end = now.add(URSUS_WINDOW_HOURS, "hours");
-    return `<@&${ROLES.URSUS}> IT IS 2X URSUS FOR THE NEXT FOUR HOURS! (<t:${now.unix()}:t> to <t:${end.unix()}:t> your local time)`;
-  },
-});
+// The culvert reminders ran to a full definition per firing time, blocks that differed only in an hour
+// and a day. Built from a table instead, so a change to the wording is one edit, and adding a time is
+// one line.
 
 const CULVERT_REMINDER = "Reminder to complete Culvert and Flag Race!";
 const culvertReminder = (id, name, baseHour, day, message = CULVERT_REMINDER) => ({
@@ -91,8 +74,6 @@ const SUNDAY_REMINDER_IMAGE =
   "https://media.discordapp.net/attachments/1147319860481765500/1435854458381668445/image.png?ex=690e23eb&is=690cd26b&hm=67db9a7562919556cccd537f67c07d353ac7658ff7e2ba2f5e42cd1818efa3ca&=&format=webp&quality=lossless";
 
 const JOB_DEFINITIONS = [
-  ursusJob("ursus-afternoon", "Ursus Afternoon Reminder", 13),
-  ursusJob("ursus-night", "Ursus Night Reminder", 20),
   culvertReminder("culvert-flag-mon-am", "Culvert & Flag Reminder (Mon AM)", 8, 1),
   culvertReminder("culvert-flag-mon-pm", "Culvert & Flag Reminder (Mon PM)", 20, 1),
   culvertReminder("culvert-flag-wed-am", "Culvert & Flag Reminder (Wed AM)", 8, 3),
